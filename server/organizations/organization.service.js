@@ -17,14 +17,14 @@ const buildQuery = (filters = {}) => {
 
 const populateRefs = (query) =>
     query
-        .populate('ownerId', '_id name email')
+        .populate('ownerId', '_id name email phone whatsapp_no')
         .populate('industryTypeIds', '_id name');
 
 export const checkOrganizationName = async (name, excludeId = null) => {
     try {
         const query = { org_name: { $regex: new RegExp(`^${name}$`, 'i') }, deletedAt: null };
         if (excludeId) query._id = { $ne: excludeId };
-        return await Organization.findOne(query).select('_id org_name');
+        return await Organization.findOne(query).select('_id org_name').lean();
     } catch (error) {
         throw error;
     }
@@ -46,14 +46,12 @@ export const createOrganization = async (data = {}) => {
             org_country: data.org_country || null,
             org_zipcode: data.org_zipcode || null,
             org_website: data.org_website || null,
-            org_whatsapp: data.org_whatsapp || null,
             hr_manager_email: data.hr_manager_email || null,
             hr_manager_no: data.hr_manager_no || null,
             industry: data.industry || null,
             industryTypeIds: Array.isArray(data.industryTypeIds) ? data.industryTypeIds.filter(id => ObjectId.isValid(id)) : [],
             course_ids: Array.isArray(data.course_ids) ? data.course_ids.filter(id => ObjectId.isValid(id)) : [],
             emp_count: data.emp_count || null,
-            whatsapp_noti: data.whatsapp_noti ?? false,
             email_digest: data.email_digest ?? false,
             credit_alert: data.credit_alert ?? false,
             zoom_reminder: data.zoom_reminder ?? false,
@@ -69,7 +67,7 @@ export const editOrganization = async (editId) => {
     try {
         return await populateRefs(
             Organization.findOne({ _id: editId, deletedAt: null })
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -80,9 +78,9 @@ export const updateOrganization = async (updateId, data) => {
         const fields = [
             'ownerId', 'org_name', 'org_desc', 'org_logo', 'org_email', 'org_phone',
             'org_address1', 'org_address2', 'org_city', 'org_state', 'org_country', 'org_zipcode',
-            'org_website', 'org_whatsapp', 'hr_manager_email', 'hr_manager_no',
+            'org_website', 'hr_manager_email', 'hr_manager_no',
             'industry', 'industryTypeIds', 'course_ids', 'emp_count',
-            'whatsapp_noti', 'email_digest', 'credit_alert', 'zoom_reminder', 'cert_issue_alert',
+            'email_digest', 'credit_alert', 'zoom_reminder', 'cert_issue_alert',
             'status'
         ];
         const updateFields = {};
@@ -101,7 +99,7 @@ export const updateOrganization = async (updateId, data) => {
         if (Object.keys(updateFields).length === 0) {
             return await populateRefs(
                 Organization.findOne({ _id: updateId, deletedAt: null })
-            );
+            ).lean();
         }
 
         updateFields.updatedAt = new Date();
@@ -110,7 +108,7 @@ export const updateOrganization = async (updateId, data) => {
             { _id: updateId, deletedAt: null },
             { $set: updateFields },
             { returnDocument: 'before', runValidators: true }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -121,7 +119,7 @@ export const listOrganization = async (filters = {}) => {
         const query = buildQuery(filters);
         return await populateRefs(
             Organization.find(query).sort({ createdAt: -1 })
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -135,7 +133,7 @@ export const listOrganizationPagination = async (page, limit, filters = {}) => {
                 .sort({ createdAt: -1 })
                 .skip((page - 1) * limit)
                 .limit(limit)
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }

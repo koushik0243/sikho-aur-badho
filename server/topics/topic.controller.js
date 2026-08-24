@@ -56,12 +56,32 @@ const topicUpload = multer({
     { name: 'lesson_video', maxCount: 1 }
 ]);
 
+// Lesson videos have their own, tighter cap than the general 100 MB multer limit above
+// (which still applies to assignment_file/lesson_image). The client already blocks
+// oversized selections before upload (AddCourseBuilder.js), but that's just UX — the
+// request could still reach this endpoint directly, so it's re-checked here too.
+const MAX_LESSON_VIDEO_BYTES = 24 * 1024 * 1024;
+
+// multer has already written the file to disk by the time fileFilter/limits can act on
+// individual fields, so an oversized lesson_video is caught here instead — delete it
+// immediately and fail the request rather than silently saving a video the client would
+// have rejected.
+function rejectIfLessonVideoTooLarge(files) {
+    const file = files.lesson_video?.[0];
+    if (!file || file.size <= MAX_LESSON_VIDEO_BYTES) return;
+    fs.unlink(file.path, () => {});
+    const err = new Error('Lesson video exceeds the 24 MB size limit.');
+    err.statusCode = 400;
+    throw err;
+}
+
 const createTopic = async (req, res, next) => {
     topicUpload(req, res, async (err) => {
         if (err) return next(err);
         try {
             const body = { ...req.body };
             const files = req.files || {};
+            rejectIfLessonVideoTooLarge(files);
             if (files.assignment_file?.[0]) {
                 body.attachments = [{ name: files.assignment_file[0].originalname, url: `/uploads/assignments/${files.assignment_file[0].filename}` }];
             }
@@ -94,6 +114,7 @@ const updateTopic = async (req, res, next) => {
         try {
             const body = { ...req.body };
             const files = req.files || {};
+            rejectIfLessonVideoTooLarge(files);
             if (files.lesson_image?.[0]) {
                 body.imageUrl = `/uploads/lesson-images/${files.lesson_image[0].filename}`;
             }
@@ -124,8 +145,10 @@ const listTopicPagination = async (req, res, next) => {
         const limit = parseInt(req.query.limit) || 10;
         const { status, courseId, chapterId } = req.query;
 
-        const topics = await TopicHelper.listTopicPagination(page, limit, { status, courseId, chapterId });
-        const total = await TopicHelper.getTopicCount({ status, courseId, chapterId });
+        const [topics, total] = await Promise.all([
+            TopicHelper.listTopicPagination(page, limit, { status, courseId, chapterId }),
+            TopicHelper.getTopicCount({ status, courseId, chapterId })
+        ]);
         res.status(200).json({
             status: 200,
             message: "Successfully fetched.",

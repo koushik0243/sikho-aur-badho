@@ -50,7 +50,7 @@ const courseUpload = upload.fields([
 const parseBodyWithFiles = (req) => {
     const body = { ...req.body };
     // Parse JSON-stringified arrays sent via FormData
-    ['subCatIds', 'tagIds'].forEach(key => {
+    ['subCatIds', 'tagIds', 'aptitudeSelectedQuestionIds'].forEach(key => {
         if (typeof body[key] === 'string') {
             try { body[key] = JSON.parse(body[key]); } catch { body[key] = [body[key]]; }
         }
@@ -58,6 +58,7 @@ const parseBodyWithFiles = (req) => {
     // Boolean coercion from FormData strings
     if (body.enable_review !== undefined) body.enable_review = body.enable_review === 'true' || body.enable_review === true;
     if (body.qna_enabled !== undefined) body.qna_enabled = body.qna_enabled === 'true' || body.qna_enabled === true;
+    if (body.aptitudeEnabled !== undefined) body.aptitudeEnabled = body.aptitudeEnabled === 'true' || body.aptitudeEnabled === true;
     // Number coercion
     if (body.max_students !== undefined) body.max_students = Number(body.max_students) || 0;
     // Attach uploaded file paths
@@ -132,8 +133,10 @@ const listCoursePagination = async (req, res, next) => {
         const limit = parseInt(req.query.limit) || 10;
         const { status, catId, level, createdBy } = req.query;
 
-        const courses = await CourseHelper.listCoursePagination(page, limit, { status, catId, level, createdBy });
-        const total = await CourseHelper.getCourseCount({ status, catId, level, createdBy });
+        const [courses, total] = await Promise.all([
+            CourseHelper.listCoursePagination(page, limit, { status, catId, level, createdBy }),
+            CourseHelper.getCourseCount({ status, catId, level, createdBy })
+        ]);
         res.status(200).json({
             status: 200,
             message: "Successfully fetched.",

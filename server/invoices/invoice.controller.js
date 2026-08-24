@@ -46,8 +46,10 @@ const listInvoicePagination = async (req, res, next) => {
         const limit = parseInt(req.query.limit) || 10;
         const { status, payment_status, org_id, order_id } = req.query;
 
-        const invoices = await InvoiceHelper.listInvoicePagination(page, limit, { status, payment_status, org_id, order_id });
-        const total    = await InvoiceHelper.getInvoiceCount({ status, payment_status, org_id, order_id });
+        const [invoices, total] = await Promise.all([
+            InvoiceHelper.listInvoicePagination(page, limit, { status, payment_status, org_id, order_id }),
+            InvoiceHelper.getInvoiceCount({ status, payment_status, org_id, order_id }),
+        ]);
         res.status(200).json({
             status: 200,
             message: "Successfully fetched.",

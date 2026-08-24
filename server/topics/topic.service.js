@@ -41,7 +41,7 @@ export const createTopic = async (data) => {
 
 export const editTopic = async (editId) => {
     try {
-        return await Topic.findOne({ _id: editId, deletedAt: null });
+        return await Topic.findOne({ _id: editId, deletedAt: null }).lean();
     } catch (error) {
         throw error;
     }
@@ -60,7 +60,7 @@ export const updateTopic = async (updateId, data) => {
         }
 
         if (Object.keys(updateFields).length === 0) {
-            return await Topic.findOne({ _id: updateId, deletedAt: null });
+            return await Topic.findOne({ _id: updateId, deletedAt: null }).lean();
         }
 
         updateFields.updatedAt = new Date();
@@ -69,7 +69,7 @@ export const updateTopic = async (updateId, data) => {
             { _id: updateId, deletedAt: null },
             { $set: updateFields },
             { returnDocument: 'before', runValidators: true }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -78,7 +78,7 @@ export const updateTopic = async (updateId, data) => {
 export const listTopic = async (filters = {}) => {
     try {
         const query = buildQuery(filters);
-        return await Topic.find(query).sort({ order: 1, title: 1 });
+        return await Topic.find(query).sort({ order: 1, title: 1 }).lean();
     } catch (error) {
         throw error;
     }
@@ -90,7 +90,8 @@ export const listTopicPagination = async (page, limit, filters = {}) => {
         return await Topic.find(query)
             .sort({ order: 1, title: 1 })
             .skip((page - 1) * limit)
-            .limit(limit);
+            .limit(limit)
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -111,7 +112,7 @@ export const deleteTopic = async (delId) => {
             { _id: delId, deletedAt: null },
             { $set: { deletedAt: new Date(), status: 'inactive' } },
             { returnDocument: 'before' }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -126,7 +127,7 @@ export const checkTopicTitle = async (title, courseId, chapterId, excludeId = nu
             deletedAt: null
         };
         if (excludeId) query._id = { $ne: excludeId };
-        const existing = await Topic.findOne(query);
+        const existing = await Topic.findOne(query).lean();
         return { isDuplicate: !!existing };
     } catch (error) {
         throw error;

@@ -23,7 +23,7 @@ export const createUser = async (newUser) => {
 
 export const editUser = async (userId) => {
     try {
-        const user = await User.findById(userId).populate('user_role', 'name');
+        const user = await User.findById(userId).select('-password').populate('user_role', 'name').lean();
         return {
             _id: user._id,
             user_type: user.user_type,
@@ -64,14 +64,16 @@ export const editUser = async (userId) => {
             emergency_contact_name: user.emergency_contact_name,
             emergency_contact_phone: user.emergency_contact_phone,
             // Notification Preferences
-            whatsapp_noti: user.whatsapp_noti,
             email_welcome_noti: user.email_welcome_noti,
             course_assign_noti: user.course_assign_noti,
             weekly_progress_noti: user.weekly_progress_noti,
+            live_session_noti: user.live_session_noti,
+            language_change_noti: user.language_change_noti,
             // Other
             other_info: user.other_info,
             isVerified: user.isVerified,
-            status: user.status
+            status: user.status,
+            createdAt: user.createdAt
         };
     } catch (error) {
         throw error;
@@ -87,7 +89,8 @@ export const updateUser = async (updateId, updateData) => {
             'address1', 'address2', 'city', 'state', 'country', 'zipcode',
             'linkedin', 'twitter', 'facebook', 'instagram', 'youtube',
             'emergency_contact_name', 'emergency_contact_phone',
-            'whatsapp_noti', 'email_welcome_noti', 'course_assign_noti', 'weekly_progress_noti',
+            'email_welcome_noti', 'course_assign_noti', 'weekly_progress_noti',
+            'live_session_noti', 'language_change_noti',
             'other_info', 'otp', 'otpExpires', 'resetPasswordToken', 'resetPasswordExpires', 'isVerified', 'status'
         ];
         const updateFields = {};
@@ -102,7 +105,7 @@ export const updateUser = async (updateId, updateData) => {
         }
 
         if (Object.keys(updateFields).length === 0) {
-            return await User.findById(updateId);
+            return await User.findById(updateId).select('-password').lean();
         }
 
         updateFields.updatedAt = new Date();
@@ -111,7 +114,7 @@ export const updateUser = async (updateId, updateData) => {
             new ObjectId(updateId),
             { $set: updateFields },
             { returnDocument: 'before', runValidators: true }
-        );
+        ).select('-password').lean();
     } catch (error) {
         throw error;
     }
@@ -130,10 +133,37 @@ export const listUser = async (filters = {}) => {
             query.orgRole = filters.orgRole;
         }
         const result = await User.find(query)
+            .select('-password')
             .populate('orgId', 'org_name')
             .populate('managerId', 'name')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .lean();
         return result;
+    } catch (error) {
+        throw error;
+    }
+};
+
+/* Check whether an email and/or whatsapp_no is already registered to another
+   (non-deleted) account — used by add-user forms across all 3 portals to block
+   duplicate signups before submitting. excludeUserId lets an edit form check
+   without tripping over the record's own current values. */
+export const checkUserExists = async ({ email, whatsapp_no, excludeUserId }) => {
+    try {
+        const orConditions = [];
+        if (email) orConditions.push({ email });
+        if (whatsapp_no) orConditions.push({ whatsapp_no });
+        if (orConditions.length === 0) return { emailExists: false, whatsappExists: false };
+
+        const query = { deletedAt: null, $or: orConditions };
+        if (excludeUserId && ObjectId.isValid(excludeUserId)) {
+            query._id = { $ne: new ObjectId(excludeUserId) };
+        }
+
+        const matches = await User.find(query).select('email whatsapp_no').lean();
+        const emailExists    = !!email && matches.some(u => u.email === email);
+        const whatsappExists = !!whatsapp_no && matches.some(u => u.whatsapp_no === whatsapp_no);
+        return { emailExists, whatsappExists };
     } catch (error) {
         throw error;
     }
@@ -144,6 +174,8 @@ export const listUserPagination = async (page, limit, filters = {}) => {
     try {
         const query = { deletedAt: null };
         if (filters.user_type) query.user_type = filters.user_type;
+        if (filters.orgId && ObjectId.isValid(filters.orgId)) query.orgId = new ObjectId(filters.orgId);
+        if (filters.orgRole) query.orgRole = filters.orgRole;
         if (filters.search) {
             query.$or = [
                 { name:  { $regex: filters.search, $options: 'i' } },
@@ -151,12 +183,37 @@ export const listUserPagination = async (page, limit, filters = {}) => {
             ];
         }
         return await User.find(query)
+            .select('-password')
             .populate('orgId', 'org_name')
             .populate('managerId', 'name')
             .populate('user_role', 'name display_name')
             .sort({ createdAt: -1 })
             .skip((page - 1) * limit)
-            .limit(limit);
+            .limit(limit)
+            .lean();
+    } catch (error) {
+        throw error;
+    }
+};
+
+/* List all users matching the given filters, unpaginated (for export) */
+export const listUserForExport = async (filters = {}) => {
+    try {
+        const query = { deletedAt: null };
+        if (filters.user_type) query.user_type = filters.user_type;
+        if (filters.search) {
+            query.$or = [
+                { name:  { $regex: filters.search, $options: 'i' } },
+                { email: { $regex: filters.search, $options: 'i' } },
+            ];
+        }
+        return await User.find(query)
+            .select('-password')
+            .populate('orgId', 'org_name')
+            .populate('managerId', 'name')
+            .populate('user_role', 'name display_name')
+            .sort({ createdAt: -1 })
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -169,7 +226,7 @@ export const deleteUser = async (delId) => {
             delId,
             { $set: { deletedAt: new Date(), status: 'deleted' } },
             { returnDocument: 'before' }
-        );
+        ).select('-password').lean();
     } catch (error) {
         throw error;
     }
@@ -185,13 +242,30 @@ export const registerUser = async (newUser) => {
     }
 };
 
+// A user whose account status isn't "active" (inactive/suspended/deleted) must
+// never receive a login token, even with correct credentials — checked right
+// after the password match succeeds, in every login path below.
+const STATUS_LOGIN_MESSAGES = {
+    inactive: 'Your account is inactive. Please contact your administrator.',
+    suspended: 'Your account has been suspended. Please contact your administrator.',
+    deleted: 'This account no longer exists. Please contact your administrator.',
+};
+
+function assertActiveStatus(status) {
+    if (!status || status === 'active') return;
+    const err = new Error(STATUS_LOGIN_MESSAGES[status] || 'Your account is not active. Please contact your administrator.');
+    err.statusCode = 400;
+    throw err;
+}
+
 /* Login user against email and password */
 export const loginUser = async (userData) => {
     try {
-        const user = await User.findOne({ email: userData.email, deletedAt: null });
+        const user = await User.findOne({ email: userData.email, deletedAt: null }).lean();
         if (user && user._id) {
             const matchPassword = await bcrypt.compare(userData.password, user.password);
             if (matchPassword) {
+                assertActiveStatus(user.status);
                 const token = generateJwtToken(user);
                 return {
                     _id: user._id,
@@ -218,12 +292,13 @@ export const adminLoginUser = async (userData) => {
         const identifier = userData.identifier || userData.email || userData.phone;
         const user = await User.findOne({
             $or: [{ email: identifier }, { phone: identifier }],
-            user_type: { $in: ['superadmin', 'creator', 'organization'] },
+            user_type: { $in: ['superadmin', 'creator', 'organization', 'employee'] },
             deletedAt: null,
-        });
+        }).lean();
         if (user && user._id) {
             const matchPassword = await bcrypt.compare(userData.password, user.password);
             if (matchPassword) {
+                assertActiveStatus(user.status);
                 const token = generateJwtToken(user);
                 return {
                     _id: user._id,
@@ -255,7 +330,7 @@ export const gmLoginUser = async (userData) => {
             throw new Error('Email is required');
         }
 
-        let user = await User.findOne({ email });
+        let user = await User.findOne({ email }).lean();
 
         if (!user) {
             const fullName = userData.name?.trim() || userData.full_name?.trim() || email.split('@')[0];
@@ -299,7 +374,7 @@ export const adminGoogleLoginUser = async (credential) => {
         }
 
         // Only allow existing admin users — never auto-create admins
-        const user = await User.findOne({ email: email.trim().toLowerCase(), user_type: 'superadmin', deletedAt: null });
+        const user = await User.findOne({ email: email.trim().toLowerCase(), user_type: 'superadmin', deletedAt: null }).lean();
         if (!user) {
             throw new Error('No admin account found for this Google account. Please contact your administrator.');
         }
@@ -327,7 +402,7 @@ export const adminGoogleLoginUser = async (credential) => {
 
 export const detailsUser = async (id_token, type) => {
     if (type === "id") {
-        const user = await User.findById(id_token);
+        const user = await User.findById(id_token).select('name email phone user_type status').lean();
         return {
             _id: user._id,
             name: user.name,
@@ -340,7 +415,7 @@ export const detailsUser = async (id_token, type) => {
 
     if (type === "token") {
         const decoded = jwt.verify(id_token, process.env.JWT_SECRET);
-        const user = await User.findById(decoded._id);
+        const user = await User.findById(decoded._id).select('name email phone user_type status').lean();
         return {
             _id: user._id,
             name: user.name,
@@ -390,10 +465,10 @@ export const verifyUserOtp = async (newUser) => {
     }
 };
 
-const generatePasswordHash = (password) => {
+const generatePasswordHash = async (password) => {
     const TEN = 10;
-    const salt = bcrypt.genSaltSync(TEN);
-    return bcrypt.hashSync(password, salt);
+    const salt = await bcrypt.genSalt(TEN);
+    return await bcrypt.hash(password, salt);
 };
 
 const generateJwtToken = (user) => {

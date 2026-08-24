@@ -25,16 +25,7 @@ export default function ResetLinkSentForm() {
   return (
     <div className={styles.formBox} style={{ textAlign: 'center' }}>
       {/* Brand Logo */}
-      <div className={styles.brandLogo}>
-        <span>si</span>
-        <span className={styles.logoKh}>
-          <span className={styles.logoKhDot} />
-          kh
-        </span>
-        <span>oaur</span>
-        <span>badh</span>
-        <span className={styles.logoOEnd}>o</span>
-      </div>
+      <img src="/logo.png" alt="sikhoaurbadho" className={styles.logoImg} />
       <p className={styles.tagline}>Sign in to continue</p>
 
       {/* Success circle */}
@@ -43,12 +34,11 @@ export default function ResetLinkSentForm() {
       </div>
 
       <h2 className={styles.formTitle} style={{ alignSelf: 'center' }}>
-        Check your WhatsApp
+        Check your inbox
       </h2>
       <p style={{ fontSize: 13, color: '#4b5563', marginBottom: 16, textAlign: 'center' }}>
         A reset link was sent to{' '}
-        <strong>{resetIdentifier}</strong>
-        {' '}and your WhatsApp number.
+        <strong>{resetIdentifier}</strong>.
       </p>
 
       <div className={styles.infoBox} style={{ justifyContent: 'center' }}>

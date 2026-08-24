@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from './OrgUserAssignment.module.css';
+import s from "./OrgUserAssignmentEdit.module.css";
 
 const BackIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">

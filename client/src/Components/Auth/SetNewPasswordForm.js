@@ -77,16 +77,7 @@ export default function SetNewPasswordForm({ resetToken }) {
   return (
     <div className={styles.formBox}>
       {/* Brand Logo */}
-      <div className={styles.brandLogo}>
-        <span>si</span>
-        <span className={styles.logoKh}>
-          <span className={styles.logoKhDot} />
-          kh
-        </span>
-        <span>oaur</span>
-        <span>badh</span>
-        <span className={styles.logoOEnd}>o</span>
-      </div>
+      <img src="/logo.png" alt="sikhoaurbadho" className={styles.logoImg} />
       <p className={styles.tagline}>Create new password</p>
 
       <h2 className={styles.formTitle}>Set New Password</h2>

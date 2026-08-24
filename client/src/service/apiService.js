@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { API_URL } from '../lib/constant';
+import { forceLogout } from '../utils/authSession';
 
 const GET_CACHE_TTL_MS = 60 * 1000;
 const getResponseCache = new Map();
@@ -117,6 +118,14 @@ async function apiServiceHandler(method, endpoint, payload) {
 
     return response.data;
   } catch (error) {
+    // A 401 only ever comes back from the JWT `protect` middleware (missing/invalid/
+    // expired token) — login failures return 400. If we WERE sending a token and the
+    // server rejected it, the session is dead server-side: force a clean logout
+    // instead of letting the page silently render with no data.
+    if (token && error?.response?.status === 401) {
+      forceLogout();
+    }
+
     const getErrorMessage = (err) => {
       const responseData = err?.response?.data;
       const statusCode = err?.response?.status;

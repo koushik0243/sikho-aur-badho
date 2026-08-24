@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from './Organizations.module.css';
+import s from "./OrganizationsList.module.css";
 
 const Icon = {
   search: (
@@ -144,7 +144,14 @@ export default function OrganizationsList() {
   const sorted = sortKey
     ? [...orgs].sort((a, b) => {
         const isDate = ['createdAt', 'updatedAt', 'purchase_date', 'payment_date'].includes(sortKey);
-        let av = a[sortKey] ?? ''; let bv = b[sortKey] ?? '';
+        let av, bv;
+        if (sortKey === 'owner_whatsapp') {
+          // Not a flat field on the organization doc — it comes from the populated owner user.
+          av = a.ownerId?.whatsapp_no || '';
+          bv = b.ownerId?.whatsapp_no || '';
+        } else {
+          av = a[sortKey] ?? ''; bv = b[sortKey] ?? '';
+        }
         if (isDate) { av = new Date(av).getTime() || 0; bv = new Date(bv).getTime() || 0; }
         else { av = String(av).toLowerCase(); bv = String(bv).toLowerCase(); }
         if (av < bv) return sortDir === 'asc' ? -1 : 1;
@@ -172,7 +179,7 @@ export default function OrganizationsList() {
         onCancel={() => setBulkConfirm(false)}
       />
 
-      <div className={s.pageHeader}>
+      <div className={s.pageHeader} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '12px' }}>
         <div>
           <h1 className={s.pageTitle}>Organizations</h1>
           <p className={s.pageSubtitle}>Manage organizations</p>
@@ -203,7 +210,7 @@ export default function OrganizationsList() {
                 </th>
                 <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('org_name')}>Name{sortArrow('org_name')}</th>
                 <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('org_email')}>Email{sortArrow('org_email')}</th>
-                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('org_phone')}>Phone{sortArrow('org_phone')}</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('owner_whatsapp')}>WhatsApp No{sortArrow('owner_whatsapp')}</th>
                 <th>Status</th>
                 <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('createdAt')}>Created At{sortArrow('createdAt')}</th>
                 <th>Action</th>
@@ -216,7 +223,7 @@ export default function OrganizationsList() {
                 <tr className={s.emptyRow}><td colSpan={7}>No organizations found.</td></tr>
               ) : sorted.map(org => (
                 <tr key={org._id} style={{ cursor: 'pointer' }} onClick={() => toggleOne(org._id)}>
-                  <td className={s.checkTd}>
+                  <td className={s.checkTd} onClick={e => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={selected.includes(org._id)}
@@ -230,7 +237,7 @@ export default function OrganizationsList() {
                     </div>
                   </td>
                   <td>{org.org_email || org.ownerId?.email || '—'}</td>
-                  <td>{org.org_phone || '—'}</td>
+                  <td>{org.ownerId?.whatsapp_no || '—'}</td>
                   <td>
                     {org.status === 'active'
                       ? <span className={s.badgeActive}>Active</span>
@@ -240,15 +247,15 @@ export default function OrganizationsList() {
                   <td>{fmtDate(org.createdAt)}</td>
                   <td>
                     <div className={s.actions} onClick={e => e.stopPropagation()}>
-                      <button className={s.btnEdit} title="Edit"
-                        onClick={() => router.push(`/superadmin/organizations/${org._id}/edit`)}
-                      >
-                        {Icon.edit}
-                      </button>
                       <button className={s.btnView} title="View"
                         onClick={() => router.push(`/superadmin/organizations/${org._id}`)}
                       >
                         {Icon.eye}
+                      </button>
+                      <button className={s.btnEdit} title="Edit"
+                        onClick={() => router.push(`/superadmin/organizations/${org._id}/edit`)}
+                      >
+                        {Icon.edit}
                       </button>
                       <button className={s.btnDelete} title="Delete"
                         onClick={() => handleDelete(org._id)}

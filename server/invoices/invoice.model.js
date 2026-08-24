@@ -43,6 +43,12 @@ const InvoiceSchema = new Schema({
   updatedAt:       { type: Date, default: Date.now },
 });
 
+// listInvoice/listInvoicePagination always filter by deletedAt and sort by createdAt desc,
+// and buildQuery optionally filters by org_id / order_id (foreign keys with no prior index).
+InvoiceSchema.index({ deletedAt: 1, createdAt: -1 });
+InvoiceSchema.index({ org_id: 1, deletedAt: 1 });
+InvoiceSchema.index({ order_id: 1, deletedAt: 1 });
+
 const InvoiceModel = mongoose.model("Invoice", InvoiceSchema);
 
 // Drop the stale invoiceNumber_1 index left over from the previous schema.

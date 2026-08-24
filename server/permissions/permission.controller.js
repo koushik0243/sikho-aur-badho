@@ -66,8 +66,10 @@ const listPermissionPagination = async (req, res, next) => {
         const limit = parseInt(req.query.limit) || 10;
         const { status } = req.query;
 
-        const permissions = await PermissionHelper.listPermissionPagination(page, limit, { status });
-        const totalPermissions = await PermissionHelper.getPermissionCount({ status });
+        const [permissions, totalPermissions] = await Promise.all([
+            PermissionHelper.listPermissionPagination(page, limit, { status }),
+            PermissionHelper.getPermissionCount({ status })
+        ]);
         const return_data = {
             status: 200,
             message: "Successfully fetched.",

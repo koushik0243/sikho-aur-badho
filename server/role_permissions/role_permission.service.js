@@ -32,7 +32,8 @@ export const editRolePermission = async (editId) => {
     try {
         return await RolePermission.findById(editId)
             .populate('role_id')
-            .populate('permission_id');
+            .populate('permission_id')
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -54,7 +55,8 @@ export const updateRolePermission = async (updateId, updateRolePermissionData) =
         if (Object.keys(updateFields).length === 0) {
             return await RolePermission.findById(updateId)
                 .populate('role_id')
-                .populate('permission_id');
+                .populate('permission_id')
+                .lean();
         }
 
         return await RolePermission.findByIdAndUpdate(
@@ -63,7 +65,7 @@ export const updateRolePermission = async (updateId, updateRolePermissionData) =
                 $set: updateFields
             },
             { returnDocument: 'before', runValidators: true }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -76,7 +78,8 @@ export const listRolePermission = async (filters = {}) => {
         return await RolePermission.find(query)
             .populate('role_id')
             .populate('permission_id')
-            .sort({ _id: -1 });
+            .sort({ _id: -1 })
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -91,7 +94,8 @@ export const listRolePermissionPagination = async (page, limit, filters = {}) =>
             .populate('permission_id')
             .sort({ _id: -1 })
             .skip((page - 1) * limit)
-            .limit(limit);
+            .limit(limit)
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -108,7 +112,7 @@ export const getRolePermissionCount = async (filters = {}) => {
 
 export const deleteRolePermission = async (delId) => {
     try {
-        return await RolePermission.findByIdAndDelete(delId);
+        return await RolePermission.findByIdAndDelete(delId).lean();
     } catch (error) {
         throw error;
     }
@@ -125,7 +129,8 @@ export const getPermissionsByRole = async (roleId) => {
                 path: 'permission_id',
                 select: '_id name display_name'
             })
-            .sort({ _id: -1 });
+            .sort({ _id: -1 })
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -192,7 +197,7 @@ export const assignPermissionsToRole = async (roleId, permissionIds) => {
             }
         }
 
-        const role = await Role.findOne({ _id: roleId, deletedAt: null });
+        const role = await Role.findOne({ _id: roleId, deletedAt: null }).select('_id').lean();
         if (!role) {
             const err = new Error('Role not found');
             err.statusCode = 404;
@@ -203,7 +208,7 @@ export const assignPermissionsToRole = async (roleId, permissionIds) => {
             const foundPermissions = await Permission.find({
                 _id: { $in: permissionIds },
                 deletedAt: null
-            }).select('_id');
+            }).select('_id').lean();
 
             if (foundPermissions.length !== permissionIds.length) {
                 const foundIds = foundPermissions.map(p => p._id.toString());

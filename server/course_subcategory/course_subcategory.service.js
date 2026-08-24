@@ -28,7 +28,7 @@ export const createCourseSubCategory = async (data, userId = null) => {
 
 export const editCourseSubCategory = async (editId) => {
     try {
-        return await CourseSubCategory.findOne({ _id: editId, deletedAt: null }).populate('categoryId', 'title');
+        return await CourseSubCategory.findOne({ _id: editId, deletedAt: null }).populate('categoryId', 'title').lean();
     } catch (error) {
         throw error;
     }
@@ -48,7 +48,7 @@ export const updateCourseSubCategory = async (updateId, data) => {
         if (status !== undefined) updateFields.status = status;
 
         if (Object.keys(updateFields).length === 0) {
-            return await CourseSubCategory.findOne({ _id: updateId, deletedAt: null });
+            return await CourseSubCategory.findOne({ _id: updateId, deletedAt: null }).lean();
         }
 
         updateFields.updatedAt = new Date();
@@ -57,7 +57,7 @@ export const updateCourseSubCategory = async (updateId, data) => {
             { _id: updateId, deletedAt: null },
             { $set: updateFields },
             { returnDocument: 'before', runValidators: true }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -66,7 +66,7 @@ export const updateCourseSubCategory = async (updateId, data) => {
 export const listCourseSubCategory = async (filters = {}) => {
     try {
         const query = buildQuery(filters);
-        return await CourseSubCategory.find(query).populate('categoryId', 'title').sort({ name: 1 });
+        return await CourseSubCategory.find(query).populate('categoryId', 'title').sort({ name: 1 }).lean();
     } catch (error) {
         throw error;
     }
@@ -79,7 +79,8 @@ export const listCourseSubCategoryPagination = async (page, limit, filters = {})
             .populate('categoryId', 'title')
             .sort({ name: 1 })
             .skip((page - 1) * limit)
-            .limit(limit);
+            .limit(limit)
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -100,7 +101,7 @@ export const deleteCourseSubCategory = async (delId) => {
             { _id: delId, deletedAt: null },
             { $set: { deletedAt: new Date(), status: 'inactive' } },
             { returnDocument: 'before' }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -110,7 +111,7 @@ export const checkCourseSubCategoryName = async (name, excludeId = null) => {
     try {
         const query = { name: { $regex: `^${name}$`, $options: 'i' }, deletedAt: null };
         if (excludeId) query._id = { $ne: excludeId };
-        const existing = await CourseSubCategory.findOne(query);
+        const existing = await CourseSubCategory.findOne(query).lean();
         return { isDuplicate: !!existing };
     } catch (error) {
         throw error;

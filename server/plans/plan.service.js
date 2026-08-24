@@ -34,7 +34,7 @@ export const createPlan = async (data, userId) => {
 
 export const editPlan = async (editId) => {
     try {
-        return await Plan.findOne({ _id: editId, deletedAt: null });
+        return await Plan.findOne({ _id: editId, deletedAt: null }).lean();
     } catch (error) {
         throw error;
     }
@@ -57,7 +57,7 @@ export const updatePlan = async (updateId, data) => {
         }
 
         if (Object.keys(updateFields).length === 0) {
-            return await Plan.findOne({ _id: updateId, deletedAt: null });
+            return await Plan.findOne({ _id: updateId, deletedAt: null }).lean();
         }
 
         updateFields.updatedAt = new Date();
@@ -66,7 +66,7 @@ export const updatePlan = async (updateId, data) => {
             { _id: updateId, deletedAt: null },
             { $set: updateFields },
             { returnDocument: 'before', runValidators: true }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -75,7 +75,7 @@ export const updatePlan = async (updateId, data) => {
 export const listPlan = async (filters = {}) => {
     try {
         const query = buildQuery(filters);
-        return await Plan.find(query).sort({ price: 1, title: 1 });
+        return await Plan.find(query).sort({ price: 1, title: 1 }).lean();
     } catch (error) {
         throw error;
     }
@@ -87,7 +87,8 @@ export const listPlanPagination = async (page, limit, filters = {}) => {
         return await Plan.find(query)
             .sort({ price: 1, title: 1 })
             .skip((page - 1) * limit)
-            .limit(limit);
+            .limit(limit)
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -108,7 +109,7 @@ export const deletePlan = async (delId) => {
             { _id: delId, deletedAt: null },
             { $set: { deletedAt: new Date(), status: 'inactive' } },
             { returnDocument: 'before' }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -121,7 +122,7 @@ export const checkPlanTitle = async (title, excludeId = null) => {
             deletedAt: null
         };
         if (excludeId) query._id = { $ne: excludeId };
-        const existing = await Plan.findOne(query);
+        const existing = await Plan.findOne(query).select('_id').lean();
         return { isDuplicate: !!existing };
     } catch (error) {
         throw error;

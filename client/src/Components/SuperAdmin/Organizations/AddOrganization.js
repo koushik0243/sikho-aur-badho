@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import IndustryTypeTree from './IndustryTypeTree';
-import s from './AddEditOrganization.module.css';
+import s from "./AddOrganization.module.css";
 
 const BackArrow = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -32,6 +32,11 @@ const CoursesIcon = (
   </svg>
 );
 
+// Optional 10-digit Indian mobile number, with or without a +91 country code
+// (matches the "+91 98765 43210" format already used elsewhere,
+// e.g. client/src/Components/StoreOwner/AddLearner/AddLearner.js).
+const WHATSAPP_NO_REGEX = /^(\+91[\s-]?)?[6-9]\d{9}$/;
+
 export default function AddOrganization() {
   const router = useRouter();
 
@@ -41,6 +46,7 @@ export default function AddOrganization() {
   const [industryTypeIds, setIndustryTypeIds]   = useState([]);
   const [industryTypes, setIndustryTypes]       = useState([]);
   const [ownerEmail, setOwnerEmail]             = useState('');
+  const [ownerWhatsapp, setOwnerWhatsapp]       = useState('');
   const [ownerPassword, setOwnerPassword]       = useState('');
   const [ownerConfirmPassword, setOwnerConfirmPassword] = useState('');
   const [pwReadOnly, setPwReadOnly]             = useState(true);
@@ -53,7 +59,7 @@ export default function AddOrganization() {
 
   useEffect(() => {
     Promise.all([
-      apiServiceHandler('GET', 'course/list-pagination?limit=500&page=1'),
+      apiServiceHandler('GET', 'course/list-pagination?limit=500&page=1&status=published'),
       apiServiceHandler('GET', 'industry-type/list-all'),
     ])
       .then(([courseRes, indRes]) => {
@@ -110,6 +116,9 @@ export default function AddOrganization() {
     if (!ownerEmail.trim()) e.owner_email = 'Email is required.';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail.trim()))
       e.owner_email = 'Enter a valid email address.';
+    if (!ownerWhatsapp.trim()) e.owner_whatsapp = 'WhatsApp number is required.';
+    else if (!WHATSAPP_NO_REGEX.test(ownerWhatsapp.trim()))
+      e.owner_whatsapp = 'Enter a valid 10-digit mobile number (optionally with +91).';
     if (!ownerPassword) e.owner_password = 'Password is required.';
     else if (ownerPassword.length < 6) e.owner_password = 'Password must be at least 6 characters.';
     if (ownerPassword !== ownerConfirmPassword)
@@ -135,13 +144,14 @@ export default function AddOrganization() {
       const orgId = orgRes?.data?._id ?? orgRes?.data?.id ?? orgRes?._id ?? orgRes?.id ?? null;
 
       const userRes = await apiServiceHandler('POST', 'user/admin/create', {
-        name:      ownerEmail.trim(),
-        email:     ownerEmail.trim(),
-        password:  ownerPassword,
-        user_type: 'organization',
+        name:        ownerEmail.trim(),
+        email:       ownerEmail.trim(),
+        password:    ownerPassword,
+        whatsapp_no: ownerWhatsapp.trim(),
+        user_type:   'organization',
         orgId,
-        orgRole:   'owner',
-        status:    'active',
+        orgRole:     'owner',
+        status:      'active',
       });
       const userId = userRes?.data?._id ?? userRes?.data?.id ?? userRes?._id ?? userRes?.id ?? null;
 
@@ -258,6 +268,18 @@ export default function AddOrganization() {
                   autoComplete="off"
                 />
                 {errors.owner_email && <span className={s.errorMsg}>{errors.owner_email}</span>}
+              </div>
+              <div className={s.formGroup}>
+                <label className={s.label}>WhatsApp No <span className={s.required}>*</span></label>
+                <input
+                  className={s.input}
+                  type="tel"
+                  placeholder="e.g. 98765 43210"
+                  value={ownerWhatsapp}
+                  onChange={e => setOwnerWhatsapp(e.target.value)}
+                  autoComplete="off"
+                />
+                {errors.owner_whatsapp && <span className={s.errorMsg}>{errors.owner_whatsapp}</span>}
               </div>
             </div>
             <div className={s.formRow}>

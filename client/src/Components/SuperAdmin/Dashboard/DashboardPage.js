@@ -6,7 +6,7 @@ import { useSelector } from 'react-redux';
 import { selectUser } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from './Dashboard.module.css';
+import s from "./DashboardPage.module.css";
 
 // ── Constants ─────────────────────────────────────────────────────────
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -91,8 +91,8 @@ const EnrollIcon = () => (
   </svg>
 );
 const RevenueIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+  <svg viewBox="0 0 24 24" fill="currentColor" stroke="none">
+    <text x="12" y="18" textAnchor="middle" fontSize="19" fontWeight="700" fontFamily="Arial, Helvetica, sans-serif">₹</text>
   </svg>
 );
 const OrgsIcon = () => (
@@ -125,71 +125,45 @@ function KpiCard({ icon, iconBg, iconColor, label, value, loading, trend }) {
   );
 }
 
-// ── Enrollment Line Chart ─────────────────────────────────────────────
-function EnrollLineChart({ data }) {
-  if (!data || data.length < 2) {
+// ── Enrollment Donut Chart ─────────────────────────────────────────────
+// Turns the filtered period-by-period enrollment counts (months, or days within a
+// month) into a circle chart: the busiest periods get their own slice, the long tail
+// rolls up into "Others" so the chart stays legible even for a 31-day month view.
+const DONUT_COLORS = ['#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
+const MAX_ENROLL_SLICES = 8;
+
+function EnrollDonutChart({ data }) {
+  if (!data || data.every(d => d.value === 0)) {
     return <div className={s.chartEmpty}>No enrollment data for this period</div>;
   }
-  const W = 560, H = 200, PL = 36, PR = 16, PT = 16, PB = 36;
-  const cW = W - PL - PR, cH = H - PT - PB;
-  const maxV = Math.max(...data.map(d => d.value), 1);
-  const ySteps = 4;
+  const total = data.reduce((sum, d) => sum + d.value, 0);
+  const sorted = data.filter(d => d.value > 0).sort((a, b) => b.value - a.value);
+  const top = sorted.slice(0, MAX_ENROLL_SLICES);
+  const othersTotal = sorted.slice(MAX_ENROLL_SLICES).reduce((sum, d) => sum + d.value, 0);
 
-  const pts = data.map((d, i) => [
-    PL + (i / (data.length - 1)) * cW,
-    PT + (1 - d.value / maxV) * cH,
-  ]);
-
-  let linePath = '', areaPath = '';
-  pts.forEach(([x, y], i) => {
-    if (i === 0) {
-      linePath = `M ${x} ${y}`;
-      areaPath = `M ${x} ${PT + cH} L ${x} ${y}`;
-    } else {
-      const [px, py] = pts[i - 1];
-      const cpx = (px + x) / 2;
-      linePath += ` C ${cpx} ${py} ${cpx} ${y} ${x} ${y}`;
-      areaPath += ` C ${cpx} ${py} ${cpx} ${y} ${x} ${y}`;
-    }
-  });
-  areaPath += ` L ${pts[pts.length - 1][0]} ${PT + cH} Z`;
+  const legendItems = top.map((d, i) => ({ label: d.label, value: d.value, color: DONUT_COLORS[i % DONUT_COLORS.length] }));
+  if (othersTotal > 0) legendItems.push({ label: 'Others', value: othersTotal, color: '#9ca3af' });
 
   return (
-    <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ display: 'block', overflow: 'visible' }}>
-      <defs>
-        <linearGradient id="elGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.18" />
-          <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      {/* Y-axis grid lines */}
-      {Array.from({ length: ySteps + 1 }, (_, i) => {
-        const y = PT + (i / ySteps) * cH;
-        const val = Math.round(maxV * (1 - i / ySteps));
-        return (
-          <g key={i}>
-            <line x1={PL} y1={y} x2={PL + cW} y2={y} stroke="#f3f4f6" strokeWidth="1" />
-            <text x={PL - 6} y={y + 4} textAnchor="end" fontSize="10" fill="#9ca3af">
-              {val >= 1000 ? `${(val / 1000).toFixed(0)}K` : val}
-            </text>
-          </g>
-        );
-      })}
-      {/* Area fill */}
-      <path d={areaPath} fill="url(#elGrad)" />
-      {/* Line */}
-      <path d={linePath} fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-      {/* Data points */}
-      {pts.map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y} r="4" fill="#fff" stroke="#3b82f6" strokeWidth="2" />
-      ))}
-      {/* X labels */}
-      {data.map((d, i) => (
-        <text key={i} x={pts[i][0]} y={H - 6} textAnchor="middle" fontSize="10" fill="#9ca3af">
-          {d.label}
-        </text>
-      ))}
-    </svg>
+    <div className={s.enrollDonutRow}>
+      <DonutChart segments={legendItems.map(item => ({ v: item.value, c: item.color }))} total={total} />
+      <div className={s.sysLegend}>
+        {legendItems.map((item, i) => {
+          const pct = total ? ((item.value / total) * 100).toFixed(1) : '0.0';
+          return (
+            <div key={i} className={s.sysLegItem}>
+              <span className={s.sysLegDot} style={{ background: item.color }} />
+              <div>
+                <div className={s.sysLegLabel}>{item.label}</div>
+                <div className={s.sysLegVal}>
+                  {item.value.toLocaleString()} {item.value === 1 ? 'enrollment' : 'enrollments'} <span>({pct}%)</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -426,7 +400,9 @@ export default function DashboardPage() {
       return hasData ? monthly.filter(m => m.value > 0) : monthly.slice(0, 6);
     }
     const daysInMonth = new Date(chartYear, chartMonth + 1, 0).getDate();
-    const daily = Array.from({ length: daysInMonth }, (_, i) => ({ label: String(i + 1), value: 0 }));
+    // Label includes the month (e.g. "Jun 23") — a bare day number reads too much like
+    // a count of its own once it's sitting next to the donut legend's real count.
+    const daily = Array.from({ length: daysInMonth }, (_, i) => ({ label: `${MONTHS[chartMonth]} ${i + 1}`, value: 0 }));
     rawOrgCourses.forEach(item => {
       const d = new Date(item.createdAt);
       if (!isNaN(d) && d.getFullYear() === chartYear && d.getMonth() === chartMonth) {
@@ -462,31 +438,28 @@ export default function DashboardPage() {
           <KpiCard icon={<OrgsIcon />}     iconBg="#fee2e2" iconColor="#dc2626" label="Total Organizations" value={counts.orgs}       loading={loading}     trend={6.1} />
         </div>
 
-        {/* ── Mid Row: Chart + (Top Courses / Top Orgs) ── */}
-        <div className={s.midRow}>
+        {/* ── Enrollments Overview + Top Courses + Top Organizations: three columns ── */}
+        <div className={s.overviewRow}>
 
-          {/* Enrollments Overview */}
-          <div className={s.card}>
-            <div className={s.cardHead}>
-              <span className={s.cardTitle}>Enrollments Overview</span>
-              <div className={s.chartFilters}>
-                <select className={s.filterSel} value={chartYear} onChange={e => setChartYear(Number(e.target.value))}>
-                  {availYears.map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
-                <select className={s.filterSel} value={chartMonth} onChange={e => setChartMonth(Number(e.target.value))}>
-                  <option value={-1}>All Months</option>
-                  {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
-                </select>
+            {/* Enrollments Overview */}
+            <div className={s.card}>
+              <div className={s.cardHead}>
+                <span className={s.cardTitle}>Enrollments Overview</span>
+                <div className={s.chartFilters}>
+                  <select className={s.filterSel} value={chartYear} onChange={e => setChartYear(Number(e.target.value))}>
+                    {availYears.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                  <select className={s.filterSel} value={chartMonth} onChange={e => setChartMonth(Number(e.target.value))}>
+                    <option value={-1}>All Months</option>
+                    {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                  </select>
+                </div>
               </div>
+              {dashLoading
+                ? <div className={s.chartSkel}><span className={s.skel} style={{ width: '100%', height: 200, display: 'block', borderRadius: 8 }} /></div>
+                : <EnrollDonutChart data={enrollmentChart} />
+              }
             </div>
-            {dashLoading
-              ? <div className={s.chartSkel}><span className={s.skel} style={{ width: '100%', height: 200, display: 'block', borderRadius: 8 }} /></div>
-              : <EnrollLineChart data={enrollmentChart} />
-            }
-          </div>
-
-          {/* Right column: Top Courses + Top Organizations */}
-          <div className={s.midRightCol}>
 
             {/* Top Courses */}
             <div className={s.card}>
@@ -555,8 +528,6 @@ export default function DashboardPage() {
                     })}
               </div>
             </div>
-
-          </div>
 
         </div>
 

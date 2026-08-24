@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from './Courses.module.css';
+import s from "./CoursesList.module.css";
 
 const Icon = {
   search: (
@@ -175,7 +175,7 @@ export default function CoursesList() {
         onCancel={() => setBulkConfirm(false)}
       />
 
-      <div className={s.pageHeader}>
+      <div className={s.pageHeader} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '12px' }}>
         <div>
           <h1 className={s.pageTitle}>Courses</h1>
           <p className={s.pageSubtitle}>Manage courses</p>
@@ -224,7 +224,7 @@ export default function CoursesList() {
                 <tr className={s.emptyRow}><td colSpan={12}>No courses found.</td></tr>
               ) : sorted.map((row, idx) => (
                 <tr key={row._id} style={{ cursor: 'pointer' }} onClick={() => toggleOne(row._id)}>
-                  <td className={s.checkTd}>
+                  <td className={s.checkTd} onClick={e => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={selected.includes(row._id)}

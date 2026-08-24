@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from './AddEditTag.module.css';
+import s from "./EditTag.module.css";
 
 const TagIcon = (
   <svg viewBox="0 0 20 20" fill="currentColor">

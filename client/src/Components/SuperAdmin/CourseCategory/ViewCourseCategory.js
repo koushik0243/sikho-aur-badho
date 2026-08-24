@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from './AddEditCategory.module.css';
-import vs from './ViewCategory.module.css';
+import s from "./ViewCourseCategory.module.css";
+import vs from "./ViewCourseCategory.module.css";
 
 const LayersIcon = (
   <svg viewBox="0 0 20 20" fill="currentColor">

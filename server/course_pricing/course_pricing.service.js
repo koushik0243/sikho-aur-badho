@@ -13,7 +13,7 @@ const buildQuery = (filters = {}) => {
 };
 
 const populateRefs = (query) =>
-    query.populate('courseId', '_id title');
+    query.populate('courseId', '_id title').lean();
 
 export const createCoursePricing = async (data) => {
     return await new CoursePricing({
@@ -45,7 +45,7 @@ export const updateCoursePricing = async (id, data) => {
         { _id: id, deletedAt: null },
         { $set: updateFields },
         { returnDocument: 'after', runValidators: true }
-    );
+    ).lean();
 };
 
 export const deleteCoursePricing = async (id) => {
@@ -53,7 +53,7 @@ export const deleteCoursePricing = async (id) => {
         { _id: id },
         { $set: { deletedAt: new Date() } },
         { returnDocument: 'after' }
-    );
+    ).lean();
 };
 
 export const listCoursePricing = async (filters = {}) => {

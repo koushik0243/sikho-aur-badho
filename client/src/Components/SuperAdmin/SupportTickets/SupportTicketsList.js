@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from './SupportTickets.module.css';
+import s from "./SupportTicketsList.module.css";
 
 const SearchIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -217,7 +217,7 @@ export default function SupportTicketsList() {
                 const pc  = PRIORITY_CLS[t.priority] ?? 'priNormal';
                 return (
                   <tr key={t._id} style={{ cursor: 'pointer' }} onClick={() => toggleOne(t._id)}>
-                    <td className={s.checkTd}>
+                    <td className={s.checkTd} onClick={e => e.stopPropagation()}>
                       <input type="checkbox" checked={selected.includes(t._id)} onChange={() => toggleOne(t._id)} />
                     </td>
                     <td>{(page - 1) * LIMIT + idx + 1}</td>

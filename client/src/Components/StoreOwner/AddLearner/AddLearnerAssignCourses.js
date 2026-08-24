@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import s from './AddLearner.module.css';
+import s from "./AddLearnerAssignCourses.module.css";
 
 // ── Icons (content-area only) ────────────────────────────────────
 const Icon = {

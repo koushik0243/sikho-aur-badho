@@ -7,8 +7,8 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import { selectUser, selectUserType } from '../../../redux/slices/authSlice';
-import s from './RolePermissions.module.css';
-import rp from './RolePermission.module.css';
+import s from "./AddRolePermission.module.css";
+import rp from "./AddRolePermission.module.css";
 
 const BackArrow = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">

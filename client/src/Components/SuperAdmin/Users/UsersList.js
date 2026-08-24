@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from './Users.module.css';
+import s from "./UsersList.module.css";
 
 const SearchIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -37,6 +37,60 @@ function fmtDate(val) {
   return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
 }
 
+const EXPORT_FIELDS = [
+  { label: 'Name', get: u => u.name },
+  { label: 'Email', get: u => u.email },
+  { label: 'Phone', get: u => u.phone },
+  { label: 'Alt Phone', get: u => u.alt_phone },
+  { label: 'Gender', get: u => u.gender },
+  { label: 'DOB', get: u => fmtDate(u.dob) },
+  { label: 'Designation', get: u => u.designation },
+  { label: 'Department', get: u => u.department },
+  { label: 'Employee ID', get: u => u.emp_id },
+  { label: 'Address 1', get: u => u.address1 },
+  { label: 'Address 2', get: u => u.address2 },
+  { label: 'City', get: u => u.city },
+  { label: 'State', get: u => u.state },
+  { label: 'Country', get: u => u.country },
+  { label: 'Zipcode', get: u => u.zipcode },
+  { label: 'LinkedIn', get: u => u.linkedin },
+  { label: 'Twitter', get: u => u.twitter },
+  { label: 'Facebook', get: u => u.facebook },
+  { label: 'Instagram', get: u => u.instagram },
+  { label: 'YouTube', get: u => u.youtube },
+  { label: 'Emergency Contact Name', get: u => u.emergency_contact_name },
+  { label: 'Emergency Contact Phone', get: u => u.emergency_contact_phone },
+  { label: 'User Type', get: u => u.user_type },
+  { label: 'Role', get: u => u.user_role?.display_name || u.user_role?.name },
+  { label: 'Permissions', get: u => (u.permissions || []).join('; ') },
+  { label: 'Status', get: u => u.status },
+  { label: 'Created At', get: u => fmtDate(u.createdAt) },
+  { label: 'Updated At', get: u => fmtDate(u.updatedAt) },
+];
+
+function toCsvValue(value) {
+  const str = value === null || value === undefined ? '' : String(value);
+  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
+function buildUsersCsv(users) {
+  const header = EXPORT_FIELDS.map(f => toCsvValue(f.label)).join(',');
+  const rows = users.map(u => EXPORT_FIELDS.map(f => toCsvValue(f.get(u))).join(','));
+  return [header, ...rows].join('\r\n');
+}
+
+function downloadCsv(filename, csvContent) {
+  const blob = new Blob(['﻿' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 const LIMIT = 50;
 
 export default function UsersList() {
@@ -53,6 +107,7 @@ export default function UsersList() {
   const [bulkConfirm, setBulkConfirm] = useState(false);
   const [sortKey, setSortKey]   = useState('');
   const [sortDir, setSortDir]   = useState('asc');
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 350);
@@ -97,6 +152,26 @@ export default function UsersList() {
     Promise.all(ids.map(id => apiServiceHandler('GET', `user/admin/delete/${id}`)))
       .then(() => { toast.success(`${ids.length} user${ids.length !== 1 ? 's' : ''} deleted.`); fetchUsers(); })
       .catch(() => toast.error('Some deletes failed'));
+  }
+
+  async function handleExportUsers() {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({ user_type: 'superadmin' });
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      const res = await apiServiceHandler('GET', `user/admin/export?${params}`);
+      const exportedUsers = Array.isArray(res?.data) ? res.data : [];
+      if (exportedUsers.length === 0) {
+        toast.error('No users to export.');
+        return;
+      }
+      downloadCsv(`superadmin-users-${Date.now()}.csv`, buildUsersCsv(exportedUsers));
+      toast.success(`Exported ${exportedUsers.length} user${exportedUsers.length !== 1 ? 's' : ''}.`);
+    } catch (err) {
+      toast.error(err?.message || 'Export failed.');
+    } finally {
+      setExporting(false);
+    }
   }
 
   function toggleSort(key) {
@@ -149,14 +224,25 @@ export default function UsersList() {
         onCancel={() => setBulkConfirm(false)}
       />
 
-      <div className={s.pageHeader}>
+      <div className={s.pageHeader} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '12px' }}>
         <div>
           <h1 className={s.pageTitle}>Users</h1>
           <p className={s.pageSubtitle}>Manage super admin users</p>
         </div>
-        <button className={s.btnAdd} onClick={() => router.push('/superadmin/user/add')}>
-          + Add User
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            className={s.btnAdd}
+            style={{ background: '#0b7b7b' }}
+            onClick={handleExportUsers}
+            disabled={exporting}
+            title="Exports all superadmin users with their role and permissions as CSV"
+          >
+            {exporting ? 'Exporting…' : '⬇ Export User'}
+          </button>
+          <button className={s.btnAdd} onClick={() => router.push('/superadmin/user/add')}>
+            + Add User
+          </button>
+        </div>
       </div>
 
       <div className={s.card}>
@@ -194,7 +280,9 @@ export default function UsersList() {
                 <tr className={s.emptyRow}><td colSpan={8}>No users found.</td></tr>
               ) : sorted.map((u, idx) => (
                 <tr key={u._id} style={{ cursor: 'pointer' }} onClick={() => toggleOne(u._id)}>
-                  <td className={s.checkTd}><input type="checkbox" checked={selected.includes(u._id)} onChange={() => toggleOne(u._id)} /></td>
+                  <td className={s.checkTd} onClick={e => e.stopPropagation()}>
+                    <input type="checkbox" checked={selected.includes(u._id)} onChange={() => toggleOne(u._id)} />
+                  </td>
                   <td>{(page - 1) * LIMIT + idx + 1}</td>
                   <td>{u.name || '—'}</td>
                   <td>{u.email || '—'}</td>

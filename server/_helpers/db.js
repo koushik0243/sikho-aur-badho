@@ -2,7 +2,19 @@ import dotenv from "dotenv";
 dotenv.config();
 import mongoose from "mongoose";
 
-mongoose.connect(process.env.MONGO_DB_URI)
+// Tune the driver's connection pool so concurrent requests reuse warm sockets
+// instead of queuing behind a small default pool or paying handshake cost.
+// - maxPoolSize: raise ceiling for concurrent in-flight queries per process.
+// - minPoolSize: keep a few sockets warm so the first requests after idle
+//   periods don't pay connection-setup latency.
+// - autoIndex: index builds on every model registration are useful in dev but
+//   cost startup time in prod; skip them there (indexes are still created by
+//   _helpers/rebuildIndexes.js / migrations, not on the request path either way).
+mongoose.connect(process.env.MONGO_DB_URI, {
+    maxPoolSize: 50,
+    minPoolSize: 5,
+    autoIndex: process.env.NODE_ENV !== 'production',
+})
 .then(async () => {
     console.log("Successfully connected to MongoDB");
 

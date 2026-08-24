@@ -7,7 +7,7 @@ const createOrgCreditAssignment = async (req, res, next) => {
     try {
         const assignedBy = req.user?._id || null;
         const data = await OrgCreditAssignmentHelper.createOrgCreditAssignment(req.body, assignedBy);
-        res.status(200).json({ status: 200, message: "Successfully added.", data });
+        res.status(200).json({ status: 200, message: "Credit assigned.", data });
     } catch (error) {
         next(error);
     }
@@ -47,8 +47,10 @@ const listOrgCreditAssignmentPagination = async (req, res, next) => {
         const limit = parseInt(req.query.limit) || 10;
         const { status, orgId, creditId, assignedBy } = req.query;
 
-        const assignments = await OrgCreditAssignmentHelper.listOrgCreditAssignmentPagination(page, limit, { status, orgId, creditId, assignedBy });
-        const total = await OrgCreditAssignmentHelper.getOrgCreditAssignmentCount({ status, orgId, creditId, assignedBy });
+        const [assignments, total] = await Promise.all([
+            OrgCreditAssignmentHelper.listOrgCreditAssignmentPagination(page, limit, { status, orgId, creditId, assignedBy }),
+            OrgCreditAssignmentHelper.getOrgCreditAssignmentCount({ status, orgId, creditId, assignedBy })
+        ]);
         res.status(200).json({
             status: 200,
             message: "Successfully fetched.",

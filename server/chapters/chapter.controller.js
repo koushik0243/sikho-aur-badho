@@ -46,8 +46,10 @@ const listChapterPagination = async (req, res, next) => {
         const limit = parseInt(req.query.limit) || 10;
         const { status, courseId } = req.query;
 
-        const chapters = await ChapterHelper.listChapterPagination(page, limit, { status, courseId });
-        const total = await ChapterHelper.getChapterCount({ status, courseId });
+        const [chapters, total] = await Promise.all([
+            ChapterHelper.listChapterPagination(page, limit, { status, courseId }),
+            ChapterHelper.getChapterCount({ status, courseId })
+        ]);
         res.status(200).json({
             status: 200,
             message: "Successfully fetched.",

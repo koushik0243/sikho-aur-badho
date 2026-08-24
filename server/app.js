@@ -3,6 +3,7 @@ dotenv.config();
 import './_helpers/db.js';
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -41,13 +42,25 @@ import orderRouter from './orders/order.controller.js';
 import invoiceRouter from './invoices/invoice.controller.js';
 import supportTicketRouter from './support_tickets/support_ticket.controller.js';
 import creditUsedRouter from './credit_used/credit_used.controller.js';
+import quizQuestionRouter from './quiz_questions/quiz_question.controller.js';
+import quizAttemptRouter from './quiz_attempts/quiz_attempt.controller.js';
+import aptitudeQuestionRouter from './aptitude_questions/aptitude_question.controller.js';
+import aptitudeAttemptRouter from './aptitude_attempts/aptitude_attempt.controller.js';
+import progressRouter from './progress/progress.controller.js';
+import noteRouter from './notes/note.controller.js';
+import reviewRouter from './reviews/review.controller.js';
+import speechRouter from './speech/speech.controller.js';
+import organizationSignupRouter from './organization_signup/organization_signup.controller.js';
+import orgDashboardRouter from './org_dashboard/org_dashboard.controller.js';
+import activityLogRouter from './activity_log/activity_log.controller.js';
 
 const app = express();
+// Gzip/deflate every response above ~1KB (JSON list/pagination payloads are the main
+// beneficiary — every page in the app fetches one of these on load). Cheap CPU cost,
+// large win on payload transfer time, especially over mobile/slow connections.
+app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Serve uploaded files as static assets
-app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
 const allowedOrigins = [
     'http://localhost:3000',
@@ -70,6 +83,9 @@ app.use(cors({
   preflightContinue: false,
   optionsSuccessStatus: 204
 }));
+
+// Serve uploaded files as static assets (must come after cors so CORS headers are applied)
+app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 
 app.use('/course-category', protect, courseCategoryRouter);
 app.use('/course-subcategory', protect, courseSubCategoryRouter);
@@ -98,6 +114,18 @@ app.use('/order', protect, orderRouter);
 app.use('/invoice', protect, invoiceRouter);
 app.use('/support-ticket', protect, supportTicketRouter);
 app.use('/credit-used', protect, creditUsedRouter);
+app.use('/quiz-questions', protect, quizQuestionRouter);
+app.use('/quiz-attempt',   protect, quizAttemptRouter);
+app.use('/aptitude-questions', protect, aptitudeQuestionRouter);
+app.use('/aptitude-attempt', protect, aptitudeAttemptRouter);
+app.use('/progress',       protect, progressRouter);
+app.use('/note', protect, noteRouter);
+app.use('/review', protect, reviewRouter);
+app.use('/speech', protect, speechRouter);
+// Public — self-service store owner signup, no auth required (creates its own org + owner account).
+app.use('/signup', organizationSignupRouter);
+app.use('/org-dashboard', protect, orgDashboardRouter);
+app.use('/activity-log', protect, activityLogRouter);
 app.use('/user', userRouter);
 
 app.use((error, req, res, next) => {

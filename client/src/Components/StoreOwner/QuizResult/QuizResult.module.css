@@ -1,0 +1,267 @@
+.page { display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Filter card ─────────────────────────────────────────── */
+.filterCard {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #e8edf0;
+  padding: 24px;
+}
+
+.filterMeta  { font-size: 11px; color: #9aa5b4; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 4px; }
+
+.filterTitle { font-size: 18px; font-weight: 700; color: #1a2b2b; margin: 0 0 20px; }
+
+.filterRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 16px;
+}
+
+.filterGroup { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+
+.filterLabel { font-size: 12px; font-weight: 600; color: #4a6060; }
+
+.selectWrap { position: relative; }
+
+.select {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 10px 36px 10px 14px;
+  border: 1.5px solid #e8edf0;
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: #1a2b2b;
+  background: #f8fafa;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 20 20' fill='%236b7280'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.select:focus { border-color: #0b7b7b; background: #fff; }
+
+.select:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.selectArrow {
+  position: absolute; right: 12px; top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none; color: #9aa5b4;
+  display: flex; align-items: center;
+}
+
+/* ── Empty / loading ─────────────────────────────────────── */
+.emptyWrap { text-align: center; padding: 80px 20px; color: #9aa5b4; }
+
+.emptyTitle { font-size: 15px; font-weight: 600; color: #4a6060; margin: 0 0 6px; }
+
+.emptySub   { font-size: 13px; }
+
+.loadingWrap { display: flex; justify-content: center; padding: 80px 0; }
+
+.spinner {
+  width: 36px; height: 36px;
+  border: 3px solid #e8edf0; border-top-color: #0b7b7b;
+  border-radius: 50%; animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Attempt banner ──────────────────────────────────────── */
+.attemptsBanner {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px;
+  background: #f0f7f7; border: 1px solid #b2d8d8;
+  border-radius: 8px;
+  font-size: 13px; color: #0b7b7b;
+  flex-wrap: wrap;
+}
+
+/* ── Summary card ─────────────────────────────────────────── */
+.summaryCard {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #e8edf0;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.summaryTopBar {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px;
+}
+
+.summaryLeft { min-width: 0; }
+
+.summaryLearner { font-size: 18px; font-weight: 700; color: #1a2b2b; margin: 0; }
+
+.summaryMeta { font-size: 13px; color: #6b7a7a; margin: 2px 0 0; }
+
+.resultBadge {
+  font-size: 13px; font-weight: 600;
+  padding: 5px 14px; border-radius: 20px;
+  flex-shrink: 0;
+}
+
+.badgePassed { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+
+.badgeFailed { background: #fff1f2; color: #dc2626; border: 1px solid #fecaca; }
+
+.summaryStatsRow {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid #e8edf0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.summaryStat {
+  flex: 1; padding: 14px 12px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  min-width: 0;
+}
+
+.summaryStatVal { font-size: 22px; font-weight: 800; color: #1a2b2b; }
+
+.summaryStatDate { font-size: 13px; font-weight: 700; color: #1a2b2b; white-space: nowrap; }
+
+.summaryStatLbl { font-size: 11.5px; color: #9aa5b4; }
+
+.summaryDivider { width: 1px; background: #e8edf0; flex-shrink: 0; }
+
+/* ── Comparison grid ──────────────────────────────────────── */
+.compareGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.compareCard {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #e8edf0;
+  padding: 20px;
+  display: flex; flex-direction: column; gap: 4px;
+  min-width: 0;
+}
+
+.compareHead { margin-bottom: 10px; }
+
+.compareMeta  { font-size: 11px; color: #9aa5b4; text-transform: uppercase; letter-spacing: 0.06em; margin: 0; }
+
+.compareTitle { font-size: 15px; font-weight: 700; color: #1a2b2b; margin: 2px 0 0; }
+
+.qList { display: flex; flex-direction: column; }
+
+/* Question row */
+.qRow {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 14px 0; border-bottom: 1px solid #f0f4f4;
+}
+
+.qRow:last-child { border-bottom: none; }
+
+.qRowWrong {
+  background: #fff5f5;
+  border-radius: 8px;
+  margin: 0 -12px;
+  padding: 14px 12px;
+  border-bottom: 1px solid #fee2e2;
+}
+
+.qHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+
+.qHeadLeft { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.diffBadge {
+  font-size: 10.5px; font-weight: 700;
+  padding: 2px 9px; border-radius: 20px;
+  text-transform: uppercase; letter-spacing: 0.02em;
+  flex-shrink: 0;
+  background: #f0fafa; color: #0b7b7b; border: 1px solid #b2d8d8;
+}
+
+.diff_beginner     { background: #f0fafa; color: #0b7b7b; border: 1px solid #b2d8d8; }
+
+.diff_intermediate { background: #fff7ed; color: #d97706; border: 1px solid #fed7aa; }
+
+.diff_advanced     { background: #f5f3ff; color: #7c3aed; border: 1px solid #ddd6fe; }
+
+.qNum { font-size: 12px; font-weight: 700; color: #9aa5b4; text-transform: uppercase; letter-spacing: 0.04em; }
+
+.qText { font-size: 13.5px; font-weight: 600; color: #1a2b2b; margin: 0; line-height: 1.4; }
+
+.qAnswer { font-size: 13px; color: #4a6060; line-height: 1.5; margin: 0; word-break: break-word; }
+
+.qSkipped { font-size: 12px; color: #f59e0b; font-weight: 500; }
+
+.qFeedback { font-size: 11.5px; color: #6b7a7a; border-left: 2px solid #e8edf0; padding-left: 8px; margin-top: 2px; }
+
+.scoreBadge {
+  font-size: 12px; font-weight: 600;
+  padding: 3px 11px; border-radius: 20px;
+  flex-shrink: 0;
+}
+
+.scoreBadgeWrong { background: #fff1f2; color: #dc2626; border: 1px solid #fecaca; }
+
+.scoreBadgeOk    { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .compareGrid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+  .filterRow { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 540px) {
+  .filterRow { grid-template-columns: 1fr; }
+
+  .summaryStatsRow { flex-wrap: wrap; }
+
+  .summaryStat { flex: 1 1 45%; }
+}
+
+@media (max-width: 480px) {
+  .filterCard,
+  .summaryCard,
+  .compareCard {
+    padding: 16px;
+  }
+
+  .filterTitle { font-size: 16px; margin-bottom: 16px; }
+
+  .summaryLearner { font-size: 16px; }
+
+  .summaryStatVal { font-size: 18px; }
+
+  .compareTitle { font-size: 14px; }
+
+  .qText { font-size: 13px; }
+
+  .qAnswer { font-size: 12.5px; }
+}
+
+@media (max-width: 360px) {
+  .filterCard,
+  .summaryCard,
+  .compareCard {
+    padding: 14px;
+  }
+
+  .summaryStat { padding: 10px 8px; }
+
+  .summaryStatVal { font-size: 16px; }
+
+  .summaryStatDate { font-size: 11.5px; }
+
+  .qHead { flex-wrap: wrap; }
+}

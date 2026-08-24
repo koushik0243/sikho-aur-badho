@@ -13,4 +13,8 @@ const CourseSubCategorySchema = new Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+// listCourseSubCategory/listCourseSubCategoryPagination always filter by deletedAt
+// and optionally by categoryId (foreign key) -- compound index covers both.
+CourseSubCategorySchema.index({ deletedAt: 1, categoryId: 1 });
+
 export default mongoose.model("course_subcategory", CourseSubCategorySchema);

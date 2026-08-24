@@ -14,7 +14,7 @@ export const createCourseCategory = async (data, userId = null) => {
         const baseSlug = generateSlug(data.title);
         let slug = baseSlug;
         let counter = 1;
-        while (await CourseCategory.findOne({ slug })) {
+        while (await CourseCategory.findOne({ slug }).lean()) {
             slug = `${baseSlug}-${counter++}`;
         }
         return await new CourseCategory({
@@ -34,7 +34,7 @@ export const createCourseCategory = async (data, userId = null) => {
 
 export const editCourseCategory = async (editId) => {
     try {
-        return await CourseCategory.findOne({ _id: editId, deletedAt: null });
+        return await CourseCategory.findOne({ _id: editId, deletedAt: null }).lean();
     } catch (error) {
         throw error;
     }
@@ -56,7 +56,7 @@ export const updateCourseCategory = async (updateId, data) => {
         if ('parentId' in data) updateFields.parentId = data.parentId || null;
 
         if (Object.keys(updateFields).length === 0) {
-            return await CourseCategory.findOne({ _id: updateId, deletedAt: null });
+            return await CourseCategory.findOne({ _id: updateId, deletedAt: null }).lean();
         }
 
         updateFields.updatedAt = new Date();
@@ -65,7 +65,7 @@ export const updateCourseCategory = async (updateId, data) => {
             { _id: updateId, deletedAt: null },
             { $set: updateFields },
             { new: true, runValidators: true }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -74,7 +74,7 @@ export const updateCourseCategory = async (updateId, data) => {
 export const listCourseCategory = async (filters = {}) => {
     try {
         const query = buildQuery(filters);
-        return await CourseCategory.find(query).sort({ title: 1 });
+        return await CourseCategory.find(query).sort({ title: 1 }).lean();
     } catch (error) {
         throw error;
     }
@@ -86,7 +86,8 @@ export const listCourseCategoryPagination = async (page, limit, filters = {}) =>
         return await CourseCategory.find(query)
             .sort({ title: 1 })
             .skip((page - 1) * limit)
-            .limit(limit);
+            .limit(limit)
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -107,7 +108,7 @@ export const deleteCourseCategory = async (delId) => {
             { _id: delId, deletedAt: null },
             { $set: { deletedAt: new Date(), status: 'inactive' } },
             { returnDocument: 'before' }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -117,7 +118,7 @@ export const checkCourseCategoryTitle = async (title, excludeId = null) => {
     try {
         const query = { title: { $regex: `^${title}$`, $options: 'i' }, deletedAt: null };
         if (excludeId) query._id = { $ne: excludeId };
-        const existing = await CourseCategory.findOne(query);
+        const existing = await CourseCategory.findOne(query).lean();
         return { isDuplicate: !!existing };
     } catch (error) {
         throw error;

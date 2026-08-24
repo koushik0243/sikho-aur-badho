@@ -5,7 +5,7 @@ import { useSelector } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import { selectUser } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
-import s from './Orders.module.css';
+import s from "./Orders.module.css";
 
 const LIMIT = 10;
 
@@ -121,8 +121,6 @@ export default function OrdersPage() {
 
   return (
     <>
-      <div className={s.pageTitle}>My Orders</div>
-
       {/* ── Stats row ── */}
       <div className={s.statsRow}>
         <div className={`${s.statCard} ${s.statCardTeal}`}>
@@ -179,7 +177,7 @@ export default function OrdersPage() {
 
       {/* ── Table card ── */}
       <div className={s.tableCard}>
-        <div className={s.tableCardTitle}>All Orders</div>
+        <div className={s.cardHead}><div className={s.tableCardTitle}>All Orders</div></div>
         <table className={s.table}>
           <thead>
             <tr>

@@ -46,8 +46,10 @@ const listOrganizationCoursePagination = async (req, res, next) => {
         const limit = parseInt(req.query.limit) || 10;
         const { status, orgId, courseId, coursePriceId } = req.query;
 
-        const organizationCourses = await OrganizationCourseHelper.listOrganizationCoursePagination(page, limit, { status, orgId, courseId, coursePriceId });
-        const total = await OrganizationCourseHelper.getOrganizationCourseCount({ status, orgId, courseId, coursePriceId });
+        const [organizationCourses, total] = await Promise.all([
+            OrganizationCourseHelper.listOrganizationCoursePagination(page, limit, { status, orgId, courseId, coursePriceId }),
+            OrganizationCourseHelper.getOrganizationCourseCount({ status, orgId, courseId, coursePriceId })
+        ]);
         res.status(200).json({
             status: 200,
             message: "Successfully fetched.",

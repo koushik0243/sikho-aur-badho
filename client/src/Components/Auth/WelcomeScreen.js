@@ -64,7 +64,7 @@ export default function WelcomeScreen() {
   if (step === 'setPassword') {
     return (
       <div className={styles.formBox}>
-        <div style={{ fontWeight: 800, fontSize: 28, marginBottom: 4 }}>LOGO</div>
+        <img src="/logo.png" alt="sikhoaurbadho" className={styles.logoImg} />
         <p className={styles.tagline}>Create new password</p>
 
         <h2 className={styles.formTitle}>Set Your Password</h2>
@@ -123,7 +123,7 @@ export default function WelcomeScreen() {
 
   return (
     <div className={styles.formBox} style={{ textAlign: 'center' }}>
-      <div style={{ fontWeight: 800, fontSize: 28, marginBottom: 4 }}>LOGO</div>
+      <img src="/logo.png" alt="sikhoaurbadho" className={styles.logoImg} />
       <p className={styles.tagline}>Sign In Your Account</p>
 
       {/* Success circle */}

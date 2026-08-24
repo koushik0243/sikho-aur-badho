@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from './OrgCreditAssignment.module.css';
+import s from "./OrgCreditAssignmentList.module.css";
 
 const SearchIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -160,7 +160,7 @@ export default function OrgCreditAssignmentList() {
         onCancel={() => setConfirm({ show: false, id: null, label: '' })}
       />
 
-      <div className={s.pageHeader}>
+      <div className={s.pageHeader} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '12px' }}>
         <div>
           <h1 className={s.pageTitle}>Credit Assignments</h1>
           <p className={s.pageSubtitle}>Manage credit plan assignments to organizations</p>
@@ -225,11 +225,9 @@ export default function OrgCreditAssignmentList() {
                       )}
                       <td>
                         {credit ? (
-                          <>
-                            <div className={s.cellMain}>{credit.title}</div>
-                            <div className={s.cellSub}>{credit.limit_from} – {credit.limit_to}</div>
-                            <div className={s.cellSub}>{credit.price}</div>
-                          </>
+                          <div className={s.cellMain}>
+                            {credit.title} <span className={s.cellSub}>({credit.limit_from}-{credit.limit_to}) {credit.price}</span>
+                          </div>
                         ) : '—'}
                       </td>
                       <td>
@@ -241,7 +239,7 @@ export default function OrgCreditAssignmentList() {
                       </td>
                       <td>{credit ? fmtDate(credit.createdAt) : '—'}</td>
                       <td>
-                        <div className={s.actions}>
+                        <div className={s.actions} onClick={e => e.stopPropagation()}>
                           <button
                             className={s.btnView}
                             title="View"
@@ -249,23 +247,21 @@ export default function OrgCreditAssignmentList() {
                           >
                             <EyeIcon />
                           </button>
+                          <button
+                            className={s.btnEdit}
+                            title="Edit"
+                            onClick={() => router.push(`/superadmin/organization-credit-assignment/${g.orgId}`)}
+                          >
+                            <EditIcon />
+                          </button>
                           {credit && (
-                            <>
-                              <button
-                                className={s.btnEdit}
-                                title="Edit"
-                                onClick={() => router.push(`/superadmin/organization-credit-assignment/${g.orgId}?assignmentId=${credit.recordId}`)}
-                              >
-                                <EditIcon />
-                              </button>
-                              <button
-                                className={s.btnDelete}
-                                title="Delete"
-                                onClick={() => setConfirm({ show: true, id: credit.recordId, label: `${g.orgName} — ${credit.title}` })}
-                              >
-                                <TrashIcon />
-                              </button>
-                            </>
+                            <button
+                              className={s.btnDelete}
+                              title="Delete"
+                              onClick={() => setConfirm({ show: true, id: credit.recordId, label: `${g.orgName} — ${credit.title}` })}
+                            >
+                              <TrashIcon />
+                            </button>
                           )}
                         </div>
                       </td>

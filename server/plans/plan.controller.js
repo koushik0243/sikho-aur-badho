@@ -47,8 +47,10 @@ const listPlanPagination = async (req, res, next) => {
         const limit = parseInt(req.query.limit) || 10;
         const { status, billingCycle } = req.query;
 
-        const plans = await PlanHelper.listPlanPagination(page, limit, { status, billingCycle });
-        const total = await PlanHelper.getPlanCount({ status, billingCycle });
+        const [plans, total] = await Promise.all([
+            PlanHelper.listPlanPagination(page, limit, { status, billingCycle }),
+            PlanHelper.getPlanCount({ status, billingCycle }),
+        ]);
         res.status(200).json({
             status: 200,
             message: "Successfully fetched.",

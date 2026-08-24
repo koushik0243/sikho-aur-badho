@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import { selectUser } from '../../../redux/slices/authSlice';
-import apiServiceHandler from '../../../service/apiService';
+import apiServiceHandler, { clearGetCache } from '../../../service/apiService';
 import { toast } from 'sonner';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import s from './AddLearner.module.css';
+import s from "./AddLearner.module.css";
 
 // ── Icons ────────────────────────────────────────────────────────
 const Icon = {
@@ -31,7 +31,7 @@ const LANGUAGES   = ['English', 'Hindi'];
 
 const EMPTY_FORM = {
   firstName: '', lastName: '',
-  email: '', whatsapp: '',
+  email: '', whatsapp_no: '',
   employeeId: '', department: '',
   designation: '', language: '', accessStartDate: '',
   tempPassword: '', accountStatus: 'active',
@@ -47,13 +47,14 @@ export default function AddLearnerPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [courses, setCourses] = useState([]);
   const [coursesLoading, setCoursesLoading] = useState(false);
-  const [selectedCourseId, setSelectedCourseId] = useState(null);
+  const [selectedCourseIds, setSelectedCourseIds] = useState([]);
   const [saving, setSaving] = useState(false);
-  const [notifyPrefs, setNotifyPrefs] = useState({ whatsapp: true, email: true, alert: true, digest: false });
+  const [checkingDup, setCheckingDup] = useState(false);
+  const [notifyPrefs, setNotifyPrefs] = useState({ email: true, alert: true, digest: false });
 
-  const [orgCredit, setOrgCredit] = useState(null);
-  const [orgEmpCount, setOrgEmpCount] = useState(null);
-  const [usedCredits, setUsedCredits] = useState(0);
+  const [allOrgCredits, setAllOrgCredits] = useState([]);
+  const [orgEmpCount, setOrgEmpCount]     = useState(null);
+  const [assignedCount, setAssignedCount] = useState(0);
   const [resolvedOrgId, setResolvedOrgId] = useState(null);
 
   const userId = user?._id ? String(user._id) : null;
@@ -69,6 +70,10 @@ export default function AddLearnerPage() {
     } catch { return null; }
   }
 
+  // Avoid serving a stale cached course/status list — this page's credit math
+  // depends on each course's up-to-the-minute published/draft state.
+  useEffect(() => { clearGetCache(); }, []);
+
   useEffect(() => {
     const effectiveUserId = userId || getTokenUserId();
     if (!effectiveUserId) return;
@@ -81,11 +86,19 @@ export default function AddLearnerPage() {
       apiServiceHandler('GET', `organization-course/list?orgId=${orgId}&status=active`)
         .then(res => {
           const list = Array.isArray(res?.data) ? res.data : [];
-          setCourses(list.map(item => ({
-            id: item.courseId?._id || String(item.courseId),
-            name: item.courseId?.title || 'Untitled',
-            meta: '',
-          })));
+          // Only published courses are offered here — a course can be unpublished
+          // back to draft after being added to the org's library, so a draft one
+          // has nothing ready for a learner to study and shouldn't be assignable.
+          setCourses(
+            list
+              .filter(item => (item.courseId?.status || 'draft') === 'published')
+              .map(item => ({
+                id: item.courseId?._id || String(item.courseId),
+                name: item.courseId?.title || 'Untitled',
+                status: item.courseId?.status,
+                meta: '',
+              }))
+          );
         })
         .catch(() => setCourses([]))
         .finally(() => setCoursesLoading(false));
@@ -94,14 +107,19 @@ export default function AddLearnerPage() {
       Promise.all([
         apiServiceHandler('GET', `organization-credit-assignment/list?orgId=${orgId}`),
         apiServiceHandler('GET', `user/admin/list?orgId=${orgId}&user_type=employee&orgRole=employee`),
-        apiServiceHandler('GET', `organization-course-assignment/list?orgId=${orgId}`),
-      ]).then(([creditRes, learnersRes, usageRes]) => {
+        apiServiceHandler('GET', `credit-used/list?orgId=${orgId}`),
+      ]).then(([creditRes, learnersRes, usedRes]) => {
         const credits = Array.isArray(creditRes?.data) ? creditRes.data : [];
-        if (credits.length > 0) setOrgCredit(credits[0]);
+        credits.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setAllOrgCredits(credits);
         const learners = Array.isArray(learnersRes?.data) ? learnersRes.data : [];
         setOrgEmpCount(learners.length);
-        const usageList = Array.isArray(usageRes?.data) ? usageRes.data : [];
-        setUsedCredits(usageList.length);
+        // Same source of truth as the Credits page — count active credit-used
+        // records (one per course assignment), not unique learners, so every
+        // course assigned (not just a learner's first) counts against the balance.
+        const used = Array.isArray(usedRes?.data) ? usedRes.data
+          : Array.isArray(usedRes) ? usedRes : [];
+        setAssignedCount(used.filter(u => (u.status || 'active') === 'active').length);
       }).catch(() => {});
     };
 
@@ -123,8 +141,48 @@ export default function AddLearnerPage() {
     }
   }, [userId]);
 
+  // Derived credit values — same calculation as Credits page
+  const lastOrgCredit  = allOrgCredits[0] ?? null;
+  const totalCredits   = allOrgCredits.reduce((sum, c) => sum + (c.creditId?.limit_to ?? 0), 0);
+  const creditsLeft    = totalCredits - assignedCount;
+
   function set(field) {
     return (e) => setForm(prev => ({ ...prev, [field]: e.target.value }));
+  }
+
+  async function goToStep1() {
+    if (checkingDup) return;
+    if (!form.firstName.trim()) { toast.error('Name is required.'); return; }
+    if (!form.email.trim())     { toast.error('Email is required.'); return; }
+    if (!form.tempPassword.trim()) { toast.error('Temporary password is required.'); return; }
+
+    // Block on a duplicate email or WhatsApp No before letting the learner
+    // move on — both are unique identifiers on the users table.
+    setCheckingDup(true);
+    try {
+      const params = new URLSearchParams({ email: form.email.trim() });
+      if (form.whatsapp_no.trim()) params.set('whatsapp_no', form.whatsapp_no.trim());
+      const res = await apiServiceHandler('GET', `user/admin/check-exists?${params.toString()}`);
+      const { emailExists, whatsappExists } = res?.data ?? res ?? {};
+
+      if (emailExists && whatsappExists) {
+        toast.error('A learner with this email and WhatsApp No already exists.');
+        return;
+      }
+      if (emailExists)    { toast.error('A learner with this email already exists.'); return; }
+      if (whatsappExists) { toast.error('A learner with this WhatsApp No already exists.'); return; }
+
+      setActiveStep(1);
+    } catch (err) {
+      toast.error(err?.message || 'Could not verify email/WhatsApp No. Please try again.');
+    } finally {
+      setCheckingDup(false);
+    }
+  }
+
+  function goToStep2() {
+    if (selectedCourseIds.length === 0) { toast.error('Please select at least one course to assign.'); return; }
+    setActiveStep(2);
   }
 
   async function handleSave() {
@@ -136,8 +194,7 @@ export default function AddLearnerPage() {
         name: `${form.firstName} ${form.lastName}`.trim() || form.firstName,
         email: form.email,
         password: form.tempPassword,
-        phone: form.whatsapp,
-        whatsapp_no: form.whatsapp,
+        whatsapp_no: form.whatsapp_no,
         emp_id: form.employeeId,
         department: form.department,
         designation: form.designation,
@@ -152,26 +209,32 @@ export default function AddLearnerPage() {
       const newUserId = createRes?.data?._id || createRes?._id;
       if (!newUserId) throw new Error('User creation failed — no ID returned.');
 
-      // Step 2 — assign the selected course (single selection)
-      if (selectedCourseId) {
-        await apiServiceHandler('POST', 'course-assignment/create', {
+      // Step 2 — assign every selected course (draft courses included — the
+      // learner is ready to study it as soon as it's published).
+      await Promise.all(selectedCourses.map(course =>
+        apiServiceHandler('POST', 'course-assignment/create', {
           organizationId: resolvedOrgId,
           userId: newUserId,
-          courseId: selectedCourseId,
+          courseId: course.id,
+        })
+      ));
+
+      // Step 3 — adding a learner costs exactly 1 credit, regardless of how many
+      // courses are assigned — but only if at least one of them is published.
+      // If every selected course is still in draft, the learner is added for
+      // free (no credit until a real, published course is actually assigned).
+      const publishedCourses = selectedCourses.filter(c => c.status === 'published');
+      if (publishedCourses.length > 0) {
+        await apiServiceHandler('POST', 'credit-used/create', {
+          orgId:     resolvedOrgId,
+          learnerId: newUserId,
+          courseId:  publishedCourses[0].id,
+          status:    'active',
         });
       }
 
-      // Step 3 — log one credit-used record after learner + course are both saved
-      await apiServiceHandler('POST', 'credit-used/create', {
-        orgId:     resolvedOrgId,
-        learnerId: newUserId,
-        courseId:  selectedCourseId || null,
-        status:    'active',
-      });
-
       // Step 4 — save notification preferences
       await apiServiceHandler('PUT', `user/admin/update/${newUserId}`, {
-        whatsapp_noti: notifyPrefs.whatsapp,
         email_welcome_noti: notifyPrefs.email,
         course_assign_noti: notifyPrefs.alert,
         weekly_progress_noti: notifyPrefs.digest,
@@ -187,10 +250,14 @@ export default function AddLearnerPage() {
   }
 
   function toggleCourse(id) {
-    setSelectedCourseId(prev => prev === id ? null : id);
+    setSelectedCourseIds(prev => prev.includes(id) ? prev.filter(cid => cid !== id) : [...prev, id]);
   }
 
-  const selectedCourses = selectedCourseId ? courses.filter(c => c.id === selectedCourseId) : [];
+  const selectedCourses = courses.filter(c => selectedCourseIds.includes(c.id));
+  // Adding a learner costs a flat 1 credit — not 1 per course — and only once
+  // at least one of the selected courses is actually published.
+  const willConsumeCredit = selectedCourses.some(c => c.status === 'published');
+  const creditsToConsume   = willConsumeCredit ? 1 : 0;
 
   function stepCircleClass(i) {
     if (i < activeStep) return `${s.stepCircle} ${s.stepCircleCheck}`;
@@ -212,12 +279,12 @@ export default function AddLearnerPage() {
           <div className={s.pageHeadMeta}>
             <span className={s.metaItem}>
               <span className={s.metaIcon}>{Icon.users}</span>
-              Learners <strong>91</strong>
+              Learners <strong>{orgEmpCount ?? '—'}</strong>
             </span>
             <span className={s.metaDivider} />
             <span className={s.metaItem}>
               <span className={s.metaIcon}>{Icon.credit}</span>
-              Credits Remaining <strong>50</strong>
+              Credits Remaining <strong>{totalCredits > 0 ? creditsLeft : '—'}</strong>
             </span>
           </div>
         </div>
@@ -242,16 +309,12 @@ export default function AddLearnerPage() {
           <>
             <div className={s.creditsBanner}>
               <strong>Credits Remaining</strong>
-              {(() => {
-                const limitTo = orgCredit?.creditId?.limit_to ?? 0;
-                const remaining = limitTo ? limitTo - usedCredits : null;
-                return (
-                  <p>
-                    {remaining !== null ? `Only ${remaining} credits remaining.` : 'Credits data loading…'}{' '}
-                    Each learner added consumes 1 credit. No enrollment beyond available credits.
-                  </p>
-                );
-              })()}
+              <p>
+                {totalCredits > 0
+                  ? `Only ${creditsLeft} credit${creditsLeft !== 1 ? 's' : ''} remaining.`
+                  : 'Credits data loading…'}{' '}
+                Adding a learner consumes 1 credit, deducted once the learner is added — no matter how many courses you assign. No enrollment beyond available credits.
+              </p>
             </div>
 
             <div className={s.formCard}>
@@ -267,8 +330,8 @@ export default function AddLearnerPage() {
                   <div className={s.fieldHint}>Used for login and email notifications</div>
                 </div>
                 <div className={s.fieldGroup}>
-                  <label className={s.label}>WhatsApp Number <span className={s.req}>*</span></label>
-                  <input className={s.input} placeholder="e.g. +91 98765 43210" value={form.whatsapp} onChange={set('whatsapp')} />
+                  <label className={s.label}>WhatsApp No <span className={s.req}>*</span></label>
+                  <input className={s.input} placeholder="e.g. +91 98765 43210" value={form.whatsapp_no} onChange={set('whatsapp_no')} />
                   <div className={s.fieldHint}>Used for course reminders and alerts</div>
                 </div>
                 <div className={s.fieldGroup}>
@@ -328,8 +391,8 @@ export default function AddLearnerPage() {
                 </div>
               </div>
               <div className={s.assignCourseRow}>
-                <button type="button" className={s.btnAssignCourse} onClick={() => setActiveStep(1)}>
-                  Assign Course
+                <button type="button" className={s.btnAssignCourse} onClick={goToStep1} disabled={checkingDup}>
+                  {checkingDup ? 'Checking…' : 'Assign Course'}
                 </button>
               </div>
             </div>
@@ -341,7 +404,7 @@ export default function AddLearnerPage() {
           <>
             <div className={s.selectCoursesCard}>
               <strong>Select Courses To Assign</strong>
-              <p>Courses follow sequential access — learner must complete each video before unlocking the quiz and the next chapter.</p>
+              <p>Courses follow sequential access — learner must complete each video before unlocking the quiz and the next chapter. Only published courses are listed below — draft courses aren&apos;t ready for a learner yet. You can assign more than one at a time; adding this learner still costs just 1 credit in total, regardless of how many you select.</p>
             </div>
             <div className={s.courseListCard}>
               <div className={s.courseListTitle}>Available Courses</div>
@@ -350,7 +413,7 @@ export default function AddLearnerPage() {
               ) : courses.length === 0 ? (
                 <div style={{ padding: '16px', color: '#888' }}>No courses found.</div>
               ) : courses.map(course => {
-                const isSelected = selectedCourseId === course.id;
+                const isSelected = selectedCourseIds.includes(course.id);
                 return (
                   <div key={course.id} className={`${s.courseItem} ${isSelected ? s.courseItemSelected : ''}`}
                     onClick={() => toggleCourse(course.id)}>
@@ -361,7 +424,7 @@ export default function AddLearnerPage() {
                         onClick={(e) => { e.stopPropagation(); toggleCourse(course.id); }}
                         aria-label={isSelected ? 'Deselect' : 'Select'}
                       >
-                        {isSelected && <span className={s.courseCircleCheck} />}
+                        {isSelected && <span className={s.courseCircleCheck}>{Icon.check}</span>}
                       </button>
                       <div className={s.courseInfo}>
                         <div className={s.courseName}>{course.name}</div>
@@ -389,10 +452,9 @@ export default function AddLearnerPage() {
               <h2 className={s.sectionTitle}>Notification Preferences</h2>
               <p className={s.notifSubtitle}>Send welcome notification</p>
               {[
-                { key: 'whatsapp', label: 'WhatsApp Welcome Message', desc: 'Send login link and course list via WhatsApp (Interakt)' },
                 { key: 'email',    label: 'Email Welcome Message',    desc: 'Send account credentials and getting started guide' },
                 { key: 'alert',    label: 'Course Assignment Alert',  desc: 'Notify learner of assigned courses with direct links' },
-                { key: 'digest',   label: 'Weekly Progress Digest',   desc: 'Enroll in weekly WhatsApp progress summary' },
+                { key: 'digest',   label: 'Weekly Progress Digest',   desc: 'Enroll in weekly progress summary email' },
               ].map(item => (
                 <div key={item.key} className={s.notifRow}>
                   <div className={s.notifInfo}>
@@ -455,21 +517,12 @@ export default function AddLearnerPage() {
               <div className={s.snapshotCol}>
                 <div className={s.snapshotCard}>
                   <h3 className={s.snapshotTitle}>Store Snapshot</h3>
-                  {(() => {
-                    const limitTo = orgCredit?.creditId?.limit_to ?? 0;
-                    const creditsRemaining = limitTo - usedCredits;
-                    const afterAdding = creditsRemaining - 1;
-                    return (
-                      <>
-                        <div className={s.snapshotRow}><span className={s.snapshotKey}>Plan</span><span className={s.snapshotVal}>{orgCredit?.creditId?.title || '–'}</span></div>
-                        <div className={s.snapshotRow}><span className={s.snapshotKey}>Total learners</span><span className={s.snapshotVal}>{orgEmpCount != null ? orgEmpCount : '–'}</span></div>
-                        <div className={s.snapshotRow}><span className={s.snapshotKey}>Credits remaining</span><span className={s.snapshotVal}>{limitTo ? creditsRemaining : '–'}</span></div>
-                        <div className={s.snapshotRow}><span className={s.snapshotKey}>Credit cost</span><span className={s.snapshotVal}>1 Per Learner</span></div>
-                        <div className={s.snapshotRow}><span className={s.snapshotKey}>After adding</span><span className={s.snapshotValAccent}>{limitTo ? `${afterAdding} Remaining` : '–'}</span></div>
-                        <div className={s.snapshotRow}><span className={s.snapshotKey}>Credits used</span><span className={s.snapshotVal}>{usedCredits}</span></div>
-                      </>
-                    );
-                  })()}
+                  <div className={s.snapshotRow}><span className={s.snapshotKey}>Plan</span><span className={s.snapshotVal}>{lastOrgCredit?.creditId?.title || '–'}</span></div>
+                  <div className={s.snapshotRow}><span className={s.snapshotKey}>Total learners</span><span className={s.snapshotVal}>{orgEmpCount != null ? orgEmpCount : '–'}</span></div>
+                  <div className={s.snapshotRow}><span className={s.snapshotKey}>Credits remaining</span><span className={s.snapshotVal}>{totalCredits > 0 ? creditsLeft : '–'}</span></div>
+                  <div className={s.snapshotRow}><span className={s.snapshotKey}>Credit cost</span><span className={s.snapshotVal}>1 Per Learner Added</span></div>
+                  <div className={s.snapshotRow}><span className={s.snapshotKey}>After adding</span><span className={s.snapshotValAccent}>{totalCredits > 0 ? `${creditsLeft - creditsToConsume} Remaining` : '–'}</span></div>
+                  <div className={s.snapshotRow}><span className={s.snapshotKey}>Credits used</span><span className={s.snapshotVal}>{assignedCount}</span></div>
                 </div>
 
                 <div className={s.snapshotCard} style={{ marginTop: 12 }}>
@@ -478,13 +531,21 @@ export default function AddLearnerPage() {
                     ? selectedCourses.map(c => (
                       <div key={c.id} className={s.selectedCourseRow}>
                         <span className={s.selectedCourseName}>{c.name}</span>
-                        <span className={s.selectedBadge}>Selected</span>
+                        <span className={c.status === 'published' ? s.courseStatusPublished : s.courseStatusDraft}>
+                          {c.status === 'published' ? 'Published' : 'Draft'}
+                        </span>
                       </div>
                     ))
                     : <div className={s.noCoursesHint}>No courses selected</div>}
                   <div className={s.totalSelectedRow}>
                     <span className={s.totalSelectedLabel}>Total Selected</span>
                     <span className={s.totalSelectedVal}>{selectedCourses.length} Course{selectedCourses.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div className={s.totalSelectedRow}>
+                    <span className={s.totalSelectedLabel}>Credit Impact</span>
+                    <span className={s.totalSelectedVal}>
+                      {selectedCourses.length === 0 ? '—' : willConsumeCredit ? '1 credit' : 'Free (no published course yet)'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -508,20 +569,20 @@ export default function AddLearnerPage() {
           </button>
         )}
         {activeStep === 0 && (
-          <button className={s.btnNext} onClick={() => setActiveStep(1)}>
-            Next: Assign Courses
-            <span className={s.footerArrow}>{Icon.arrowRight}</span>
+          <button className={s.btnNext} onClick={goToStep1} disabled={checkingDup}>
+            {checkingDup ? 'Checking…' : 'Next: Assign Courses'}
+            {!checkingDup && <span className={s.footerArrow}>{Icon.arrowRight}</span>}
           </button>
         )}
         {activeStep === 1 && (
-          <button className={s.btnNext} onClick={() => setActiveStep(2)}>
+          <button className={s.btnNext} onClick={goToStep2}>
             Next: Confirm &amp; Notify
             <span className={s.footerArrow}>{Icon.arrowRight}</span>
           </button>
         )}
         {activeStep === 2 && (
           <div className={s.footerRightGroup}>
-            <button className={s.btnDiscard} onClick={() => { setForm(EMPTY_FORM); setSelectedCourseId(null); setActiveStep(0); }}>
+            <button className={s.btnDiscard} onClick={() => { setForm(EMPTY_FORM); setSelectedCourseIds([]); setActiveStep(0); }}>
               Discard
             </button>
             <button className={s.btnNext} onClick={handleSave} disabled={saving}>

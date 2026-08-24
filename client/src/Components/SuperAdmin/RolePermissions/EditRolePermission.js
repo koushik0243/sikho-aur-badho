@@ -5,8 +5,8 @@ import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from './RolePermissions.module.css';
-import rp from './RolePermission.module.css';
+import s from "./EditRolePermission.module.css";
+import rp from "./EditRolePermission.module.css";
 
 const BackArrow = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">

@@ -90,19 +90,17 @@ export default function OtpForm() {
   return (
     <div className={styles.formBox}>
       {/* Logo */}
-      <div className={styles.logo}>
-        sikho<span className={styles.logoAccent} />urbadho
-      </div>
+      <img src="/logo.png" alt="sikhoaurbadho" className={styles.logoImg} />
       <p className={styles.tagline}>Sign in to continue</p>
 
       <h2 className={`${styles.formTitle} ${styles.otpHeader}`}>Enter OTP</h2>
       <p className={styles.otpSubtext}>
-        Sent to {maskIdentifier(identifier)} via WhatsApp
+        Sent to {maskIdentifier(identifier)}
       </p>
 
       <div className={styles.infoBox}>
         <span>❓</span>
-        OTP delivered via WhatsApp (Interakt). Check your messages.
+        OTP delivered via SMS or email. Check your messages.
       </div>
 
       {error && <div className={styles.errorBanner}>{error}</div>}

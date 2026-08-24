@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -6,11 +6,17 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from './RolePermissions.module.css';
+import s from "./RolePermissionsList.module.css";
 
 const SearchIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
     <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+  </svg>
+);
+const ViewIcon = () => (
+  <svg viewBox="0 0 20 20" fill="currentColor">
+    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+    <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
   </svg>
 );
 const EditIcon = () => (
@@ -68,20 +74,20 @@ function buildPermissionsLabel(permDocs) {
 }
 
 /* ── Badges ─────────────────────────────────────────────────────────────── */
-const TYPE_BADGE = {
-  superadmin:   { label: 'Super Admin',  bg: '#ede9fe', color: '#7c3aed' },
-  organization: { label: 'Organization', bg: '#dcfce7', color: '#16a34a' },
+const TYPE_LABEL = {
+  superadmin:   'Super Admin',
+  organization: 'Organization',
 };
 
 function TypeBadge({ userType }) {
-  const t = TYPE_BADGE[userType] || { label: userType || '—', bg: '#f3f4f6', color: '#374151' };
+  const label = TYPE_LABEL[userType] || userType || '—';
   return (
     <span style={{
       display: 'inline-block', padding: '2px 10px', borderRadius: 20,
-      fontSize: 11.5, fontWeight: 700, background: t.bg, color: t.color,
+      fontSize: 11.5, fontWeight: 400, background: 'transparent', color: '#000',
       whiteSpace: 'nowrap',
     }}>
-      {t.label}
+      {label}
     </span>
   );
 }
@@ -136,6 +142,7 @@ export default function RolePermissionsList() {
       if (!map[roleId]) {
         map[roleId] = {
           roleId,
+          firstRecordId: r._id,
           roleName:     r.role_id?.display_name || r.role_id?.name || '—',
           roleUserType: r.role_id?.user_type || 'superadmin',
           roleOrgId:    r.role_id?.organizationId?.toString() || null,
@@ -247,7 +254,7 @@ export default function RolePermissionsList() {
         onCancel={() => setBulkConfirm(false)}
       />
 
-      <div className={s.pageHeader}>
+      <div className={s.pageHeader} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '12px' }}>
         <div>
           <h1 className={s.pageTitle}>Assign Role</h1>
           <p className={s.pageSubtitle}>Manage role-permission assignments</p>
@@ -305,7 +312,7 @@ export default function RolePermissionsList() {
                 const orgName = row.roleOrgId ? (orgMap[row.roleOrgId] || row.roleOrgId) : '—';
                 return (
                   <tr key={row.roleId} style={{ cursor: 'pointer' }} onClick={() => toggleOne(row.roleId)}>
-                    <td className={s.checkTd}>
+                    <td className={s.checkTd} onClick={e => e.stopPropagation()}>
                       <input type="checkbox" checked={selected.includes(row.roleId)} onChange={() => toggleOne(row.roleId)} />
                     </td>
                     <td>{(page - 1) * LIMIT + idx + 1}</td>
@@ -315,6 +322,13 @@ export default function RolePermissionsList() {
                     <td className={s.permCell}>{buildPermissionsLabel(row.permissions)}</td>
                     <td>
                       <div className={s.actions} onClick={e => e.stopPropagation()}>
+                        <button
+                          className={s.btnView}
+                          title="View"
+                          onClick={() => router.push(`/superadmin/role-permissions/${row.firstRecordId}`)}
+                        >
+                          <ViewIcon />
+                        </button>
                         <button
                           className={s.btnEdit}
                           title="Edit"

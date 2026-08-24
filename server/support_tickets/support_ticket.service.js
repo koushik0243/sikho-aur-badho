@@ -33,7 +33,7 @@ export const createTicket = async (data, orgId) => {
 export const listTickets = async (filters = {}) => {
   try {
     const query = buildQuery(filters);
-    return await Ticket.find(query).populate('orgId', 'org_name').sort({ createdAt: -1 });
+    return await Ticket.find(query).populate('orgId', 'org_name').sort({ createdAt: -1 }).lean();
   } catch (error) {
     throw error;
   }
@@ -41,7 +41,7 @@ export const listTickets = async (filters = {}) => {
 
 export const editTicket = async (id) => {
   try {
-    return await Ticket.findOne({ _id: id, deletedAt: null }).populate('orgId', 'org_name');
+    return await Ticket.findOne({ _id: id, deletedAt: null }).populate('orgId', 'org_name').lean();
   } catch (error) {
     throw error;
   }
@@ -68,7 +68,7 @@ export const updateTicket = async (id, data, adminInfo = {}) => {
       { _id: id, deletedAt: null },
       { $set: updateFields, $push: { logs: logEntry } },
       { returnDocument: 'after', runValidators: true }
-    );
+    ).lean();
   } catch (error) {
     throw error;
   }
@@ -80,7 +80,7 @@ export const deleteTicket = async (id) => {
       { _id: id, deletedAt: null },
       { $set: { deletedAt: new Date(), status: 'deleted' } },
       { returnDocument: 'before' }
-    );
+    ).lean();
   } catch (error) {
     throw error;
   }

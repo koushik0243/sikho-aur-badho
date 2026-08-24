@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from './Courses.module.css';
+import s from "./CourseBuilderList.module.css";
 
 const Icon = {
   search: (
@@ -168,7 +168,7 @@ export default function CourseBuilderList() {
         onCancel={() => setConfirm({ show: false, id: null })}
       />
 
-      <div className={s.pageHeader}>
+      <div className={s.pageHeader} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '12px' }}>
         <div>
           <h1 className={s.pageTitle}>Course Builder</h1>
           <p className={s.pageSubtitle}>Create and manage courses</p>
@@ -199,7 +199,6 @@ export default function CourseBuilderList() {
                 </th>
                 <th className={s.numCol}>#</th>
                 <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('title')}>Title{sortArrow('title')}</th>
-                <th>Slug</th>
                 <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('catTitle')}>Category{sortArrow('catTitle')}</th>
                 <th>Sub-Category</th>
                 <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('duration')}>Duration{sortArrow('duration')}</th>
@@ -212,9 +211,9 @@ export default function CourseBuilderList() {
             </thead>
             <tbody>
               {loading ? (
-                <tr className={s.emptyRow}><td colSpan={12}>Loading…</td></tr>
+                <tr className={s.emptyRow}><td colSpan={11}>Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr className={s.emptyRow}><td colSpan={12}>No courses found.</td></tr>
+                <tr className={s.emptyRow}><td colSpan={11}>No courses found.</td></tr>
               ) : sorted.map((row, idx) => (
                 <tr key={row._id}>
                   <td className={s.checkTd}>
@@ -231,14 +230,16 @@ export default function CourseBuilderList() {
                       <span className={s.courseTitle}>{row.title ?? '—'}</span>
                     </div>
                   </td>
-                  <td><span className={s.slugText}>{row.slug ?? '—'}</span></td>
                   <td>{row.catId?.title ?? '—'}</td>
                   <td>
                     {Array.isArray(row.subCatIds) && row.subCatIds.length > 0 ? (
                       <div className={s.subCatWrap}>
-                        {row.subCatIds.map(sc => (
+                        {row.subCatIds.slice(0, 2).map(sc => (
                           <span key={sc._id ?? sc} className={s.subCatTag}>{sc.name ?? sc}</span>
                         ))}
+                        {row.subCatIds.length > 2 && (
+                          <span className={s.subCatMore}>+{row.subCatIds.length - 2}</span>
+                        )}
                       </div>
                     ) : '—'}
                   </td>
@@ -248,7 +249,7 @@ export default function CourseBuilderList() {
                   <td><StatusLabel status={row.status} /></td>
                   <td>{fmtDate(row.createdAt)}</td>
                   <td>
-                    <div className={s.actions}>
+                    <div className={s.actions} onClick={e => e.stopPropagation()}>
                       <button className={s.btnView} title="View"
                         onClick={() => router.push(`/superadmin/course-builder/${row._id}/view`)}>
                         {Icon.eye}

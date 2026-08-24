@@ -21,7 +21,7 @@ const buildQuery = (filters = {}) => {
 const populateRefs = (query) =>
     query
         .populate('orgId', '_id org_name')
-        .populate('courseId', '_id title slug')
+        .populate('courseId', '_id title slug status')
         .populate('coursePriceId', '_id price mrp_price quantity');
 
 export const createOrganizationCourse = async (data) => {
@@ -43,7 +43,7 @@ export const editOrganizationCourse = async (editId) => {
     try {
         return await populateRefs(
             OrganizationCourse.findOne({ _id: editId, deletedAt: null })
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -60,7 +60,7 @@ export const updateOrganizationCourse = async (updateId, data) => {
         if (Object.keys(updateFields).length === 0) {
             return await populateRefs(
                 OrganizationCourse.findOne({ _id: updateId, deletedAt: null })
-            );
+            ).lean();
         }
 
         updateFields.updatedAt = new Date();
@@ -69,7 +69,7 @@ export const updateOrganizationCourse = async (updateId, data) => {
             { _id: updateId, deletedAt: null },
             { $set: updateFields },
             { new: false, runValidators: true }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -80,7 +80,7 @@ export const listOrganizationCourse = async (filters = {}) => {
         const query = buildQuery(filters);
         return await populateRefs(
             OrganizationCourse.find(query).sort({ createdAt: -1 })
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -94,7 +94,7 @@ export const listOrganizationCoursePagination = async (page, limit, filters = {}
                 .sort({ createdAt: -1 })
                 .skip((page - 1) * limit)
                 .limit(limit)
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -115,7 +115,7 @@ export const deleteOrganizationCourse = async (delId) => {
             { _id: delId, deletedAt: null },
             { $set: { deletedAt: new Date(), status: 'inactive' } },
             { new: false }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }

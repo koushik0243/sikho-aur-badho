@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from './OrgCourseAssignment.module.css';
+import s from "./OrgCourseAssignmentList.module.css";
 
 const SearchIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -16,6 +16,17 @@ const SearchIcon = () => (
 const TrashIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
     <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+  </svg>
+);
+const EyeIcon = () => (
+  <svg viewBox="0 0 20 20" fill="currentColor">
+    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+    <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+  </svg>
+);
+const EditIcon = () => (
+  <svg viewBox="0 0 20 20" fill="currentColor">
+    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
   </svg>
 );
 
@@ -149,7 +160,7 @@ export default function OrgCourseAssignmentList() {
         onCancel={() => setConfirm({ show: false, id: null, label: '' })}
       />
 
-      <div className={s.pageHeader}>
+      <div className={s.pageHeader} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '12px' }}>
         <div>
           <h1 className={s.pageTitle}>Course Assignments</h1>
           <p className={s.pageSubtitle}>Manage course assignments to organizations</p>
@@ -231,13 +242,29 @@ export default function OrgCourseAssignmentList() {
                       </td>
                       <td>{fmtDate(course.createdAt)}</td>
                       <td>
-                        <button
-                          className={s.btnDelete}
-                          title="Delete"
-                          onClick={() => setConfirm({ show: true, id: course.recordId, label: course.title })}
-                        >
-                          <TrashIcon />
-                        </button>
+                        <div className={s.actions} onClick={e => e.stopPropagation()}>
+                          <button
+                            className={s.btnView}
+                            title="View"
+                            onClick={() => router.push(`/superadmin/organization-course-assignment/view/${g.orgId}`)}
+                          >
+                            <EyeIcon />
+                          </button>
+                          <button
+                            className={s.btnEdit}
+                            title="Edit"
+                            onClick={() => router.push(`/superadmin/organization-course-assignment/${g.orgId}`)}
+                          >
+                            <EditIcon />
+                          </button>
+                          <button
+                            className={s.btnDelete}
+                            title="Delete"
+                            onClick={() => setConfirm({ show: true, id: course.recordId, label: course.title })}
+                          >
+                            <TrashIcon />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ));

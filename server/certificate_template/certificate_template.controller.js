@@ -45,8 +45,10 @@ const listCertificateTemplatesPagination = async (req, res, next) => {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const { status } = req.query;
-        const data = await CertificateTemplateService.listCertificateTemplatesPagination(page, limit, { status });
-        const total = await CertificateTemplateService.getCertificateTemplateCount({ status });
+        const [data, total] = await Promise.all([
+            CertificateTemplateService.listCertificateTemplatesPagination(page, limit, { status }),
+            CertificateTemplateService.getCertificateTemplateCount({ status })
+        ]);
         res.status(200).json({
             status: 200,
             message: "Successfully fetched.",

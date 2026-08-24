@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { selectUser } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
-import s from './OrgDashboard.module.css';
+import s from "./OrgDashboard.module.css";
 
 // ── StatRing ────────────────────────────────────────────────────
 function StatRing({ value, pct, light }) {
@@ -51,42 +51,23 @@ function CourseBar({ pct, label }) {
 }
 
 function Av({ name }) {
-  const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const initials = (name || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
   return <div className={s.avatar}>{initials}</div>;
 }
 
-const COURSES = [
-  { label: 'QC Basics',           pct: 88 },
-  { label: 'Safety At Work',      pct: 74 },
-  { label: 'Compliance & Ethics', pct: 74 },
-  { label: 'Leadership Basics',   pct: 74 },
-  { label: 'Fire Safety',         pct: 88 },
-];
-
-const TOP = [
-  { name: 'Mike Devid' },
-  { name: 'Karan Malhotra', highlight: true },
-  { name: 'Sneha Iyer' },
-  { name: 'Rahul Das' },
-];
-
-const BOTTOM = [
-  { name: 'Aarav Sharma', badge: 'AT RISK',    cls: 'badgeRisk' },
-  { name: 'Riya Mehta',   badge: 'STRUGGLING', cls: 'badgeStruggling' },
-  { name: 'Arjun Verma',  badge: 'STRUGGLING', cls: 'badgeStruggling' },
-  { name: 'Neha Kapoor',  badge: 'STRUGGLING', cls: 'badgeStruggling' },
-];
-
-const ACTIVITY = [
-  { text: 'Anita Sharma completed Safety at Work',   meta: '1 Hour Ago · Certificate Issued' },
-  { text: '5 new learners added to QC Basics',       meta: '3 Hours Ago' },
-  { text: 'Priya K. failed Ethics quiz — retry 2/2', meta: 'Yesterday · Mandatory Rewatch Triggered' },
-  { text: 'Credits low — 50 remaining of 500',       meta: 'Yesterday · Consider Upgrading Plan' },
-  { text: 'Credits low — 50 remaining of 500',       meta: 'Yesterday · Consider Upgrading Plan' },
-  { text: 'Credits low — 50 remaining of 500',       meta: 'Yesterday · Consider Upgrading Plan' },
-  { text: 'Credits low — 50 remaining of 500',       meta: 'Yesterday · Consider Upgrading Plan' },
-  { text: 'Credits low — 50 remaining of 500',       meta: 'Yesterday · Consider Upgrading Plan' },
-];
+function fmtRelative(iso) {
+  if (!iso) return '';
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins} Minute${mins !== 1 ? 's' : ''} Ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} Hour${hrs !== 1 ? 's' : ''} Ago`;
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return 'Yesterday';
+  if (days < 30) return `${days} Days Ago`;
+  return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
 
 const StatIcons = {
   learners:   <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zm8 0a3 3 0 11-6 0 3 3 0 016 0zM6.865 14c.41-1.135 1.53-2 2.635-2h1c1.105 0 2.226.865 2.635 2H6.865zM1 14a5.002 5.002 0 019-3h.001A5 5 0 0119 14v1H1v-1z" /></svg>,
@@ -95,9 +76,18 @@ const StatIcons = {
   credits:    <svg viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" /><path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd" /></svg>,
 };
 
+const EMPTY_SUMMARY = {
+  learnerCount: 0, newLearnersThisMonth: 0,
+  coursesAssignedCount: 0, newCoursesThisMonth: 0,
+  completionRate: 0,
+  totalCredits: 0, creditsLeft: 0, isLowOnCredits: false,
+  courseCompletion: [], topPerformers: [], bottomPerformers: [], activity: [],
+};
+
 export default function OrganizationDashboard() {
   const user = useSelector(selectUser);
-  const [stats, setStats] = useState({ learners: null, coursesAssigned: null });
+  const [summary, setSummary]   = useState(EMPTY_SUMMARY);
+  const [loading, setLoading]   = useState(true);
 
   function getTokenUserId() {
     if (typeof window === 'undefined') return null;
@@ -109,7 +99,8 @@ export default function OrganizationDashboard() {
     } catch { return null; }
   }
 
-  const loadStats = useCallback(async () => {
+  const loadSummary = useCallback(async () => {
+    setLoading(true);
     try {
       let effectiveOrgId = user?.orgId ? String(user.orgId) : null;
       if (!effectiveOrgId) {
@@ -120,24 +111,31 @@ export default function OrganizationDashboard() {
           if (rec?.orgId) effectiveOrgId = String(rec.orgId);
         }
       }
-      if (!effectiveOrgId) return;
+      if (!effectiveOrgId) { setSummary(EMPTY_SUMMARY); return; }
 
-      const [learnersRes, orgCoursesRes] = await Promise.all([
-        apiServiceHandler('GET', `user/admin/list?orgId=${effectiveOrgId}&user_type=employee&orgRole=employee`),
-        apiServiceHandler('GET', `organization-course/list?orgId=${effectiveOrgId}`),
-      ]);
-
-      const learnerList   = Array.isArray(learnersRes?.data)    ? learnersRes.data    : (Array.isArray(learnersRes)    ? learnersRes    : []);
-      const orgCourseList = Array.isArray(orgCoursesRes?.data)  ? orgCoursesRes.data  : (Array.isArray(orgCoursesRes)  ? orgCoursesRes  : []);
-
-      setStats({ learners: learnerList.length, coursesAssigned: orgCourseList.length });
-    } catch { /* silent */ }
+      const res = await apiServiceHandler('GET', `org-dashboard/summary?orgId=${effectiveOrgId}`);
+      setSummary({ ...EMPTY_SUMMARY, ...(res?.data ?? res ?? {}) });
+    } catch {
+      setSummary(EMPTY_SUMMARY);
+    } finally {
+      setLoading(false);
+    }
   }, [user?._id, user?.orgId]);
 
-  useEffect(() => { loadStats(); }, [loadStats]);
+  useEffect(() => { loadSummary(); }, [loadSummary]);
 
-  const learnerCnt = stats.learners ?? 0;
-  const courseCnt  = stats.coursesAssigned ?? 0;
+  const {
+    learnerCount, newLearnersThisMonth,
+    coursesAssignedCount, newCoursesThisMonth,
+    completionRate, totalCredits, creditsLeft, isLowOnCredits,
+    courseCompletion, topPerformers, bottomPerformers, activity,
+  } = summary;
+
+  const creditsStatusText = totalCredits === 0
+    ? 'No credits purchased yet'
+    : isLowOnCredits
+    ? `Low — ${totalCredits} Issued`
+    : `${totalCredits} Issued`;
 
   return (
     <>
@@ -152,10 +150,12 @@ export default function OrganizationDashboard() {
               <div className={s.statIcon}>{StatIcons.learners}</div>
               <div className={s.statLabel}>Total Learners</div>
             </div>
-            <div className={s.statValue}>{stats.learners ?? '—'}</div>
-            <div className={`${s.statDelta} ${s.statDeltaUp}`}>↑ 7 This Month</div>
+            <div className={s.statValue}>{loading ? '—' : learnerCount}</div>
+            {newLearnersThisMonth > 0 && (
+              <div className={`${s.statDelta} ${s.statDeltaUp}`}>↑ {newLearnersThisMonth} This Month</div>
+            )}
           </div>
-          <StatRing value={learnerCnt} pct={Math.min(learnerCnt, 100)} />
+          <StatRing value={learnerCount} pct={Math.min(learnerCount, 100)} />
         </div>
 
         <div className={s.statCard}>
@@ -164,10 +164,12 @@ export default function OrganizationDashboard() {
               <div className={s.statIcon}>{StatIcons.courses}</div>
               <div className={s.statLabel}>Courses Assigned</div>
             </div>
-            <div className={s.statValue}>{stats.coursesAssigned ?? '—'}</div>
-            <div className={`${s.statDelta} ${s.statDeltaUp}`}>↑ 1 New</div>
+            <div className={s.statValue}>{loading ? '—' : coursesAssignedCount}</div>
+            {newCoursesThisMonth > 0 && (
+              <div className={`${s.statDelta} ${s.statDeltaUp}`}>↑ {newCoursesThisMonth} New</div>
+            )}
           </div>
-          <StatRing value={courseCnt} pct={Math.min(courseCnt / 20 * 100, 100)} />
+          <StatRing value={coursesAssignedCount} pct={Math.min(coursesAssignedCount / 20 * 100, 100)} />
         </div>
 
         <div className={s.statCard}>
@@ -176,10 +178,9 @@ export default function OrganizationDashboard() {
               <div className={s.statIcon}>{StatIcons.completion}</div>
               <div className={s.statLabel}>Completion Rate</div>
             </div>
-            <div className={s.statValue}>74%</div>
-            <div className={`${s.statDelta} ${s.statDeltaUp}`}>↑ 6% MoM</div>
+            <div className={s.statValue}>{loading ? '—' : `${completionRate}%`}</div>
           </div>
-          <StatRing value="74" pct={74} />
+          <StatRing value={`${completionRate}`} pct={completionRate} />
         </div>
 
         <div className={s.statCard}>
@@ -188,10 +189,10 @@ export default function OrganizationDashboard() {
               <div className={s.statIcon}>{StatIcons.credits}</div>
               <div className={s.statLabel}>Credits Remaining</div>
             </div>
-            <div className={s.statValue}>50</div>
-            <div className={`${s.statDelta} ${s.statDeltaWarn}`}>Low — 500 Issued</div>
+            <div className={s.statValue}>{loading ? '—' : creditsLeft}</div>
+            <div className={`${s.statDelta} ${isLowOnCredits ? s.statDeltaWarn : s.statDeltaUp}`}>{creditsStatusText}</div>
           </div>
-          <StatRing value="50" pct={10} />
+          <StatRing value={creditsLeft} pct={totalCredits > 0 ? Math.min((creditsLeft / totalCredits) * 100, 100) : 0} />
         </div>
 
       </div>
@@ -202,9 +203,13 @@ export default function OrganizationDashboard() {
 
           <div className={s.card}>
             <div className={s.cardTitle}>Course completion overview</div>
-            <div className={s.courseBarRow}>
-              {COURSES.map(c => <CourseBar key={c.label} pct={c.pct} label={c.label} />)}
-            </div>
+            {courseCompletion.length === 0 ? (
+              <p className={s.emptyText}>{loading ? 'Loading…' : 'No courses assigned to this organization yet.'}</p>
+            ) : (
+              <div className={s.courseBarRow}>
+                {courseCompletion.map(c => <CourseBar key={c.label} pct={c.pct} label={c.label} />)}
+              </div>
+            )}
           </div>
 
           <div className={s.card}>
@@ -212,16 +217,18 @@ export default function OrganizationDashboard() {
               <div>
                 <div className={s.cardTitle}>Top performers</div>
                 <div className={s.performerList}>
-                  {TOP.map(p => (
-                    <div key={p.name}
-                         className={`${s.performerRow} ${p.highlight ? s.performerRowHighlight : ''}`}>
+                  {topPerformers.length === 0 ? (
+                    <p className={s.emptyText}>{loading ? 'Loading…' : 'No quiz attempts yet.'}</p>
+                  ) : topPerformers.map((p, i) => (
+                    <div key={p.name + i}
+                         className={`${s.performerRow} ${i === 0 ? s.performerRowHighlight : ''}`}>
                       <Av name={p.name} />
                       <div className={s.performerInfo}>
                         <div className={s.performerName}>{p.name}</div>
-                        <div className={s.performerMeta}>Courses Done: 4/6</div>
-                        <div className={s.performerMeta}>Avg. Score: 94%</div>
+                        <div className={s.performerMeta}>Courses Passed: {p.coursesPassed}/{p.coursesAssigned}</div>
+                        <div className={s.performerMeta}>Avg. Score: {p.avgScore}%</div>
                       </div>
-                      <span className={`${s.badge} ${s.badgeTop}`}>TOP</span>
+                      {i === 0 && <span className={`${s.badge} ${s.badgeTop}`}>TOP</span>}
                     </div>
                   ))}
                 </div>
@@ -229,17 +236,27 @@ export default function OrganizationDashboard() {
               <div>
                 <div className={s.cardTitle}>Bottom performers</div>
                 <div className={s.performerList}>
-                  {BOTTOM.map(p => (
-                    <div key={p.name} className={s.performerRow}>
-                      <Av name={p.name} />
-                      <div className={s.performerInfo}>
-                        <div className={s.performerName}>{p.name}</div>
-                        <div className={s.performerMeta}>Courses Done: 4/6</div>
-                        <div className={s.performerMeta}>Avg. Score: 94%</div>
+                  {bottomPerformers.length === 0 ? (
+                    <p className={s.emptyText}>
+                      {loading ? 'Loading…' : topPerformers.length > 0
+                        ? 'Not enough learners yet for a separate bottom-performer group.'
+                        : 'No quiz attempts yet.'}
+                    </p>
+                  ) : bottomPerformers.map((p, i) => {
+                    const badge = p.avgScore < 40 ? 'AT RISK' : 'STRUGGLING';
+                    const cls = p.avgScore < 40 ? 'badgeRisk' : 'badgeStruggling';
+                    return (
+                      <div key={p.name + i} className={s.performerRow}>
+                        <Av name={p.name} />
+                        <div className={s.performerInfo}>
+                          <div className={s.performerName}>{p.name}</div>
+                          <div className={s.performerMeta}>Courses Passed: {p.coursesPassed}/{p.coursesAssigned}</div>
+                          <div className={s.performerMeta}>Avg. Score: {p.avgScore}%</div>
+                        </div>
+                        <span className={`${s.badge} ${s[cls]}`}>{badge}</span>
                       </div>
-                      <span className={`${s.badge} ${s[p.cls]}`}>{p.badge}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -249,17 +266,21 @@ export default function OrganizationDashboard() {
 
         <div className={`${s.card} ${s.activityCard}`}>
           <div className={s.cardTitle}>Recent activity</div>
-          <div className={s.activityList}>
-            {ACTIVITY.map((a, i) => (
-              <div key={i} className={s.activityItem}>
-                <div className={s.activityNum}>{String(i + 1).padStart(2, '0')}</div>
-                <div className={s.activityBody}>
-                  <div className={s.activityText}>{a.text}</div>
-                  <div className={s.activityMeta}>{a.meta}</div>
+          {activity.length === 0 ? (
+            <p className={s.emptyText}>{loading ? 'Loading…' : 'No recent activity yet.'}</p>
+          ) : (
+            <div className={s.activityList}>
+              {activity.map((a, i) => (
+                <div key={i} className={s.activityItem}>
+                  <div className={s.activityNum}>{String(i + 1).padStart(2, '0')}</div>
+                  <div className={s.activityBody}>
+                    <div className={s.activityText}>{a.text}</div>
+                    <div className={s.activityMeta}>{fmtRelative(a.date)}</div>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </>

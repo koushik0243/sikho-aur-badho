@@ -14,7 +14,7 @@ export const createTag = async (data, userId = null) => {
         const baseSlug = generateSlug(data.title);
         let slug = baseSlug;
         let counter = 1;
-        while (await Tag.findOne({ slug })) {
+        while (await Tag.findOne({ slug }).lean()) {
             slug = `${baseSlug}-${counter++}`;
         }
         return await new Tag({
@@ -31,7 +31,7 @@ export const createTag = async (data, userId = null) => {
 
 export const getTag = async (id) => {
     try {
-        return await Tag.findOne({ _id: id, deletedAt: null });
+        return await Tag.findOne({ _id: id, deletedAt: null }).lean();
     } catch (error) {
         throw error;
     }
@@ -52,7 +52,7 @@ export const updateTag = async (id, data) => {
             { _id: id, deletedAt: null },
             { $set: updateFields },
             { new: true, runValidators: true }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -61,7 +61,7 @@ export const updateTag = async (id, data) => {
 export const listTags = async (filters = {}) => {
     try {
         const query = buildQuery(filters);
-        return await Tag.find(query).sort({ title: 1 });
+        return await Tag.find(query).sort({ title: 1 }).lean();
     } catch (error) {
         throw error;
     }
@@ -73,7 +73,8 @@ export const listTagsPagination = async (page, limit, filters = {}) => {
         return await Tag.find(query)
             .sort({ createdAt: -1 })
             .skip((page - 1) * limit)
-            .limit(limit);
+            .limit(limit)
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -94,7 +95,7 @@ export const deleteTag = async (id) => {
             { _id: id, deletedAt: null },
             { $set: { deletedAt: new Date() } },
             { new: true }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }

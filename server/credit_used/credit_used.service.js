@@ -35,7 +35,7 @@ export const createCreditUsed = async (data) => {
 };
 
 export const editCreditUsed = async (id) => {
-    return await populateRefs(CreditUsed.findById(id));
+    return await populateRefs(CreditUsed.findById(id)).lean();
 };
 
 export const updateCreditUsed = async (id, data) => {
@@ -47,14 +47,14 @@ export const updateCreditUsed = async (id, data) => {
     if (data.deletedAt !== undefined) fields.deletedAt = data.deletedAt;
 
     if (Object.keys(fields).length === 0) {
-        return await populateRefs(CreditUsed.findById(id));
+        return await populateRefs(CreditUsed.findById(id)).lean();
     }
-    return await CreditUsed.findByIdAndUpdate(id, { $set: fields }, { new: true });
+    return await CreditUsed.findByIdAndUpdate(id, { $set: fields }, { new: true }).lean();
 };
 
 export const listCreditUsed = async (filters = {}) => {
     const query = buildQuery(filters);
-    return await populateRefs(CreditUsed.find(query).sort({ createdAt: -1 }));
+    return await populateRefs(CreditUsed.find(query).sort({ createdAt: -1 })).lean();
 };
 
 export const listCreditUsedPagination = async (page, limit, filters = {}) => {
@@ -64,7 +64,7 @@ export const listCreditUsedPagination = async (page, limit, filters = {}) => {
             .sort({ createdAt: -1 })
             .skip((page - 1) * limit)
             .limit(limit)
-    );
+    ).lean();
 };
 
 export const getCreditUsedCount = async (filters = {}) => {
@@ -77,5 +77,5 @@ export const deleteCreditUsed = async (id) => {
         id,
         { $set: { deletedAt: new Date(), status: 'inactive' } },
         { new: true }
-    );
+    ).lean();
 };

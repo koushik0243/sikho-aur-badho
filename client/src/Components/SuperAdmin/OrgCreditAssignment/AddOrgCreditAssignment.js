@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from './OrgCreditAssignment.module.css';
+import s from "./AddOrgCreditAssignment.module.css";
 
 const BackIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -38,17 +38,20 @@ export default function AddOrgCreditAssignment() {
     return e;
   }
 
+  // Assign Credit -> the assignment is created directly server-side (see
+  // server/organization_credit_assignment/organization_credit_assignment.service.js).
   async function handleSubmit() {
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
     setSubmitting(true);
+
     try {
-      await apiServiceHandler('POST', 'organization-credit-assignment/create', { orgId, creditId, status: 'active' });
+      await apiServiceHandler('POST', 'organization-credit-assignment/create', { orgId, creditId });
       toast.success('Credit assigned successfully.');
       router.push('/superadmin/organization-credit-assignment');
     } catch (err) {
-      toast.error(err?.message || 'Failed to assign credit. Please try again.');
+      toast.error(err?.message || 'Could not assign credit. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -93,7 +96,7 @@ export default function AddOrgCreditAssignment() {
 
         <div className={s.formActions}>
           <button className={s.btnPublish} disabled={submitting} onClick={handleSubmit}>
-            {submitting ? 'Saving…' : 'Assign Credit'}
+            {submitting ? 'Processing…' : 'Assign Credit'}
           </button>
           <button className={s.btnCancel} onClick={() => router.push('/superadmin/organization-credit-assignment')}>
             Cancel

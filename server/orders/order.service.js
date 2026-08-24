@@ -35,7 +35,7 @@ export const createOrder = async (data) => {
 
 export const editOrder = async (id) => {
     try {
-        return await populateRefs(Order.findOne({ _id: id, deletedAt: null }));
+        return await populateRefs(Order.findOne({ _id: id, deletedAt: null })).lean();
     } catch (error) {
         throw error;
     }
@@ -49,14 +49,14 @@ export const updateOrder = async (id, data) => {
             if (data[f] !== undefined) updateFields[f] = data[f];
         }
         if (!Object.keys(updateFields).length)
-            return await populateRefs(Order.findOne({ _id: id, deletedAt: null }));
+            return await populateRefs(Order.findOne({ _id: id, deletedAt: null })).lean();
 
         updateFields.updatedAt = new Date();
         return await Order.findOneAndUpdate(
             { _id: id, deletedAt: null },
             { $set: updateFields },
             { new: true, runValidators: true }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -64,7 +64,7 @@ export const updateOrder = async (id, data) => {
 
 export const listOrder = async (filters = {}) => {
     try {
-        return await populateRefs(Order.find(buildQuery(filters)).sort({ createdAt: -1 }));
+        return await populateRefs(Order.find(buildQuery(filters)).sort({ createdAt: -1 })).lean();
     } catch (error) {
         throw error;
     }
@@ -77,7 +77,7 @@ export const listOrderPagination = async (page, limit, filters = {}) => {
                 .sort({ createdAt: -1 })
                 .skip((page - 1) * limit)
                 .limit(limit)
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -97,7 +97,7 @@ export const deleteOrder = async (id) => {
             { _id: id, deletedAt: null },
             { $set: { deletedAt: new Date(), status: 'inactive' } },
             { returnDocument: 'before' }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }

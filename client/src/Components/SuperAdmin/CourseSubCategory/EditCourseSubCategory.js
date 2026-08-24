@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from './AddEditSubCategory.module.css';
+import s from "./EditCourseSubCategory.module.css";
 
 const LayersIcon = (
   <svg viewBox="0 0 20 20" fill="currentColor">

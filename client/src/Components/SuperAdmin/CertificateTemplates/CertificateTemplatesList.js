@@ -1,12 +1,41 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
+import useScaledIframePreview from '../../../hooks/useScaledIframePreview';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from './CertificateTemplates.module.css';
+import s from "./CertificateTemplatesList.module.css";
+
+// Small live-rendered preview of a template's HTML, shrunk to fit a fixed thumbnail
+// box (cropped, not scrolled) — same shrink-to-fit measurement the Add/Edit preview
+// uses, just constrained to a tiny fixed size here instead of showing the whole thing.
+// Clicking it opens the full-size preview popup.
+function TemplateThumb({ html, onClick }) {
+  const { wrapRef, frameRef, handleLoad, frameStyle } = useScaledIframePreview();
+  if (!html) return <div className={s.templateThumb} />;
+  return (
+    <div
+      ref={wrapRef}
+      className={s.templateThumb}
+      onClick={onClick}
+      title="Click to preview"
+      role="button"
+    >
+      <iframe
+        ref={frameRef}
+        className={s.templateThumbFrame}
+        style={frameStyle}
+        srcDoc={html}
+        title="Certificate template thumbnail"
+        sandbox="allow-same-origin"
+        onLoad={handleLoad}
+      />
+    </div>
+  );
+}
 
 const Icon = {
   search: (
@@ -379,6 +408,7 @@ export default function CertificateTemplatesList() {
   const [seeding, setSeeding]       = useState(false);
   const [sortKey, setSortKey]       = useState('');
   const [sortDir, setSortDir]       = useState('asc');
+  const [previewTpl, setPreviewTpl] = useState(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 350);
@@ -502,7 +532,7 @@ export default function CertificateTemplatesList() {
         onCancel={() => setBulkConfirm(false)}
       />
 
-      <div className={s.pageHeader}>
+      <div className={s.pageHeader} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '12px' }}>
         <div>
           <h1 className={s.pageTitle}>Certificate Templates</h1>
           <p className={s.pageSubtitle}>Manage certificate templates</p>
@@ -537,7 +567,7 @@ export default function CertificateTemplatesList() {
                   <input type="checkbox" checked={allSelected} onChange={toggleAll} />
                 </th>
                 <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('title')}>Title{sortArrow('title')}</th>
-                <th>Template HTML</th>
+                <th>Template</th>
                 <th>Status</th>
                 <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('createdAt')}>Created At{sortArrow('createdAt')}</th>
                 <th>Action</th>
@@ -550,7 +580,7 @@ export default function CertificateTemplatesList() {
                 <tr className={s.emptyRow}><td colSpan={6}>No certificate templates found.</td></tr>
               ) : sorted.map(row => (
                 <tr key={row._id} style={{ cursor: 'pointer' }} onClick={() => toggleOne(row._id)}>
-                  <td className={s.checkTd}>
+                  <td className={s.checkTd} onClick={e => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={selected.includes(row._id)}
@@ -563,7 +593,9 @@ export default function CertificateTemplatesList() {
                       <span className={s.certName}>{row.title ?? '—'}</span>
                     </div>
                   </td>
-                  <td className={s.descCell}>{row.desc ?? '—'}</td>
+                  <td className={s.descCell} onClick={e => e.stopPropagation()}>
+                    <TemplateThumb html={row.desc} onClick={() => setPreviewTpl(row)} />
+                  </td>
                   <td>
                     {row.status === 'active'
                       ? <span className={s.badgeActive}>Active</span>
@@ -625,6 +657,24 @@ export default function CertificateTemplatesList() {
           </div>
         </div>
       </div>
+
+      {previewTpl && (
+        <div className={s.previewOverlay} onClick={() => setPreviewTpl(null)}>
+          <div className={s.previewTopBar} onClick={e => e.stopPropagation()}>
+            <span className={s.previewTopTitle}>Certificate Preview — {previewTpl.title || 'Untitled'}</span>
+            <button className={s.btnHide} onClick={() => setPreviewTpl(null)}>
+              Close
+            </button>
+          </div>
+          <iframe
+            className={s.previewFrame}
+            srcDoc={previewTpl.desc}
+            title="Certificate Preview"
+            sandbox="allow-same-origin"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
+      )}
     </SuperAdminShell>
   );
 }

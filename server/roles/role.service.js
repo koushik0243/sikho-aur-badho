@@ -21,7 +21,7 @@ export const createRole = async (newRole) => {
             name: { $regex: `^${newRole.name}$`, $options: 'i' },
             organizationId: orgId,
             deletedAt: null,
-        });
+        }).select('_id').lean();
         if (active) {
             const err = new Error('A role with this name already exists.');
             err.statusCode = 400;
@@ -29,7 +29,7 @@ export const createRole = async (newRole) => {
         }
 
         // If a soft-deleted record with the same name/scope exists, restore it
-        const deleted = await Role.findOne({ name: newRole.name, organizationId: orgId, deletedAt: { $ne: null } });
+        const deleted = await Role.findOne({ name: newRole.name, organizationId: orgId, deletedAt: { $ne: null } }).select('_id').lean();
         if (deleted) {
             return await Role.findOneAndUpdate(
                 { _id: deleted._id },
@@ -57,7 +57,7 @@ export const createRole = async (newRole) => {
 
 export const editRole = async (editId) => {
     try {
-        return await Role.findOne({ _id: editId, deletedAt: null });
+        return await Role.findOne({ _id: editId, deletedAt: null }).lean();
     } catch (error) {
         throw error;
     }
@@ -67,7 +67,7 @@ export const updateRole = async (updateId, updateRoleData) => {
     try {
         const { name, display_name, desc, status } = updateRoleData;
 
-        const current = await Role.findOne({ _id: updateId, deletedAt: null });
+        const current = await Role.findOne({ _id: updateId, deletedAt: null }).lean();
         if (!current) {
             const err = new Error('Role not found.');
             err.statusCode = 404;
@@ -84,7 +84,7 @@ export const updateRole = async (updateId, updateRoleData) => {
                 name: { $regex: `^${name}$`, $options: 'i' },
                 deletedAt: null,
                 _id: { $ne: updateId },
-            });
+            }).select('_id').lean();
             if (duplicate) {
                 const err = new Error('A role with this name already exists.');
                 err.statusCode = 400;
@@ -108,7 +108,7 @@ export const updateRole = async (updateId, updateRoleData) => {
             { _id: updateId, deletedAt: null },
             { $set: updateFields },
             { new: true }
-        );
+        ).lean();
     } catch (error) {
         if (error.code === 11000) {
             const err = new Error('A role with this name already exists.');
@@ -122,7 +122,7 @@ export const updateRole = async (updateId, updateRoleData) => {
 export const listRole = async (filters = {}) => {
     try {
         const query = buildRoleQuery(filters);
-        return await Role.find(query).populate('organizationId', 'org_name').sort({ _id: 1 });
+        return await Role.find(query).populate('organizationId', 'org_name').sort({ _id: 1 }).lean();
     } catch (error) {
         throw error;
     }
@@ -135,7 +135,8 @@ export const listRolePagination = async (page, limit, filters = {}) => {
             .populate('organizationId', 'org_name')
             .sort({ display_name: 1, name: 1 })
             .skip((page - 1) * limit)
-            .limit(limit);
+            .limit(limit)
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -156,7 +157,7 @@ export const checkRoleName = async (name, excludeId = null) => {
         if (excludeId) {
             query._id = { $ne: excludeId };
         }
-        const existing = await Role.findOne(query);
+        const existing = await Role.findOne(query).select('_id').lean();
         return { isDuplicate: !!existing };
     } catch (error) {
         throw error;
@@ -174,7 +175,7 @@ export const deleteRole = async (delId) => {
                 }
             },
             { returnDocument: 'before' }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }

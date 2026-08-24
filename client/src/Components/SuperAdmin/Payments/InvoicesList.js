@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from './Payments.module.css';
+import s from "./InvoicesList.module.css";
 
 const SearchIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -37,13 +37,6 @@ function fmtAmount(val, currency = 'INR') {
   const symbol = currency === 'INR' ? '₹' : currency + ' ';
   return `${symbol}${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
-
-const PAYMENT_STATUS_COLORS = {
-  paid:     { bg: '#dcfce7', color: '#16a34a' },
-  pending:  { bg: '#fef9c3', color: '#ca8a04' },
-  failed:   { bg: '#fee2e2', color: '#dc2626' },
-  refunded: { bg: '#e0f2fe', color: '#0284c7' },
-};
 
 const LIMIT = 50;
 
@@ -152,7 +145,7 @@ export default function InvoicesList() {
         onCancel={() => setBulkConfirm(false)}
       />
 
-      <div className={s.pageHeader}>
+      <div className={s.pageHeader} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '12px' }}>
         <div>
           <h1 className={s.pageTitle}>Invoices</h1>
           <p className={s.pageSubtitle}>Credit purchase invoices</p>
@@ -185,38 +178,32 @@ export default function InvoicesList() {
                 <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('invoice_no')}>Invoice No{sortArrow('invoice_no')}</th>
                 <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('org_name')}>Organization{sortArrow('org_name')}</th>
                 <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('credit_title')}>Credit Package{sortArrow('credit_title')}</th>
-                <th>Sub Total</th>
-                <th>Discount</th>
-                <th>Tax</th>
                 <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('total_amount')}>Total{sortArrow('total_amount')}</th>
                 <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('payment_status')}>Payment{sortArrow('payment_status')}</th>
                 <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('payment_method')}>Method{sortArrow('payment_method')}</th>
                 <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('payment_date')}>Payment Date{sortArrow('payment_date')}</th>
                 <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('status')}>Status{sortArrow('status')}</th>
-                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('createdAt')}>Created At{sortArrow('createdAt')}</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr className={s.emptyRow}><td colSpan={15}>Loading…</td></tr>
+                <tr className={s.emptyRow}><td colSpan={11}>Loading…</td></tr>
               ) : sorted.length === 0 ? (
-                <tr className={s.emptyRow}><td colSpan={15}>No invoices found.</td></tr>
+                <tr className={s.emptyRow}><td colSpan={11}>No invoices found.</td></tr>
               ) : sorted.map((inv, idx) => {
-                const ps = PAYMENT_STATUS_COLORS[inv.payment_status] || { bg: '#f3f4f6', color: '#374151' };
                 return (
                   <tr key={inv._id} style={{ cursor: 'pointer' }} onClick={() => toggleOne(inv._id)}>
-                    <td className={s.checkTd}><input type="checkbox" checked={selected.includes(inv._id)} onChange={() => toggleOne(inv._id)} /></td>
+                    <td className={s.checkTd} onClick={e => e.stopPropagation()}>
+                      <input type="checkbox" checked={selected.includes(inv._id)} onChange={() => toggleOne(inv._id)} />
+                    </td>
                     <td>{(page - 1) * LIMIT + idx + 1}</td>
                     <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{inv.invoice_no || '—'}</td>
                     <td>{inv.org_id?.org_name || '—'}</td>
                     <td>{inv.order_id?.credit_id?.title || '—'}</td>
-                    <td>{fmtAmount(inv.sub_total, inv.currency)}</td>
-                    <td>{fmtAmount(inv.discount, inv.currency)}</td>
-                    <td>{fmtAmount(inv.tax, inv.currency)}</td>
-                    <td><strong>{fmtAmount(inv.total_amount, inv.currency)}</strong></td>
+                    <td>{fmtAmount(inv.total_amount, inv.currency)}</td>
                     <td>
-                      <span style={{ display: 'inline-block', padding: '2px 9px', borderRadius: 20, fontSize: 11.5, fontWeight: 600, background: ps.bg, color: ps.color, textTransform: 'capitalize' }}>
+                      <span style={{ display: 'inline-block', padding: '2px 9px', borderRadius: 20, fontSize: 11.5, fontWeight: 400, background: 'transparent', color: '#000', textTransform: 'capitalize' }}>
                         {inv.payment_status || '—'}
                       </span>
                     </td>
@@ -227,7 +214,6 @@ export default function InvoicesList() {
                         ? <span className={s.badgeActive}>Active</span>
                         : <span className={s.badgeInactive}>Inactive</span>}
                     </td>
-                    <td>{fmtDate(inv.createdAt)}</td>
                     <td>
                       <div className={s.actions} onClick={e => e.stopPropagation()}>
                         <button className={s.btnView} title="View" onClick={() => router.push(`/superadmin/payments/invoices/view/${inv._id}`)}>

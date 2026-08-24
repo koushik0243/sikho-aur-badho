@@ -8,10 +8,10 @@ const Users = new Schema(
         // user_role: { type: String, required: false, default: null },
         // orgId: { type: mongoose.Schema.Types.ObjectId, ref: "Organization", required: false, default: null },
 
-        user_type: { type: String, enum: ['superadmin', 'creator', 'organization', 'employee'], default: 'employee' },
+        user_type: { type: String, enum: ['superadmin', 'creator', 'organization', 'employee'], default: 'employee', index: true },
         user_role: { type: mongoose.Schema.Types.ObjectId, ref: 'Role', default: null },
-        orgId: { type: mongoose.Schema.Types.ObjectId, ref: "Organization", default: null },
-        orgRole: { type: String, enum: ['owner', 'admin', 'manager', 'employee'], default: 'employee' },
+        orgId: { type: mongoose.Schema.Types.ObjectId, ref: "Organization", default: null, index: true },
+        orgRole: { type: String, enum: ['owner', 'admin', 'manager', 'employee'], default: 'employee', index: true },
         createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
         managerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
 
@@ -19,7 +19,7 @@ const Users = new Schema(
         name: { type: String, required: true },        
         email: { type: String, required: true, unique: true },        
         password: { type: String, required: true },        
-        phone: { type: String, required: false, default: null },        
+        phone: { type: String, required: false, default: null },
         alt_phone: { type: String, required: false, default: null },
         whatsapp_no: { type: String, required: false, default: null },
         course_language: { type: String, required: false, default: null },
@@ -53,10 +53,11 @@ const Users = new Schema(
         emergency_contact_phone: { type: String, required: false, default: null },       
 
         // Notification Preferences
-        whatsapp_noti: { type: Boolean, default: false },
         email_welcome_noti: { type: Boolean, default: false },
         course_assign_noti: { type: Boolean, default: false },
         weekly_progress_noti: { type: Boolean, default: false },
+        live_session_noti: { type: Boolean, default: false },
+        language_change_noti: { type: Boolean, default: false },
         
         // Other fields        
         other_info: { type: String, required: false, default: null },        
@@ -71,6 +72,11 @@ const Users = new Schema(
         updatedAt: { type: Date, default: Date.now },        
     }    
 );
+
+// Matches the exact filter shape used by listUser/listUserPagination (org-scoped
+// role lookups — e.g. "this org's owner/admins/employees") so those queries hit an
+// index instead of scanning the whole collection.
+Users.index({ orgId: 1, user_type: 1, orgRole: 1 });
 
 // Password hash middleware
 Users.pre('save', async function () {

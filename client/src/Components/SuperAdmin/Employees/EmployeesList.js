@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from './Employees.module.css';
+import s from "./EmployeesList.module.css";
 
 const SearchIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -153,7 +153,7 @@ export default function EmployeesList() {
         onCancel={() => setBulkConfirm(false)}
       />
 
-      <div className={s.pageHeader}>
+      <div className={s.pageHeader} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '12px' }}>
         <div>
           <h1 className={s.pageTitle}>Users</h1>
           <p className={s.pageSubtitle}>Employee accounts (unassigned)</p>
@@ -197,7 +197,9 @@ export default function EmployeesList() {
                 <tr className={s.emptyRow}><td colSpan={7}>No users found.</td></tr>
               ) : sorted.map((u, idx) => (
                 <tr key={u._id} style={{ cursor: 'pointer' }} onClick={() => toggleOne(u._id)}>
-                  <td className={s.checkTd}><input type="checkbox" checked={selected.includes(u._id)} onChange={() => toggleOne(u._id)} /></td>
+                  <td className={s.checkTd} onClick={e => e.stopPropagation()}>
+                    <input type="checkbox" checked={selected.includes(u._id)} onChange={() => toggleOne(u._id)} />
+                  </td>
                   <td>{(page - 1) * LIMIT + idx + 1}</td>
                   <td>{u.name || '—'}</td>
                   <td>{u.email || '—'}</td>

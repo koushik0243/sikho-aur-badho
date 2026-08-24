@@ -5,7 +5,7 @@ import { useSelector } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import { selectUser } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
-import s from './Invoices.module.css';
+import s from "./Invoices.module.css";
 
 const LIMIT = 10;
 
@@ -120,8 +120,6 @@ export default function InvoicesPage() {
 
   return (
     <>
-      <div className={s.pageTitle}>My Invoices</div>
-
       {/* ── Stats row ── */}
       <div className={s.statsRow}>
         <div className={`${s.statCard} ${s.statCardTeal}`}>
@@ -178,7 +176,7 @@ export default function InvoicesPage() {
 
       {/* ── Table card ── */}
       <div className={s.tableCard}>
-        <div className={s.tableCardTitle}>All Invoices</div>
+        <div className={s.cardHead}><div className={s.tableCardTitle}>All Invoices</div></div>
         <table className={s.table}>
           <thead>
             <tr>

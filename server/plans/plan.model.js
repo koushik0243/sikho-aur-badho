@@ -19,5 +19,10 @@ const PlanSchema = new Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+// listPlan sorts by price+title and listPlanPagination sorts by createdAt; buildQuery
+// filters by deletedAt/status/billingCycle — cover both query shapes with indexes.
+PlanSchema.index({ deletedAt: 1, status: 1, billingCycle: 1 });
+PlanSchema.index({ deletedAt: 1, createdAt: -1 });
+
 export default mongoose.model("Plan", PlanSchema);
 

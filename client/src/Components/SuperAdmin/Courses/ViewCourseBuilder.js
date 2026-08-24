@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import apiServiceHandler from '../../../service/apiService';
 import { API_URL } from '../../../lib/constant';
 import SuperAdminShell from '../SuperAdminShell';
-import s from './CourseBuilder.module.css';
+import s from "./ViewCourseBuilder.module.css";
 
 /* ── Icons ──────────────────────────────────────────────────────── */
 const MenuIcon = (

@@ -5,7 +5,7 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from './OrgAdmins.module.css';
+import s from "./EditOrgAdmin.module.css";
 
 const BackArrow = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">

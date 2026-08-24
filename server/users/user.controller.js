@@ -5,6 +5,7 @@ const Router = express.Router();
 import * as UserHelper from './user.service.js';
 import User from './user.model.js';
 import protect from '../middleware/authMiddleware.js';
+import RolePermission from '../role_permissions/role_permission.model.js';
 //import otpGenerator from 'otp-generator';
 import nodemailer from 'nodemailer';
 import jwt from 'jsonwebtoken';
@@ -360,6 +361,16 @@ const updateUser = async (req, res, next) => {
     }
 };
 
+const checkUserExists = async (req, res, next) => {
+    try {
+        const { email, whatsapp_no, excludeUserId } = req.query;
+        const data = await UserHelper.checkUserExists({ email, whatsapp_no, excludeUserId });
+        res.status(200).json({ status: 200, message: "Successfully checked.", data });
+    } catch (error) {
+        next(error);
+    }
+};
+
 const listUser = async (req, res, next) => {
     try {
         const { orgId, user_type, orgRole } = req.query;
@@ -377,6 +388,8 @@ const listUserPagination = async (req, res, next) => {
         const filters = {};
         if (req.query.user_type) filters.user_type = req.query.user_type;
         if (req.query.search) filters.search = req.query.search;
+        if (req.query.orgId) filters.orgId = req.query.orgId;
+        if (req.query.orgRole) filters.orgRole = req.query.orgRole;
 
         const countQuery = { deletedAt: null };
         if (filters.user_type) countQuery.user_type = filters.user_type;
@@ -386,9 +399,13 @@ const listUserPagination = async (req, res, next) => {
                 { email: { $regex: filters.search, $options: 'i' } },
             ];
         }
+        if (filters.orgId) countQuery.orgId = filters.orgId;
+        if (filters.orgRole) countQuery.orgRole = filters.orgRole;
 
-        const users = await UserHelper.listUserPagination(page, limit, filters);
-        const totalUsers = await User.countDocuments(countQuery);
+        const [users, totalUsers] = await Promise.all([
+            UserHelper.listUserPagination(page, limit, filters),
+            User.countDocuments(countQuery),
+        ]);
         const totalPages = Math.ceil(totalUsers / limit);
 
         res.status(200).json({
@@ -399,6 +416,48 @@ const listUserPagination = async (req, res, next) => {
             totalPages,
             currentPage: page
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+const exportUsers = async (req, res, next) => {
+    try {
+        const filters = {};
+        if (req.query.user_type) filters.user_type = req.query.user_type;
+        if (req.query.search) filters.search = req.query.search;
+
+        const users = await UserHelper.listUserForExport(filters);
+
+        // Batch-fetch permissions for every distinct role in a single query instead of
+        // one getPermissionsByRole() lookup per user (N+1) — was O(n) queries for n users.
+        const roleIds = [...new Set(
+            users.map(u => u.user_role?._id).filter(Boolean).map(id => id.toString())
+        )];
+
+        const rolePermissions = roleIds.length
+            ? await RolePermission.find({ role_id: { $in: roleIds } })
+                .populate({ path: 'permission_id', select: '_id name display_name' })
+                .lean()
+            : [];
+
+        const permissionsByRole = new Map();
+        for (const rp of rolePermissions) {
+            const key = rp.role_id.toString();
+            const label = rp.permission_id?.display_name || rp.permission_id?.name;
+            if (!label) continue;
+            if (!permissionsByRole.has(key)) permissionsByRole.set(key, []);
+            permissionsByRole.get(key).push(label);
+        }
+
+        const data = users.map((user) => ({
+            ...user,
+            permissions: user.user_role?._id
+                ? (permissionsByRole.get(user.user_role._id.toString()) || [])
+                : [],
+        }));
+
+        res.status(200).json({ status: 200, message: "Successfully fetched.", data });
     } catch (error) {
         next(error);
     }
@@ -424,17 +483,16 @@ const registerUser = async (req, res, next) => {
 
 const loginUser = async (req, res, next) => {
     try {
+        // Single fetch reused for both the existence check and the password compare —
+        // previously this ran the exact same User.findOne() query twice per request.
         const check_email = await User.findOne({ email: req.body.email, deletedAt: null });
         if (!check_email) {
             return res.status(400).json({ status: 400, message: "Email does not exist." });
         }
 
-        const check_password = await User.findOne({ email: req.body.email, deletedAt: null });
-        if (check_password) {
-            const isMatch = await bcrypt.compare(req.body.password, check_password.password);
-            if (!isMatch) {
-                return res.status(400).json({ status: 400, message: "Password does not match." });
-            }
+        const isMatch = await bcrypt.compare(req.body.password, check_email.password);
+        if (!isMatch) {
+            return res.status(400).json({ status: 400, message: "Password does not match." });
         }
 
         const data = await UserHelper.loginUser(req.body);
@@ -833,12 +891,14 @@ const getGoogleClientId = (req, res, next) => {
 
 // Route bindings
 Router.post('/admin/create', protect, createUser);
+Router.get('/admin/check-exists', protect, checkUserExists);
 Router.get('/admin/edit/:id', protect, editUser);
 Router.get('/admin/details/:id/:type', protect, detailsUser);
 Router.put('/admin/update/:id', protect, updateUser);
 Router.get('/admin/list', protect, listUser);
 Router.get('/admin/delete/:id', protect, deleteUser);
 Router.get('/admin/list-pagination', protect, listUserPagination);
+Router.get('/admin/export', protect, exportUsers);
 Router.post('/register', registerUser);
 Router.post('/login', loginUser);
 Router.post('/gmail-login', gmLoginUser);

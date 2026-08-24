@@ -28,16 +28,7 @@ export default function ForgotPasswordForm() {
   return (
     <div className={styles.formBox}>
       {/* Brand Logo */}
-      <div className={styles.brandLogo}>
-        <span>si</span>
-        <span className={styles.logoKh}>
-          <span className={styles.logoKhDot} />
-          kh
-        </span>
-        <span>oaur</span>
-        <span>badh</span>
-        <span className={styles.logoOEnd}>o</span>
-      </div>
+      <img src="/logo.png" alt="sikhoaurbadho" className={styles.logoImg} />
       <p className={styles.tagline}>Sign in to continue</p>
 
       <h2 className={styles.formTitle}>Forgot password?</h2>
@@ -67,7 +58,7 @@ export default function ForgotPasswordForm() {
         <div className={styles.infoBox}>
           <span>ℹ️</span>
           <span>
-            <strong>Note:</strong> The reset link will be sent to your registered WhatsApp and email.
+            <strong>Note:</strong> The reset link will be sent to your registered email.
             Valid for 15 minutes.
           </span>
         </div>

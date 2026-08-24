@@ -31,7 +31,8 @@ export const createCredit = async (data, userId = null) => {
 export const editCredit = async (editId) => {
     try {
         return await Credit.findOne({ _id: editId, deletedAt: null })
-            .populate('createdBy', '_id name email');
+            .populate('createdBy', '_id name email')
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -58,7 +59,7 @@ export const updateCredit = async (updateId, data) => {
         }
 
         if (Object.keys(updateFields).length === 0) {
-            return await Credit.findOne({ _id: updateId, deletedAt: null });
+            return await Credit.findOne({ _id: updateId, deletedAt: null }).lean();
         }
 
         updateFields.updatedAt = new Date();
@@ -67,7 +68,7 @@ export const updateCredit = async (updateId, data) => {
             { _id: updateId, deletedAt: null },
             { $set: updateFields },
             { returnDocument: 'before', runValidators: true }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -78,7 +79,8 @@ export const listCredit = async (filters = {}) => {
         const query = buildQuery(filters);
         return await Credit.find(query)
             .populate('createdBy', '_id name email')
-            .sort({ limit_to: 1 });
+            .sort({ limit_to: 1 })
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -91,7 +93,8 @@ export const listCreditPagination = async (page, limit, filters = {}) => {
             .populate('createdBy', '_id name email')
             .sort({ createdAt: -1 })
             .skip((page - 1) * limit)
-            .limit(limit);
+            .limit(limit)
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -112,7 +115,7 @@ export const deleteCredit = async (delId) => {
             { _id: delId, deletedAt: null },
             { $set: { deletedAt: new Date(), status: 'inactive' } },
             { returnDocument: 'before' }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -122,7 +125,7 @@ export const checkCreditTitle = async (title, excludeId = null) => {
     try {
         const query = { title: { $regex: `^${title}$`, $options: 'i' }, deletedAt: null };
         if (excludeId) query._id = { $ne: excludeId };
-        const existing = await Credit.findOne(query);
+        const existing = await Credit.findOne(query).select('_id').lean();
         return { isDuplicate: !!existing };
     } catch (error) {
         throw error;

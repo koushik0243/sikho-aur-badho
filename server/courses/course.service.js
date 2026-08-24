@@ -46,6 +46,9 @@ export const createCourse = async (data, userId) => {
             target_audience: data.target_audience || '',
             materials_included: data.materials_included || '',
             requirements: data.requirements || '',
+            aptitudeEnabled: data.aptitudeEnabled !== undefined ? data.aptitudeEnabled : false,
+            aptitudeContext: data.aptitudeContext || '',
+            aptitudeSelectedQuestionIds: Array.isArray(data.aptitudeSelectedQuestionIds) ? data.aptitudeSelectedQuestionIds : [],
             certificate_template_id: data.certificate_template_id || null,
             createdBy: userId,
             status: data.status || 'draft'
@@ -60,7 +63,9 @@ export const editCourse = async (editId) => {
         return await Course.findOne({ _id: editId, deletedAt: null })
             .populate('catId', '_id title slug')
             .populate('subCatIds', '_id name slug')
-            .populate('createdBy', '_id name email');
+            .populate('createdBy', '_id name email')
+            .populate('certificate_template_id', '_id title slug desc status')
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -73,6 +78,7 @@ export const updateCourse = async (updateId, data) => {
             'intro_video', 'intro_video_url', 'duration_hr', 'duration_min',
             'totalChapters', 'status', 'max_students', 'enable_review', 'qna_enabled',
             'what_will_learn', 'target_audience', 'materials_included', 'requirements',
+            'aptitudeEnabled', 'aptitudeContext', 'aptitudeSelectedQuestionIds',
             'certificate_template_id'
         ];
         const updateFields = {};
@@ -90,7 +96,7 @@ export const updateCourse = async (updateId, data) => {
         }
 
         if (Object.keys(updateFields).length === 0) {
-            return await Course.findOne({ _id: updateId, deletedAt: null });
+            return await Course.findOne({ _id: updateId, deletedAt: null }).lean();
         }
 
         updateFields.updatedAt = new Date();
@@ -99,7 +105,7 @@ export const updateCourse = async (updateId, data) => {
             { _id: updateId, deletedAt: null },
             { $set: updateFields },
             { returnDocument: 'before', runValidators: true }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -112,7 +118,8 @@ export const listCourse = async (filters = {}) => {
             .populate('catId', '_id title slug')
             .populate('subCatIds', '_id name slug')
             .populate('createdBy', '_id name email')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -127,7 +134,8 @@ export const listCoursePagination = async (page, limit, filters = {}) => {
             .populate('createdBy', '_id name email')
             .sort({ createdAt: -1 })
             .skip((page - 1) * limit)
-            .limit(limit);
+            .limit(limit)
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -148,7 +156,7 @@ export const deleteCourse = async (delId) => {
             { _id: delId, deletedAt: null },
             { $set: { deletedAt: new Date(), status: 'deleted' } },
             { returnDocument: 'before' }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -162,7 +170,7 @@ export const checkCourseTitle = async (title, catId, excludeId = null) => {
             deletedAt: null
         };
         if (excludeId) query._id = { $ne: excludeId };
-        const existing = await Course.findOne(query);
+        const existing = await Course.findOne(query).lean();
         return { isDuplicate: !!existing };
     } catch (error) {
         throw error;

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from './Payments.module.css';
+import s from "./OrdersList.module.css";
 
 const SearchIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -50,8 +50,9 @@ export default function OrdersList() {
   const [confirm, setConfirm]       = useState({ show: false, id: null });
   const [selected, setSelected]     = useState([]);
   const [bulkConfirm, setBulkConfirm] = useState(false);
-  const [sortKey, setSortKey] = useState('');
-  const [sortDir, setSortDir] = useState('asc');
+  const [sortKey, setSortKey]       = useState('');
+  const [sortDir, setSortDir]       = useState('asc');
+  const [statusFilter, setStatusFilter] = useState('');
 
   const fetchOrders = useCallback(() => {
     setLoading(true);
@@ -77,13 +78,14 @@ export default function OrdersList() {
     return sortDir === 'asc' ? ' ↑' : ' ↓';
   }
 
-  const filtered = search
-    ? orders.filter(o =>
-        (o.organizer_id?.org_name || '').toLowerCase().includes(search.toLowerCase()) ||
-        (o.credit_id?.title || '').toLowerCase().includes(search.toLowerCase()) ||
-        (o.payment_gateway || '').toLowerCase().includes(search.toLowerCase())
-      )
-    : orders;
+  const filtered = orders.filter(o => {
+    const matchesSearch = !search ||
+      (o.organizer_id?.org_name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (o.credit_id?.title || '').toLowerCase().includes(search.toLowerCase()) ||
+      (o.payment_gateway || '').toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = !statusFilter || o.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   const sorted = sortKey
     ? [...filtered].sort((a, b) => {
@@ -143,7 +145,7 @@ export default function OrdersList() {
         onCancel={() => setBulkConfirm(false)}
       />
 
-      <div className={s.pageHeader}>
+      <div className={s.pageHeader} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '12px' }}>
         <div>
           <h1 className={s.pageTitle}>Orders</h1>
           <p className={s.pageSubtitle}>Credit purchase orders</p>
@@ -160,11 +162,23 @@ export default function OrdersList() {
             <input
               className={s.searchInput}
               type="text"
-              placeholder="Search by organization, credit, or gateway…"
+              placeholder="Search organization, credit, gateway…"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
           </div>
+          <select
+            className={s.statusSelect}
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+          >
+            <option value="">All Statuses</option>
+            <option value="success">Success</option>
+            <option value="pending">Pending</option>
+            <option value="failed">Failed</option>
+            <option value="canceled">Canceled</option>
+            <option value="refunded">Refunded</option>
+          </select>
         </div>
 
         <div className={s.tableWrap}>
@@ -189,13 +203,15 @@ export default function OrdersList() {
                 <tr className={s.emptyRow}><td colSpan={9}>No orders found.</td></tr>
               ) : sorted.map((o, idx) => (
                 <tr key={o._id} style={{ cursor: 'pointer' }} onClick={() => toggleOne(o._id)}>
-                  <td className={s.checkTd}><input type="checkbox" checked={selected.includes(o._id)} onChange={() => toggleOne(o._id)} /></td>
-                  <td>{(page - 1) * LIMIT + idx + 1}</td>
+                  <td className={s.checkTd} onClick={e => e.stopPropagation()}>
+                    <input type="checkbox" checked={selected.includes(o._id)} onChange={() => toggleOne(o._id)} />
+                  </td>
+                  <td className={s.colMuted}>{(page - 1) * LIMIT + idx + 1}</td>
                   <td>{o.organizer_id?.org_name || '—'}</td>
                   <td>{o.credit_id?.title || '—'}</td>
-                  <td>{fmtAmount(o.credit_amount)}</td>
-                  <td>{fmtDate(o.purchase_date)}</td>
-                  <td style={{ textTransform: 'capitalize' }}>{o.payment_gateway || '—'}</td>
+                  <td className={s.colAmount}>{fmtAmount(o.credit_amount)}</td>
+                  <td className={s.colMuted}>{fmtDate(o.purchase_date)}</td>
+                  <td><span className={s.colGateway}>{o.payment_gateway || '—'}</span></td>
                   <td>
                     {o.status === 'success'  && <span className={s.badgeSuccess}>Success</span>}
                     {o.status === 'pending'  && <span className={s.badgePending}>Pending</span>}
@@ -208,18 +224,10 @@ export default function OrdersList() {
                   </td>
                   <td>
                     <div className={s.actions} onClick={e => e.stopPropagation()}>
-                      <button
-                        className={s.btnView}
-                        title="View"
-                        onClick={() => router.push(`/superadmin/payments/orders/view/${o._id}`)}
-                      >
+                      <button className={s.btnView} title="View" onClick={() => router.push(`/superadmin/payments/orders/view/${o._id}`)}>
                         <EyeIcon />
                       </button>
-                      <button
-                        className={s.btnDelete}
-                        title="Delete"
-                        onClick={() => setConfirm({ show: true, id: o._id })}
-                      >
+                      <button className={s.btnDelete} title="Delete" onClick={() => setConfirm({ show: true, id: o._id })}>
                         <TrashIcon />
                       </button>
                     </div>

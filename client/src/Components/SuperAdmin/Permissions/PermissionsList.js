@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import apiServiceHandler, { clearGetCache } from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from './Permissions.module.css';
+import s from "./PermissionsList.module.css";
 
 const SearchIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -179,7 +179,7 @@ export default function PermissionsList() {
         onCancel={() => setBulkConfirm(false)}
       />
 
-      <div className={s.pageHeader}>
+      <div className={s.pageHeader} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '12px' }}>
         <div>
           <h1 className={s.pageTitle}>Permissions</h1>
           <p className={s.pageSubtitle}>Manage system permissions</p>
@@ -234,7 +234,9 @@ export default function PermissionsList() {
                 <tr className={s.emptyRow}><td colSpan={7}>No permissions found.</td></tr>
               ) : sorted.map((p, idx) => (
                 <tr key={p._id} style={{ cursor: 'pointer' }} onClick={() => toggleOne(p._id)}>
-                  <td className={s.checkTd}><input type="checkbox" checked={selected.includes(p._id)} onChange={() => toggleOne(p._id)} /></td>
+                  <td className={s.checkTd} onClick={e => e.stopPropagation()}>
+                    <input type="checkbox" checked={selected.includes(p._id)} onChange={() => toggleOne(p._id)} />
+                  </td>
                   <td>{(page - 1) * LIMIT + idx + 1}</td>
                   <td><code style={{ fontSize: 12, background: '#f3f4f6', padding: '2px 6px', borderRadius: 4 }}>{p.name}</code></td>
                   <td>{p.display_name || '—'}</td>

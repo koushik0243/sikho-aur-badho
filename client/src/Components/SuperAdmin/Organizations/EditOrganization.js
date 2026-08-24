@@ -7,7 +7,7 @@ import apiServiceHandler from '../../../service/apiService';
 import { API_URL } from '../../../lib/constant';
 import SuperAdminShell from '../SuperAdminShell';
 import IndustryTypeTree from './IndustryTypeTree';
-import s from './AddEditOrganization.module.css';
+import s from "./EditOrganization.module.css";
 
 const BackArrow = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -33,6 +33,11 @@ const CoursesIcon = (
   </svg>
 );
 
+// Optional 10-digit Indian mobile number, with or without a +91 country code
+// (matches the "+91 98765 43210" format already used elsewhere,
+// e.g. client/src/Components/StoreOwner/AddLearner/AddLearner.js).
+const WHATSAPP_NO_REGEX = /^(\+91[\s-]?)?[6-9]\d{9}$/;
+
 export default function EditOrganization() {
   const router = useRouter();
   const { id } = useParams();
@@ -47,6 +52,7 @@ export default function EditOrganization() {
   const [industryTypes, setIndustryTypes]       = useState([]);
   const [ownerUserId, setOwnerUserId]           = useState('');
   const [ownerEmail, setOwnerEmail]             = useState('');
+  const [ownerWhatsapp, setOwnerWhatsapp]       = useState('');
   const [ownerPassword, setOwnerPassword]       = useState('');
   const [ownerConfirmPassword, setOwnerConfirmPassword] = useState('');
   const [pwReadOnly, setPwReadOnly]             = useState(true);
@@ -61,7 +67,7 @@ export default function EditOrganization() {
     if (!id) return;
     Promise.all([
       apiServiceHandler('GET', `organization/edit/${id}`).catch(() => null),
-      apiServiceHandler('GET', 'course/list-pagination?limit=500&page=1').catch(() => null),
+      apiServiceHandler('GET', 'course/list-pagination?limit=500&page=1&status=published').catch(() => null),
       apiServiceHandler('GET', 'industry-type/list-all').catch(() => null),
       apiServiceHandler('GET', `organization-course/list?orgId=${id}`).catch(() => null),
       apiServiceHandler('GET', `user/admin/list-pagination?page=1&limit=1&user_type=organization&orgId=${id}&orgRole=owner`).catch(() => null),
@@ -84,8 +90,10 @@ export default function EditOrganization() {
       const ownerUserFallback = Array.isArray(ownerUserRes?.data) ? ownerUserRes.data[0] : null;
       const resolvedOwnerId = ownerObj?._id ?? (typeof org.ownerId === 'string' ? org.ownerId : '') ?? String(ownerUserFallback?._id ?? '');
       const resolvedEmail   = ownerObj?.email ?? org.owner_email ?? ownerUserFallback?.email ?? '';
+      const resolvedWhatsapp = ownerObj?.whatsapp_no ?? ownerUserFallback?.whatsapp_no ?? '';
       setOwnerUserId(resolvedOwnerId);
       setOwnerEmail(resolvedEmail);
+      setOwnerWhatsapp(resolvedWhatsapp);
 
       const ocCourseIds = (Array.isArray(ocRes?.data) ? ocRes.data : [])
         .map(r => String(r.courseId?._id ?? r.courseId));
@@ -153,6 +161,9 @@ export default function EditOrganization() {
     const hasPassword = ownerPassword !== '';
     if (hasEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail.trim()))
       e.owner_email = 'Enter a valid email address.';
+    if (!ownerWhatsapp.trim()) e.owner_whatsapp = 'WhatsApp number is required.';
+    else if (!WHATSAPP_NO_REGEX.test(ownerWhatsapp.trim()))
+      e.owner_whatsapp = 'Enter a valid 10-digit mobile number (optionally with +91).';
     if (hasPassword) {
       if (ownerPassword.length < 6) e.owner_password = 'Password must be at least 6 characters.';
       if (ownerPassword !== ownerConfirmPassword) e.owner_confirm = 'Passwords do not match.';
@@ -171,21 +182,25 @@ export default function EditOrganization() {
       const hasPassword = ownerPassword !== '';
       let resolvedOwnerId = ownerUserId;
 
-      if (hasEmail || hasPassword) {
+      const hasWhatsapp = ownerWhatsapp.trim() !== '';
+
+      if (hasEmail || hasPassword || hasWhatsapp) {
         if (ownerUserId) {
           const userPayload = { user_type: 'organization', orgId: id, orgRole: 'owner', status: 'active' };
-          if (hasEmail)    { userPayload.name = ownerEmail.trim(); userPayload.email = ownerEmail.trim(); }
-          if (hasPassword) { userPayload.password = ownerPassword; }
+          if (hasEmail)     { userPayload.name = ownerEmail.trim(); userPayload.email = ownerEmail.trim(); }
+          if (hasPassword)  { userPayload.password = ownerPassword; }
+          if (hasWhatsapp)  { userPayload.whatsapp_no = ownerWhatsapp.trim(); }
           await apiServiceHandler('PUT', `user/admin/update/${ownerUserId}`, userPayload);
         } else if (hasEmail && hasPassword) {
           const userRes = await apiServiceHandler('POST', 'user/admin/create', {
-            name:      ownerEmail.trim(),
-            email:     ownerEmail.trim(),
-            password:  ownerPassword,
-            user_type: 'organization',
-            orgId:     id,
-            orgRole:   'owner',
-            status:    'active',
+            name:        ownerEmail.trim(),
+            email:       ownerEmail.trim(),
+            password:    ownerPassword,
+            whatsapp_no: ownerWhatsapp.trim(),
+            user_type:   'organization',
+            orgId:       id,
+            orgRole:     'owner',
+            status:      'active',
           });
           resolvedOwnerId = userRes?.data?._id ?? userRes?.data?.id ?? userRes?._id ?? userRes?.id ?? null;
         }
@@ -330,7 +345,7 @@ export default function EditOrganization() {
           </div>
           <div className={s.sectionBody}>
             <p style={{ fontSize: 12, color: '#6b7280', margin: 0 }}>
-              All owner fields are optional. Leave blank to keep existing values unchanged.
+              Email and password are optional — leave blank to keep existing values unchanged. WhatsApp No is required.
             </p>
             <div className={s.formRow}>
               <div className={s.formGroup}>
@@ -344,6 +359,18 @@ export default function EditOrganization() {
                   autoComplete="off"
                 />
                 {errors.owner_email && <span className={s.errorMsg}>{errors.owner_email}</span>}
+              </div>
+              <div className={s.formGroup}>
+                <label className={s.label}>WhatsApp No <span className={s.required}>*</span></label>
+                <input
+                  className={s.input}
+                  type="tel"
+                  placeholder="e.g. 98765 43210"
+                  value={ownerWhatsapp}
+                  onChange={e => setOwnerWhatsapp(e.target.value)}
+                  autoComplete="off"
+                />
+                {errors.owner_whatsapp && <span className={s.errorMsg}>{errors.owner_whatsapp}</span>}
               </div>
             </div>
             <div className={s.formRow}>

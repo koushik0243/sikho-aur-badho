@@ -45,8 +45,10 @@ const listCoursePricingPagination = async (req, res, next) => {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const { status, courseId } = req.query;
-        const data = await CoursePricingHelper.listCoursePricingPagination(page, limit, { status, courseId });
-        const total = await CoursePricingHelper.getCoursePricingCount({ status, courseId });
+        const [data, total] = await Promise.all([
+            CoursePricingHelper.listCoursePricingPagination(page, limit, { status, courseId }),
+            CoursePricingHelper.getCoursePricingCount({ status, courseId })
+        ]);
         res.status(200).json({
             status: 200,
             message: 'Successfully fetched.',

@@ -46,8 +46,10 @@ const listOrderPagination = async (req, res, next) => {
         const limit = parseInt(req.query.limit) || 10;
         const { status, organizer_id, credit_id } = req.query;
 
-        const orders = await OrderHelper.listOrderPagination(page, limit, { status, organizer_id, credit_id });
-        const total  = await OrderHelper.getOrderCount({ status, organizer_id, credit_id });
+        const [orders, total] = await Promise.all([
+            OrderHelper.listOrderPagination(page, limit, { status, organizer_id, credit_id }),
+            OrderHelper.getOrderCount({ status, organizer_id, credit_id }),
+        ]);
         res.status(200).json({
             status: 200,
             message: "Successfully fetched.",

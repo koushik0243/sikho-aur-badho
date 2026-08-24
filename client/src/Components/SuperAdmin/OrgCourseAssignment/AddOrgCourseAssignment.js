@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from './OrgCourseAssignment.module.css';
+import s from "./AddOrgCourseAssignment.module.css";
 
 const BackIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -34,7 +34,7 @@ export default function AddOrgCourseAssignment() {
 
   // Load courses (always) and orgs (only when no orgId in URL)
   useEffect(() => {
-    apiServiceHandler('GET', 'course/list')
+    apiServiceHandler('GET', 'course/list?status=published')
       .then(res => setCourses(Array.isArray(res?.data) ? res.data : []))
       .catch(() => {});
 

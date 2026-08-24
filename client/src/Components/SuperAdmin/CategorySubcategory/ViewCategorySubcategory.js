@@ -4,13 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from './CategorySubcategory.module.css';
+import s from "./ViewCategorySubcategory.module.css";
 
-const BackArrow = () => (
-  <svg viewBox="0 0 20 20" fill="currentColor">
-    <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-  </svg>
-);
 const EditIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
     <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
@@ -21,16 +16,7 @@ function fmtDate(val) {
   if (!val) return '—';
   const d = new Date(val);
   if (isNaN(d)) return '—';
-  return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
-}
-
-function Row({ label, value, full }) {
-  return (
-    <div className={`${s.viewRow} ${full ? s.viewFull : ''}`}>
-      <div className={s.viewLabel}>{label}</div>
-      {value ? <div className={s.viewValue}>{value}</div> : <div className={s.viewValueMuted}>—</div>}
-    </div>
-  );
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 export default function ViewCategorySubcategory() {
@@ -39,9 +25,9 @@ export default function ViewCategorySubcategory() {
   const searchParams = useSearchParams();
   const isSub        = searchParams.get('type') === 'sub-category';
 
-  const [item, setItem]           = useState(null);
+  const [item, setItem]             = useState(null);
   const [parentName, setParentName] = useState(null);
-  const [loading, setLoading]     = useState(true);
+  const [loading, setLoading]       = useState(true);
 
   useEffect(() => {
     if (!id) return;
@@ -49,19 +35,14 @@ export default function ViewCategorySubcategory() {
       ? apiServiceHandler('GET', `course-subcategory/edit/${id}`)
       : apiServiceHandler('GET', `course-category/edit/${id}`);
 
-    Promise.all([
-      editPromise,
-      apiServiceHandler('GET', 'course-category/list-all'),
-    ])
+    Promise.all([editPromise, apiServiceHandler('GET', 'course-category/list-all')])
       .then(([editRes, catRes]) => {
         const row  = editRes?.data ?? editRes;
         const cats = Array.isArray(catRes?.data) ? catRes.data : (Array.isArray(catRes) ? catRes : []);
         setItem(row);
-
         const parentId = isSub
           ? (row?.categoryId?._id ?? row?.categoryId ?? null)
           : (row?.parentId ?? null);
-
         if (parentId) {
           const parent = cats.find(c => String(c._id) === String(parentId));
           setParentName(parent?.title ?? parent?.name ?? null);
@@ -71,8 +52,16 @@ export default function ViewCategorySubcategory() {
       .finally(() => setLoading(false));
   }, [id, isSub]);
 
-  if (loading) return <SuperAdminShell activeSection="category-subcategory"><p style={{ padding: 40, color: '#6b7280' }}>Loading…</p></SuperAdminShell>;
-  if (!item?._id) return <SuperAdminShell activeSection="category-subcategory"><p style={{ padding: 40, color: '#6b7280' }}>Item not found.</p></SuperAdminShell>;
+  if (loading) return (
+    <SuperAdminShell activeSection="category-subcategory">
+      <p className={s.loadingText}>Loading…</p>
+    </SuperAdminShell>
+  );
+  if (!item?._id) return (
+    <SuperAdminShell activeSection="category-subcategory">
+      <p className={s.loadingText}>Item not found.</p>
+    </SuperAdminShell>
+  );
 
   const displayName = isSub ? (item.name ?? '') : (item.title ?? item.name ?? '');
   const description = isSub ? (item.description ?? '') : (item.desc ?? item.description ?? '');
@@ -80,43 +69,77 @@ export default function ViewCategorySubcategory() {
   const editUrl     = isSub
     ? `/superadmin/category-subcategory/${id}/edit?type=sub-category`
     : `/superadmin/category-subcategory/${id}/edit`;
+  const isActive    = item.status === 'active';
 
   return (
     <SuperAdminShell activeSection="category-subcategory">
-      <button className={s.backBtn} onClick={() => router.push('/superadmin/category-subcategory')}>
-        <BackArrow /> Back to Categories
-      </button>
-
-      <div className={s.pageHeader}>
-        <div>
-          <h1 className={s.pageTitle}>{displayName}</h1>
-          <p className={s.pageSubtitle}>{typeLabel} details</p>
-        </div>
-        <button className={s.btnEditView} onClick={() => router.push(editUrl)}>
-          <EditIcon /> Edit
+      {/* Breadcrumb */}
+      <nav className={s.breadcrumb}>
+        <button className={s.breadcrumbLink} onClick={() => router.push('/superadmin/category-subcategory')}>
+          Categories
         </button>
-      </div>
+        <span className={s.breadcrumbSep}>›</span>
+        <span className={s.breadcrumbCurr}>{displayName}</span>
+      </nav>
 
-      <div className={s.viewCard}>
-        <div className={s.viewGrid}>
-          <Row label="Name"       value={displayName} />
-          <Row label="Type"       value={typeLabel} />
-          <Row label="Parent"     value={parentName} />
-          <Row label="Status"     value={item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1) : null} />
-          <Row label="Created At" value={fmtDate(item.createdAt)} />
-          <Row label="Updated At" value={fmtDate(item.updatedAt)} />
-          {description && <Row label="Description" value={description} full />}
-        </div>
-        {item.cat_subcat_image && (
-          <div style={{ marginTop: 20 }}>
-            <div className={s.viewLabel}>Image</div>
-            <img
-              src={item.cat_subcat_image}
-              alt={displayName}
-              style={{ marginTop: 8, maxWidth: 200, maxHeight: 120, objectFit: 'cover', borderRadius: 6, border: '1px solid #e5e7eb' }}
-            />
+      {/* Detail card */}
+      <div className={s.detailCard}>
+
+        {/* Card header */}
+        <div className={s.detailHead}>
+          <div className={s.detailHeadLeft}>
+            <div className={s.detailAvatar}>{displayName.charAt(0).toUpperCase()}</div>
+            <div>
+              <h1 className={s.detailTitle}>{displayName}</h1>
+              <div className={s.detailBadges}>
+                <span className={isSub ? s.badgeSubCat : s.badgeCategory}>{typeLabel}</span>
+                <span className={isActive ? s.badgeActive : s.badgeInactive}>
+                  {item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1) : 'Unknown'}
+                </span>
+              </div>
+            </div>
           </div>
-        )}
+          <button className={s.btnEditView} onClick={() => router.push(editUrl)}>
+            <EditIcon /> Edit
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className={s.detailBody}>
+          <div className={s.detailRows}>
+            {parentName && (
+              <div className={s.detailRow}>
+                <span className={s.detailLabel}>Parent</span>
+                <span className={s.detailValue}>{parentName}</span>
+              </div>
+            )}
+            <div className={s.detailRow}>
+              <span className={s.detailLabel}>Created</span>
+              <span className={s.detailValue}>{fmtDate(item.createdAt)}</span>
+            </div>
+            <div className={s.detailRow}>
+              <span className={s.detailLabel}>Updated</span>
+              <span className={s.detailValue}>{fmtDate(item.updatedAt)}</span>
+            </div>
+            {description && (
+              <div className={s.detailRow}>
+                <span className={s.detailLabel}>Description</span>
+                <span className={`${s.detailValue} ${s.detailValueDesc}`}>{description}</span>
+              </div>
+            )}
+            {item.cat_subcat_image && (
+              <div className={s.detailRow}>
+                <span className={s.detailLabel}>Image</span>
+                <img
+                  src={item.cat_subcat_image}
+                  alt={displayName}
+                  className={s.detailImg}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
     </SuperAdminShell>
   );

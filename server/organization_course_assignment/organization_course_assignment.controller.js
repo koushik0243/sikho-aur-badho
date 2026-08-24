@@ -47,8 +47,10 @@ const listOrgCourseAssignmentPagination = async (req, res, next) => {
         const limit = parseInt(req.query.limit) || 10;
         const { status, orgId, courseId, assignedBy } = req.query;
 
-        const assignments = await OrgCourseAssignmentHelper.listOrgCourseAssignmentPagination(page, limit, { status, orgId, courseId, assignedBy });
-        const total = await OrgCourseAssignmentHelper.getOrgCourseAssignmentCount({ status, orgId, courseId, assignedBy });
+        const [assignments, total] = await Promise.all([
+            OrgCourseAssignmentHelper.listOrgCourseAssignmentPagination(page, limit, { status, orgId, courseId, assignedBy }),
+            OrgCourseAssignmentHelper.getOrgCourseAssignmentCount({ status, orgId, courseId, assignedBy })
+        ]);
         res.status(200).json({
             status: 200,
             message: "Successfully fetched.",

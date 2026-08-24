@@ -46,8 +46,10 @@ const listCreditUsedPagination = async (req, res, next) => {
         const limit = parseInt(req.query.limit) || 10;
         const { orgId, learnerId, courseId, status } = req.query;
 
-        const records = await CreditUsedHelper.listCreditUsedPagination(page, limit, { orgId, learnerId, courseId, status });
-        const total   = await CreditUsedHelper.getCreditUsedCount({ orgId, learnerId, courseId, status });
+        const [records, total] = await Promise.all([
+            CreditUsedHelper.listCreditUsedPagination(page, limit, { orgId, learnerId, courseId, status }),
+            CreditUsedHelper.getCreditUsedCount({ orgId, learnerId, courseId, status }),
+        ]);
         res.status(200).json({
             status: 200,
             message: "Successfully fetched.",

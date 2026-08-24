@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
+import { useRouter } from 'next/navigation';
 import { selectUser } from '../../../redux/slices/authSlice';
-import s from './Support.module.css';
+import s from "./Support.module.css";
 import apiServiceHandler from '../../../service/apiService';
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -24,24 +25,18 @@ function formatDate(iso) {
   } catch { return '—'; }
 }
 
-function formatDateTime(iso) {
-  if (!iso) return '—';
-  try {
-    const d = new Date(iso);
-    const date = d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    const time = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
-    return `${date}  ${time}`;
-  } catch { return '—'; }
-}
-
-function progressColor(status) {
-  return { open: '#ef4444', in_progress: '#f59e0b', resolved: '#0b7b7b', close: '#0b7b7b', not_possible: '#9ca3af', deleted: '#d1d5db' }[status] ?? '#9ca3af';
-}
 
 // ── Icons ─────────────────────────────────────────────────────────
 const TrashIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
     <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+  </svg>
+);
+
+const EyeIcon = () => (
+  <svg viewBox="0 0 20 20" fill="currentColor">
+    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+    <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
   </svg>
 );
 
@@ -66,7 +61,7 @@ const STATUS_CFG = {
   deleted:      { label: 'Deleted',      cls: 'statusDeleted',     progress: 0 },
 };
 
-// ── Toast helper component ────────────────────────────────────────
+// ── Toast ────────────────────────────────────────────────────────
 function Toast({ toast }) {
   if (!toast) return null;
   return (
@@ -90,7 +85,7 @@ function DeleteModal({ count, onCancel, onConfirm, deleting }) {
         <div className={s.modalActions}>
           <button className={s.btnCancelModal} onClick={onCancel} disabled={deleting}>Cancel</button>
           <button className={s.btnConfirmDelete} onClick={onConfirm} disabled={deleting}>
-            {deleting ? 'Deleting…' : `Delete ${count > 1 ? `(${count})` : ''}`}
+            {deleting ? 'Deleting…' : `Delete${count > 1 ? ` (${count})` : ''}`}
           </button>
         </div>
       </div>
@@ -101,32 +96,30 @@ function DeleteModal({ count, onCancel, onConfirm, deleting }) {
 // ── Main Component ────────────────────────────────────────────────
 export default function SupportPage() {
   const user = useSelector(selectUser);
+  const router = useRouter();
 
-  const [view, setView]                     = useState('list');
-  const [selectedTicket, setSelectedTicket] = useState(null);
-  const [tickets, setTickets]               = useState([]);
-  const [loading, setLoading]               = useState(true);
-  const [orgId, setOrgId]                   = useState(null);
+  const [view, setView]             = useState('list');
+  const [tickets, setTickets]       = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [orgId, setOrgId]           = useState(null);
 
-  const [form, setForm]                     = useState(EMPTY_FORM);
-  const [submitting, setSubmitting]         = useState(false);
+  const [form, setForm]             = useState(EMPTY_FORM);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [checked, setChecked]               = useState(new Set());
-  const [page, setPage]                     = useState(1);
-  const [statusFilter, setStatusFilter]     = useState('');
-  const [searchQuery, setSearchQuery]       = useState('');
+  const [checked, setChecked]           = useState(new Set());
+  const [page, setPage]                 = useState(1);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [searchQuery, setSearchQuery]   = useState('');
 
-  const [toast, setToast]                   = useState(null);
-  const [deleteModal, setDeleteModal]       = useState(null); // string[]
-  const [deleting, setDeleting]             = useState(false);
+  const [toast, setToast]             = useState(null);
+  const [deleteModal, setDeleteModal] = useState(null);
+  const [deleting, setDeleting]       = useState(false);
 
-  // ── Toast ───────────────────────────────────────────────────────
   const showToast = useCallback((type, msg) => {
     setToast({ type, msg });
     setTimeout(() => setToast(null), 4000);
   }, []);
 
-  // ── Load data ───────────────────────────────────────────────────
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -152,7 +145,6 @@ export default function SupportPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // ── Form ────────────────────────────────────────────────────────
   function setField(key) {
     return e => setForm(f => ({ ...f, [key]: e.target.value }));
   }
@@ -168,18 +160,17 @@ export default function SupportPage() {
         desc:       form.description,
         priority:   form.priority,
       });
-      showToast('success', 'Ticket raised successfully! Our team will respond shortly.');
+      showToast('success', 'Ticket raised successfully!');
       setForm(EMPTY_FORM);
       setView('list');
       loadData();
     } catch (err) {
-      showToast('error', err?.message || 'Failed to raise ticket. Please try again.');
+      showToast('error', err?.message || 'Failed to raise ticket.');
     } finally {
       setSubmitting(false);
     }
   }
 
-  // ── Delete ──────────────────────────────────────────────────────
   async function confirmDelete() {
     if (!deleteModal) return;
     setDeleting(true);
@@ -190,7 +181,6 @@ export default function SupportPage() {
       showToast('success', `${deleteModal.length} ticket${deleteModal.length > 1 ? 's' : ''} deleted.`);
       setChecked(new Set());
       setDeleteModal(null);
-      if (view === 'view') setView('list');
       setPage(1);
       await loadData();
     } catch (err) {
@@ -200,23 +190,23 @@ export default function SupportPage() {
     }
   }
 
-  // ── Filtering ────────────────────────────────────────────────────
   const filteredTickets = tickets.filter(t => {
     if (statusFilter && t.status !== statusFilter) return false;
     if (searchQuery) {
       const q = searchQuery.replace(/^#/, '').toLowerCase();
-      if (!(t.ticket_id || '').toLowerCase().includes(q)) return false;
+      const matchId      = (t.ticket_id   || '').toLowerCase().includes(q);
+      const matchSubject = (t.subject     || '').toLowerCase().includes(q);
+      const matchType    = (t.issue_type  || '').toLowerCase().includes(q);
+      if (!matchId && !matchSubject && !matchType) return false;
     }
     return true;
   });
 
-  // Reset page when filters change
   useEffect(() => { setPage(1); }, [statusFilter, searchQuery]);
 
-  // ── Pagination & selection ───────────────────────────────────────
-  const totalPages    = Math.max(1, Math.ceil(filteredTickets.length / PER_PAGE));
-  const pagedTickets  = filteredTickets.slice((page - 1) * PER_PAGE, page * PER_PAGE);
-  const pageIds       = pagedTickets.map(t => t._id);
+  const totalPages     = Math.max(1, Math.ceil(filteredTickets.length / PER_PAGE));
+  const pagedTickets   = filteredTickets.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  const pageIds        = pagedTickets.map(t => t._id);
   const allPageChecked = pageIds.length > 0 && pageIds.every(id => checked.has(id));
 
   function toggleCheck(id) {
@@ -243,133 +233,74 @@ export default function SupportPage() {
     return (
       <>
         <Toast toast={toast} />
-        <div className={s.subPageHeader}>
-          <button className={s.btnBack} onClick={() => setView('list')}>← Back</button>
-          <h2 className={s.subPageTitle}>Raise A Ticket</h2>
-        </div>
-
-        <div className={s.formCard}>
-          <form onSubmit={handleSubmit}>
-            <div className={s.formGrid}>
-              <div className={s.fieldGroup}>
-                <label className={s.label}>Issue Type</label>
-                <div className={s.selectWrap}>
-                  <select className={s.select} value={form.issueType} onChange={setField('issueType')} required>
-                    <option value="" disabled>Select Issue Type…</option>
-                    {ISSUE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                  <span className={s.chevron}><ChevronDown /></span>
-                </div>
-              </div>
-              <div className={s.fieldGroup}>
-                <label className={s.label}>Priority</label>
-                <div className={s.selectWrap}>
-                  <select className={s.select} value={form.priority} onChange={setField('priority')}>
-                    {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                  <span className={s.chevron}><ChevronDown /></span>
-                </div>
-              </div>
-            </div>
-
-            <div className={s.fieldGroup}>
-              <label className={s.label}>Subject</label>
-              <input className={s.input} placeholder="Brief description of the issue…" value={form.subject} onChange={setField('subject')} required />
-            </div>
-
-            <div className={s.fieldGroup}>
-              <label className={s.label}>Description</label>
-              <textarea className={s.textarea} placeholder="Describe your issue in detail…" value={form.description} onChange={setField('description')} rows={5} required />
-            </div>
-
-            <div className={s.formFooter}>
-              <button type="button" className={s.btnCancel} onClick={() => setView('list')}>Cancel</button>
-              <button type="submit" className={s.btnSubmit} disabled={submitting}>
-                {submitting ? 'Submitting…' : 'Raise a Ticket'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </>
-    );
-  }
-
-  // ════════════════════════════════════════════════════════════════
-  // VIEW DETAIL
-  // ════════════════════════════════════════════════════════════════
-  if (view === 'view' && selectedTicket) {
-    const t  = selectedTicket;
-    const sc = STATUS_CFG[t.status] ?? { label: t.status, cls: 'statusOpen', progress: 10 };
-    return (
-      <>
-        <Toast toast={toast} />
-        <div className={s.subPageHeader}>
-          <button className={s.btnBack} onClick={() => setView('list')}>← Back</button>
-          <h2 className={s.subPageTitle}>Ticket Details</h2>
-          <button className={s.btnDeleteOutline} onClick={() => setDeleteModal([t._id])}>Delete</button>
-        </div>
-
-        <div className={s.viewCard}>
-          <div className={s.viewCardHeader}>
-            <div className={s.ticketIdGroup}>
-              <span className={s.ticketId}>#{t.ticket_id}</span>
-              <span className={s.ticketDot}>·</span>
-              <span className={s.ticketCategory}>{t.issue_type}</span>
-            </div>
-            <span className={`${s.statusBadge} ${s[sc.cls]}`}>{sc.label}</span>
+        <nav className={s.breadcrumb}>
+          <div className={s.breadcrumbLeft}>
+            <button className={s.breadcrumbLink} onClick={() => setView('list')}>Support Tickets</button>
+            <span className={s.breadcrumbSep}>›</span>
+            <span className={s.breadcrumbCurr}>Raise a Ticket</span>
           </div>
+        </nav>
 
-          <div className={s.viewSubject}>{t.subject}</div>
-
-          <div className={s.viewMeta}>
-            <div className={s.viewMetaItem}><span className={s.viewMetaLabel}>Priority</span><span className={s.viewMetaVal}>{t.priority}</span></div>
-            <div className={s.viewMetaItem}><span className={s.viewMetaLabel}>Raised On</span><span className={s.viewMetaVal}>{formatDate(t.createdAt)}</span></div>
-            <div className={s.viewMetaItem}><span className={s.viewMetaLabel}>Ticket ID</span><span className={s.viewMetaVal}>#{t.ticket_id}</span></div>
-            <div className={s.viewMetaItem}><span className={s.viewMetaLabel}>Status</span><span className={`${s.statusBadge} ${s[sc.cls]}`}>{sc.label}</span></div>
+        <div className={s.card}>
+          <div className={s.formCardHead}>
+            <h2 className={s.formCardTitle}>Ticket Information</h2>
           </div>
-
-          <div className={s.viewSection}>
-            <span className={s.viewSectionLabel}>Description</span>
-            <p className={s.viewSectionText}>{t.desc}</p>
-          </div>
-
-          {t.resolve_text && (
-            <div className={s.viewSection}>
-              <span className={s.viewSectionLabel}>Resolution Notes</span>
-              <p className={s.viewSectionText}>{t.resolve_text}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Response history */}
-        {Array.isArray(t.logs) && t.logs.length > 0 && (
-          <div className={s.logsCard}>
-            <h3 className={s.logsTitle}>Response History</h3>
-            <div className={s.logsList}>
-              {[...t.logs].reverse().map((log, i) => {
-                const logSc = STATUS_CFG[log.status] ?? null;
-                return (
-                  <div key={i} className={s.logEntry}>
-                    <div className={s.logEntryHeader}>
-                      <span className={s.logDate}>{formatDateTime(log.date)}</span>
-                      <span className={s.logAdmin}>{log.adminName || 'Admin'}</span>
-                      {logSc && (
-                        <span className={`${s.statusBadge} ${s[logSc.cls]}`}>{logSc.label}</span>
-                      )}
-                    </div>
-                    {log.comment && (
-                      <p className={s.logComment}>{log.comment}</p>
-                    )}
+          <div className={s.formCardBody}>
+            <form onSubmit={handleSubmit}>
+              <div className={s.formGrid}>
+                <div className={s.fieldGroup}>
+                  <label className={s.label}>Issue Type</label>
+                  <div className={s.selectWrap}>
+                    <select className={s.select} value={form.issueType} onChange={setField('issueType')} required>
+                      <option value="" disabled>Select Issue Type…</option>
+                      {ISSUE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    <span className={s.chevron}><ChevronDown /></span>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+                </div>
+                <div className={s.fieldGroup}>
+                  <label className={s.label}>Priority</label>
+                  <div className={s.selectWrap}>
+                    <select className={s.select} value={form.priority} onChange={setField('priority')}>
+                      {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                    <span className={s.chevron}><ChevronDown /></span>
+                  </div>
+                </div>
+              </div>
 
-        {deleteModal && (
-          <DeleteModal count={deleteModal.length} onCancel={() => setDeleteModal(null)} onConfirm={confirmDelete} deleting={deleting} />
-        )}
+              <div className={s.fieldGroup}>
+                <label className={s.label}>Subject</label>
+                <input
+                  className={s.input}
+                  placeholder="Brief description of the issue…"
+                  value={form.subject}
+                  onChange={setField('subject')}
+                  required
+                />
+              </div>
+
+              <div className={s.fieldGroup}>
+                <label className={s.label}>Description</label>
+                <textarea
+                  className={s.textarea}
+                  placeholder="Describe your issue in detail…"
+                  value={form.description}
+                  onChange={setField('description')}
+                  rows={5}
+                  required
+                />
+              </div>
+
+              <div className={s.formFooter}>
+                <button type="button" className={s.btnCancel} onClick={() => setView('list')}>Cancel</button>
+                <button type="submit" className={s.btnSubmit} disabled={submitting}>
+                  {submitting ? 'Submitting…' : 'Raise a Ticket'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       </>
     );
   }
@@ -381,41 +312,34 @@ export default function SupportPage() {
     <>
       <Toast toast={toast} />
 
-      {/* Header */}
-      <div className={s.listHeader}>
-        <h2 className={s.listTitle}>Support Tickets
-          {!loading && (
-            <span className={s.countChip}>
-              {filteredTickets.length !== tickets.length
-                ? `${filteredTickets.length} / ${tickets.length}`
-                : tickets.length}
-            </span>
-          )}
-        </h2>
-        <div className={s.listHeaderRight}>
-          <button className={s.btnNewTicket} onClick={() => setView('add')}>+ New Ticket</button>
+      {/* ── Page header ── */}
+      <div className={s.pageHeader} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '12px' }}>
+        <div>
+          <h1 className={s.pageTitle}>Support Tickets</h1>
+          <p className={s.pageSubtitle}>Manage your support requests</p>
         </div>
+        <button className={s.btnAdd} onClick={() => setView('add')}>+ New Ticket</button>
       </div>
 
-      {/* Filter bar */}
-      <div className={s.filterBar}>
-        <div className={s.filterSearch}>
-          <span className={s.filterSearchIcon}>
-            <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+      {/* ── Table card ── */}
+      <div className={s.tableCard}>
+
+        {/* Toolbar */}
+        <div className={s.toolbar}>
+          <div className={s.searchWrap}>
+            <svg viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
             </svg>
-          </span>
-          <input
-            className={s.filterInput}
-            type="text"
-            placeholder="#TKT-001"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
-        </div>
-        <div className={s.filterSelectWrap}>
+            <input
+              className={s.searchInput}
+              type="text"
+              placeholder="Search by subject, type or ticket ID…"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+          </div>
           <select
-            className={s.filterSelect}
+            className={s.statusSelect}
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value)}
           >
@@ -424,117 +348,105 @@ export default function SupportPage() {
               <option key={k} value={k}>{v.label}</option>
             ))}
           </select>
-          <span className={s.filterChevron}><ChevronDown /></span>
         </div>
-      </div>
 
-      {/* List Card */}
-      <div className={s.listCard}>
-        {loading ? (
-          <div className={s.emptyState}>Loading tickets…</div>
-        ) : tickets.length === 0 ? (
-          <div className={s.emptyState}>
-            No tickets yet.{' '}
-            <button className={s.emptyLink} onClick={() => setView('add')}>Raise your first ticket →</button>
-          </div>
-        ) : filteredTickets.length === 0 ? (
-          <div className={s.emptyState}>No tickets match your filters.</div>
-        ) : (
-          <>
-            {/* Select-all row */}
-            <div className={s.selectAllRow}>
-              <label className={s.checkboxLabel}>
-                <input type="checkbox" className={s.checkbox} checked={allPageChecked} onChange={toggleAll} />
-                Select all on this page
-              </label>
-            </div>
-
-            <div className={s.ticketList}>
-              {pagedTickets.map(ticket => {
-                const sc      = STATUS_CFG[ticket.status] ?? STATUS_CFG.open;
-                const isChkd  = checked.has(ticket._id);
+        {/* Table */}
+        <div className={s.tableWrap}>
+          <table className={s.table}>
+            <thead>
+              <tr>
+                <th className={s.th}>
+                  <input type="checkbox" className={s.checkInput} checked={allPageChecked} onChange={toggleAll} />
+                </th>
+                <th className={s.th}>#</th>
+                <th className={s.th}>Ticket ID</th>
+                <th className={s.th}>Subject</th>
+                <th className={s.th}>Type</th>
+                <th className={s.th}>Priority</th>
+                <th className={s.th}>Status</th>
+                <th className={s.th}>Raised On</th>
+                <th className={s.th}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <tr key={i}><td colSpan={9}><div className={s.skeletonRow} /></td></tr>
+                ))
+              ) : filteredTickets.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className={s.tdEmpty}>
+                    {tickets.length === 0 ? (
+                      <>No tickets yet.{' '}
+                        <button className={s.emptyLink} onClick={() => setView('add')}>Raise your first ticket →</button>
+                      </>
+                    ) : 'No tickets match your filters.'}
+                  </td>
+                </tr>
+              ) : pagedTickets.map((ticket, idx) => {
+                const sc     = STATUS_CFG[ticket.status] ?? STATUS_CFG.open;
+                const isChkd = checked.has(ticket._id);
                 return (
-                  <div key={ticket._id} className={`${s.ticketRow} ${isChkd ? s.ticketRowChecked : ''}`}>
-                    {/* Checkbox */}
-                    <div className={s.ticketChkCell}>
-                      <input
-                        type="checkbox"
-                        className={s.checkbox}
-                        checked={isChkd}
-                        onChange={() => toggleCheck(ticket._id)}
-                        onClick={e => e.stopPropagation()}
-                      />
-                    </div>
-
-                    {/* Body — clickable */}
-                    <div className={s.ticketRowBody} onClick={() => { setSelectedTicket(ticket); setView('view'); }}>
-                      <div className={s.ticketTopRow}>
-                        <div className={s.ticketIdGroup}>
-                          <span className={s.ticketId}>#{ticket.ticket_id}</span>
-                          <span className={s.ticketDot}>·</span>
-                          <span className={s.ticketCategory}>{ticket.issue_type}</span>
-                        </div>
-                        <span className={`${s.statusBadge} ${s[sc.cls]}`}>{sc.label}</span>
+                  <tr
+                    key={ticket._id}
+                    className={`${s.tr} ${isChkd ? s.trChecked : ''}`}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => router.push(`/storeowner/support/${ticket._id}`)}
+                  >
+                    <td className={s.td} onClick={e => e.stopPropagation()}>
+                      <input type="checkbox" className={s.checkInput} checked={isChkd} onChange={() => toggleCheck(ticket._id)} />
+                    </td>
+                    <td className={s.td}>{(page - 1) * PER_PAGE + idx + 1}</td>
+                    <td className={s.td}><span className={s.ticketIdBadge}>#{ticket.ticket_id}</span></td>
+                    <td className={s.tdSubject}>{ticket.subject}</td>
+                    <td className={s.td}>{ticket.issue_type || '—'}</td>
+                    <td className={s.td}>{ticket.priority || '—'}</td>
+                    <td className={s.td}>
+                      <span className={`${s.statusBadge} ${s[sc.cls]}`}>{sc.label}</span>
+                    </td>
+                    <td className={s.td}>{formatDate(ticket.createdAt)}</td>
+                    <td className={s.td} onClick={e => e.stopPropagation()}>
+                      <div className={s.actions}>
+                        <button className={s.btnRowView} title="View"
+                          onClick={() => router.push(`/storeowner/support/${ticket._id}`)}>
+                          <EyeIcon />
+                        </button>
+                        <button className={s.btnRowDelete} title="Delete"
+                          onClick={() => setDeleteModal([ticket._id])}>
+                          <TrashIcon />
+                        </button>
                       </div>
-                      <div className={s.ticketTitle}>{ticket.subject}</div>
-                      <div className={s.ticketProgressRow}>
-                        <div className={s.ticketTrack}>
-                          <div className={s.ticketFill} style={{ width: `${sc.progress}%`, background: progressColor(ticket.status) }} />
-                        </div>
-                      </div>
-                      <div className={s.ticketMeta}>
-                        Raised {formatDate(ticket.createdAt)} · {ticket.priority} · {ticket.issue_type}
-                      </div>
-                    </div>
-
-                    {/* Delete icon */}
-                    <button
-                      className={s.btnRowDelete}
-                      onClick={e => { e.stopPropagation(); setDeleteModal([ticket._id]); }}
-                      title="Delete ticket"
-                    >
-                      <TrashIcon />
-                    </button>
-                  </div>
+                    </td>
+                  </tr>
                 );
               })}
-            </div>
+            </tbody>
+          </table>
+        </div>
 
-            {/* Table footer — superadmin style */}
-            <div className={s.tableFooter}>
-              <div className={s.footerLeft}>
-                {checked.size > 0 && (
-                  <button className={s.btnBulkDelete} onClick={() => setDeleteModal([...checked])}>
-                    Delete Selected ({checked.size})
-                  </button>
-                )}
-                <span>
-                  {`Showing ${(page - 1) * PER_PAGE + 1} to ${Math.min(page * PER_PAGE, filteredTickets.length)} of ${filteredTickets.length} ticket${filteredTickets.length !== 1 ? 's' : ''}`}
-                </span>
-              </div>
-              <div className={s.pagination}>
-                <button className={s.pageBtn} disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
-                  Previous
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
-                  <button
-                    key={n}
-                    className={`${s.pageBtn} ${n === page ? s.pageBtnActive : ''}`}
-                    onClick={() => setPage(n)}
-                  >
-                    {n}
-                  </button>
-                ))}
-                <button className={s.pageBtn} disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-                  Next
-                </button>
-              </div>
-            </div>
-          </>
-        )}
+        {/* Pagination */}
+        <div className={s.pagination}>
+          <div className={s.footerLeft}>
+            {checked.size > 0 && (
+              <button className={s.btnBulkDelete} onClick={() => setDeleteModal([...checked])}>
+                Delete Selected ({checked.size})
+              </button>
+            )}
+            <span>
+              Showing {filteredTickets.length === 0 ? 0 : (page - 1) * PER_PAGE + 1}–{Math.min(page * PER_PAGE, filteredTickets.length)} of {filteredTickets.length}
+            </span>
+          </div>
+          <div className={s.paginationBtns}>
+            <button className={s.pageBtn} disabled={page <= 1} onClick={() => setPage(p => p - 1)}>‹</button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+              <button key={n} className={`${s.pageBtn} ${n === page ? s.pageBtnActive : ''}`} onClick={() => setPage(n)}>{n}</button>
+            ))}
+            <button className={s.pageBtn} disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>›</button>
+          </div>
+        </div>
+
       </div>
 
-      {/* Delete modal */}
       {deleteModal && (
         <DeleteModal count={deleteModal.length} onCancel={() => setDeleteModal(null)} onConfirm={confirmDelete} deleting={deleting} />
       )}

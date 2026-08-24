@@ -30,7 +30,7 @@ export const createChapter = async (data) => {
 
 export const editChapter = async (editId) => {
     try {
-        return await Chapter.findOne({ _id: editId, deletedAt: null });
+        return await Chapter.findOne({ _id: editId, deletedAt: null }).lean();
     } catch (error) {
         throw error;
     }
@@ -50,7 +50,7 @@ export const updateChapter = async (updateId, data) => {
         if (courseId !== undefined) updateFields.courseId = courseId;
 
         if (Object.keys(updateFields).length === 0) {
-            return await Chapter.findOne({ _id: updateId, deletedAt: null });
+            return await Chapter.findOne({ _id: updateId, deletedAt: null }).lean();
         }
 
         updateFields.updatedAt = new Date();
@@ -59,7 +59,7 @@ export const updateChapter = async (updateId, data) => {
             { _id: updateId, deletedAt: null },
             { $set: updateFields },
             { returnDocument: 'before', runValidators: true }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -68,7 +68,7 @@ export const updateChapter = async (updateId, data) => {
 export const listChapter = async (filters = {}) => {
     try {
         const query = buildQuery(filters);
-        return await Chapter.find(query).sort({ order: 1, title: 1 });
+        return await Chapter.find(query).sort({ order: 1, title: 1 }).lean();
     } catch (error) {
         throw error;
     }
@@ -80,7 +80,8 @@ export const listChapterPagination = async (page, limit, filters = {}) => {
         return await Chapter.find(query)
             .sort({ order: 1, title: 1 })
             .skip((page - 1) * limit)
-            .limit(limit);
+            .limit(limit)
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -101,7 +102,7 @@ export const deleteChapter = async (delId) => {
             { _id: delId, deletedAt: null },
             { $set: { deletedAt: new Date(), status: 'inactive' } },
             { returnDocument: 'before' }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -115,7 +116,7 @@ export const checkChapterTitle = async (title, courseId, excludeId = null) => {
             deletedAt: null
         };
         if (excludeId) query._id = { $ne: excludeId };
-        const existing = await Chapter.findOne(query);
+        const existing = await Chapter.findOne(query).lean();
         return { isDuplicate: !!existing };
     } catch (error) {
         throw error;

@@ -14,4 +14,9 @@ const CoursePricingSchema = new Schema({
     updatedAt:       { type: Date, default: Date.now },
 });
 
+// listCoursePricing/listCoursePricingPagination (course_pricing.service.js) always
+// filter by deletedAt, optionally by courseId, and sort by isDefault desc then
+// quantity asc -- compound index covers the filter + sort combination.
+CoursePricingSchema.index({ deletedAt: 1, courseId: 1, isDefault: -1, quantity: 1 });
+
 export default mongoose.model('course_pricings', CoursePricingSchema);

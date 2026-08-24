@@ -44,8 +44,10 @@ const listIndustryTypesPagination = async (req, res, next) => {
         const page  = parseInt(req.query.page)  || 1;
         const limit = parseInt(req.query.limit) || 15;
         const { status, search } = req.query;
-        const data  = await IndustryTypeHelper.listIndustryTypesPagination(page, limit, { status, search });
-        const total = await IndustryTypeHelper.getIndustryTypeCount({ status, search });
+        const [data, total] = await Promise.all([
+            IndustryTypeHelper.listIndustryTypesPagination(page, limit, { status, search }),
+            IndustryTypeHelper.getIndustryTypeCount({ status, search })
+        ]);
         res.status(200).json({
             status: 200,
             message: 'Successfully fetched.',

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from './CourseSubCategory.module.css';
+import s from "./CourseSubCategoryList.module.css";
 
 const Icon = {
   search: (
@@ -153,7 +153,7 @@ export default function CourseSubCategoryList() {
         onCancel={() => setConfirm({ show: false, id: null, bulk: false })}
       />
 
-      <div className={s.pageHeader}>
+      <div className={s.pageHeader} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '12px' }}>
         <div>
           <h1 className={s.pageTitle}>Course Sub-Categories</h1>
           <p className={s.pageSubtitle}>Manage course sub-categories</p>

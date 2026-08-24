@@ -3,8 +3,10 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectUser, clearAuth } from '../../redux/slices/authSlice';
-import s from './StoreOwnerShell.module.css';
+import { selectUser, selectAuthReady, selectIsAuthenticated, clearAuth } from '../../redux/slices/authSlice';
+import useIdleLogout from '../../hooks/useIdleLogout';
+import useStoreProfileGate from '../../hooks/useStoreProfileGate';
+import s from "./StoreOwnerShell.module.css";
 
 // ── Section / nav data ──────────────────────────────────────────
 const SECTIONS = [
@@ -29,7 +31,10 @@ const SECTIONS = [
     id: 'content', label: 'Content',
     icon: <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4 7.962 7.962 0 009 5.189V4.804z" /></svg>,
     items: [
+      { id: 'all-courses', label: 'All Courses', path: '/storeowner/all-courses', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg> },
       { id: 'my-courses', label: 'My Courses', path: '/storeowner/my-courses', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4 7.962 7.962 0 009 5.189V4.804z" /></svg> },
+      { id: 'quiz-result', label: 'Quiz Result', path: '/storeowner/quiz-result', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg> },
+      { id: 'course-certificate', label: 'Course Certificate', path: '/storeowner/course-certificate', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V6.414A2 2 0 0015.414 5L13 2.586A2 2 0 0011.586 2H6zm4 12a2 2 0 100-4 2 2 0 000 4zm-1 1.5v3.5l1-1 1 1v-3.5a3.5 3.5 0 01-2 0z" clipRule="evenodd" /></svg> },
     ],
   },
   {
@@ -44,16 +49,14 @@ const SECTIONS = [
     id: 'account', label: 'Account',
     icon: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>,
     items: [
-      { id: 'subscription', label: 'Subscription', path: '/storeowner/subscription', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" /><path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd" /></svg> },
-      { id: 'credits',      label: 'Credits',      path: '/storeowner/credits',      icon: <svg viewBox="0 0 20 20" fill="currentColor"><path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" /><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" /></svg> },
+      { id: 'subscription', label: 'Current Credit', path: '/storeowner/current-credits', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" /><path fillRule="evenodd" d="M18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z" clipRule="evenodd" /></svg> },
+      { id: 'credits',      label: 'Credits Usage', path: '/storeowner/credits-usage', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z" /><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd" /></svg> },
       { id: 'support',      label: 'Support',      path: '/storeowner/support',      icon: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-2 0c0 .993-.241 1.929-.668 2.754l-1.524-1.525a3.997 3.997 0 00.078-2.183l1.562-1.562C15.802 8.249 16 9.1 16 10zm-5.165 3.913l1.58 1.58A5.98 5.98 0 0110 16a5.976 5.976 0 01-2.516-.552l1.562-1.562a4.006 4.006 0 001.789.027zm-4.677-2.796a4.002 4.002 0 01-.041-2.08l-.08.08-1.53-1.533A5.98 5.98 0 004 10c0 .954.223 1.856.619 2.657l1.54-1.54zm1.088-6.45A5.974 5.974 0 0110 4c.954 0 1.856.223 2.657.619l-1.54 1.54a4.002 4.002 0 00-2.346.033L7.246 4.668z" clipRule="evenodd" /></svg> },
       { id: 'orders',       label: 'Orders',       path: '/storeowner/orders',       icon: <svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zm12 16a1 1 0 100-2 1 1 0 000 2zM7 17a1 1 0 100-2 1 1 0 000 2z" /></svg> },
       { id: 'invoices',     label: 'Invoices',     path: '/storeowner/invoices',     icon: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" /></svg> },
     ],
   },
 ];
-
-const LOGOUT_SECTION = { id: 'logout', label: 'Logout', items: [] };
 
 const ALL_ITEMS = SECTIONS.flatMap(sec => sec.items);
 
@@ -74,13 +77,26 @@ const Icon = {
   help:        <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" /></svg>,
   logout:      <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" /></svg>,
   chevronLeft: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" /></svg>,
+  menu: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>,
+  close: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>,
 };
 
 export default function StoreOwnerShell({ children }) {
-  const user     = useSelector(selectUser);
+  const user          = useSelector(selectUser);
+  const authReady     = useSelector(selectAuthReady);
+  const isAuthed      = useSelector(selectIsAuthenticated);
   const dispatch = useDispatch();
   const router   = useRouter();
   const pathname = usePathname();
+  useIdleLogout();
+  useStoreProfileGate();
+
+  // Actual gate: once rehydration has run and there's still no valid session (never
+  // logged in, or rehydrateAuth rejected a stale/expired token), stop rendering this
+  // portal and bounce to login instead of silently showing an empty shell.
+  useEffect(() => {
+    if (authReady && !isAuthed) router.replace('/login');
+  }, [authReady, isAuthed, router]);
 
   const activeSection  = getActiveSectionFromPath(pathname);
   const activeItemId   = ALL_ITEMS.find(i => pathname === i.path || pathname.startsWith(i.path + '/'))?.id || 'dashboard';
@@ -88,6 +104,14 @@ export default function StoreOwnerShell({ children }) {
 
   const [openSection, setOpenSection] = useState(() => activeSection);
   const [panelOpen,   setPanelOpen]   = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Redux's auth rehydration (from localStorage) can complete before this component's
+  // own hydration pass reaches it, so `user` may already differ from what the server
+  // rendered (which always sees a logged-out/null user). Gate the real name behind a
+  // mount flag so both the server and the client's FIRST paint agree on the fallback,
+  // then swap to the real name in an effect — a normal post-hydration update, not a mismatch.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   useLayoutEffect(() => {
     if (sessionStorage.getItem('storeSidebarOpen') === 'true') setPanelOpen(true);
@@ -131,7 +155,7 @@ export default function StoreOwnerShell({ children }) {
     router.replace('/login');
   }
 
-  const userName = user?.name || user?.email || 'Store Owner';
+  const userName = mounted ? (user?.name || user?.email || 'Store Owner') : 'Store Owner';
   const initials = userName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
   function openSec(sec) {
@@ -145,11 +169,27 @@ export default function StoreOwnerShell({ children }) {
     sessionStorage.setItem('storeSidebarOpen', 'false');
   }
 
+  function closeMobileMenu() {
+    setMobileMenuOpen(false);
+    setPanelOpen(false);
+    sessionStorage.setItem('storeSidebarOpen', 'false');
+  }
+
+  function toggleMobileMenu() {
+    if (mobileMenuOpen) {
+      closeMobileMenu();
+    } else {
+      setMobileMenuOpen(true);
+      setPanelOpen(true);
+      sessionStorage.setItem('storeSidebarOpen', 'true');
+    }
+  }
+
   return (
     <div className={s.shell}>
 
       {/* ── Sidebar ── */}
-      <aside className={s.sidebar}>
+      <aside className={`${s.sidebar}${mobileMenuOpen ? ` ${s.sidebarMobileOpen}` : ''}`}>
         {/* Icon strip */}
         <div className={s.iconStrip}>
           {SECTIONS.map(sec => (
@@ -160,45 +200,50 @@ export default function StoreOwnerShell({ children }) {
               <span className={s.stripIcon}>{sec.icon}</span>
             </button>
           ))}
-          <button className={`${s.stripBtn} ${openSection.id === 'logout' ? s.stripBtnActive : ''}`}
-                  onClick={() => openSec(LOGOUT_SECTION)}
+          <div className={s.stripSpacer} />
+          <button className={s.stripBtn}
+                  onClick={handleLogout}
                   title="Logout">
             <span className={s.stripIcon}>{Icon.logout}</span>
           </button>
-          <div className={s.stripSpacer} />
         </div>
 
         {/* Nav panel */}
         <div className={`${s.navPanel}${!panelOpen ? ` ${s.navPanelHidden}` : ''}`}>
           <div className={s.navPanelHeader}>
-            <button className={s.backBtn} title="Collapse" onClick={closePanel}>
+            <button className={s.backBtn} title="Collapse" onClick={closeMobileMenu}>
               <span className={s.backBtnIcon}>{Icon.chevronLeft}</span>
             </button>
             <span className={s.navPanelTitle}>{openSection.label}</span>
           </div>
           <div className={s.navList}>
-            {openSection.id === 'logout' ? (
-              <button className={s.navItem} onClick={handleLogout}>
-                <span className={s.navItemIcon}>{Icon.logout}</span>
-                Logout
+            {openSection.items.map(item => (
+              <button key={item.id}
+                      className={`${s.navItem} ${activeItemId === item.id ? s.navItemActive : ''}`}
+                      onClick={() => { router.push(item.path); setMobileMenuOpen(false); }}>
+                <span className={s.navItemIcon}>{item.icon}</span>
+                {item.label}
               </button>
-            ) : (
-              openSection.items.map(item => (
-                <button key={item.id}
-                        className={`${s.navItem} ${activeItemId === item.id ? s.navItemActive : ''}`}
-                        onClick={() => router.push(item.path)}>
-                  <span className={s.navItemIcon}>{item.icon}</span>
-                  {item.label}
-                </button>
-              ))
-            )}
+            ))}
           </div>
         </div>
       </aside>
 
+      {/* ── Mobile nav-panel backdrop ── */}
+      {mobileMenuOpen && (
+        <div className={s.backdrop} onClick={closeMobileMenu} />
+      )}
+
       {/* ── Topbar ── */}
       <header className={s.topbar}>
         <div className={s.topbarLeft}>
+          <button
+            className={s.hamburgerBtn}
+            title={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+            onClick={toggleMobileMenu}
+          >
+            {mobileMenuOpen ? Icon.close : Icon.menu}
+          </button>
           <div className={s.topbarLogo}>
             <img src="/logo.png" alt="sikhoaurbadho" className={s.logoImg} />
           </div>
@@ -257,7 +302,7 @@ export default function StoreOwnerShell({ children }) {
               <div className={s.userMenuDropdown}>
                 <div className={s.userMenuHeader}>
                   <div className={s.userMenuAvatar}>{initials}</div>
-                  <div>
+                  <div className={s.userMenuInfo}>
                     <div className={s.userMenuName}>{userName}</div>
                     {user?.email && <div className={s.userMenuEmail}>{user.email}</div>}
                   </div>

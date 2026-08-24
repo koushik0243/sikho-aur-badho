@@ -1,93 +1,212 @@
 'use client';
 
-import s from './TrackAnalysis.module.css';
+import { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import { useRouter } from 'next/navigation';
+import { selectUser } from '../../../redux/slices/authSlice';
+import apiServiceHandler from '../../../service/apiService';
+import s from "./TrackAnalysis.module.css";
 
-// ── Static data ───────────────────────────────────────────────────
-const FAILURE_CHAPTERS = [
-  { label: 'Safety · Ch.3',    pct: 62 },
-  { label: 'Ethics · Ch.2',    pct: 49 },
-  { label: 'Leadership · Ch.1',pct: 38 },
-  { label: 'QC · Ch.2',        pct: 22 },
-  { label: 'Safety · Ch.1',    pct: 11 },
-];
+const AVATAR_COLORS = ['#d4897a','#e5a97b','#c8956a','#b8856a','#5a9b8a','#7b9fd4','#9b8ad4','#d4a87a'];
 
-// Avatar background colours for the learner list
-const AVATAR_COLORS = ['#d4897a', '#e5a97b', '#c8956a', '#b8856a', '#d4897a', '#e5a97b', '#c8956a', '#a07866'];
+function toArr(res) {
+  if (Array.isArray(res))             return res;
+  if (Array.isArray(res?.data))       return res.data;
+  if (Array.isArray(res?.data?.data)) return res.data.data;
+  if (Array.isArray(res?.data?.list)) return res.data.list;
+  if (Array.isArray(res?.list))       return res.list;
+  return [];
+}
 
-const LEARNERS = Array.from({ length: 8 }, (_, i) => ({
-  id: i,
-  name: 'Anita S.',
-  sub: 'Safety · Ch.3',
-  courses: '4/6',
-  duration: 'Avg. Watch Time: 6m',
-  color: AVATAR_COLORS[i % AVATAR_COLORS.length],
-  isMale: i === 7,
-}));
-
-const VIDEO_ITEMS = [
-  { title: 'Safety · Ch.3 · PPE Usage',    sub: 'Watched (time-based)', progress: 79, score: '72/91', watch: '6m', days: '22s / 8m' },
-  { title: 'Ethics · Ch.2 · Case Studies', sub: 'Watched (time-based)', progress: 91, score: '41/45', watch: '11m', days: '04s / 12m' },
-  { title: 'QC · Ch.3 · Reporting',        sub: 'Watched (time-based)', progress: 34, score: '31/91', watch: '3m',  days: '11s / 8m' },
-  { title: 'Safety · Ch.3 · PPE Usage',    sub: 'Watched (time-based)', progress: 79, score: '72/91', watch: '5m',  days: '22s / 8m' },
-];
-
-const chevronDownIcon = <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>;
-
-// ── Circular progress ring ─────────────────────────────────────
 function Ring({ pct }) {
-  const r = 28;
-  const circ = 2 * Math.PI * r;
-  const dash = (pct / 100) * circ;
+  const r = 28, circ = 2 * Math.PI * r, dash = (pct / 100) * circ;
+  const stroke = pct > 60 ? '#e05252' : pct > 35 ? '#d97706' : '#0b7b7b';
   return (
     <svg className={s.ring} viewBox="0 0 70 70">
       <circle cx="35" cy="35" r={r} fill="none" stroke="#e8edf0" strokeWidth="5" />
-      <circle
-        cx="35" cy="35" r={r} fill="none"
-        stroke="#0b7b7b" strokeWidth="5"
+      <circle cx="35" cy="35" r={r} fill="none"
+        stroke={stroke} strokeWidth="5"
         strokeDasharray={`${dash} ${circ}`}
-        strokeLinecap="round"
-        transform="rotate(-90 35 35)"
-      />
+        strokeLinecap="round" transform="rotate(-90 35 35)" />
       <text x="35" y="40" textAnchor="middle" fontSize="13" fontWeight="700" fill="#1a2b2b">{pct}%</text>
     </svg>
   );
 }
 
-// ── Avatar placeholder ─────────────────────────────────────────
-function Avatar({ color, isMale }) {
+function InitialAvatar({ name, idx }) {
+  const color    = AVATAR_COLORS[idx % AVATAR_COLORS.length];
+  const initials = name
+    ? name.split(' ').filter(Boolean).map(w => w[0]).slice(0, 2).join('').toUpperCase()
+    : '?';
   return (
     <svg className={s.avatar} viewBox="0 0 40 40">
       <circle cx="20" cy="20" r="20" fill={color} />
-      {isMale ? (
-        <>
-          <circle cx="20" cy="15" r="6" fill="rgba(255,255,255,0.7)" />
-          <ellipse cx="20" cy="32" rx="9" ry="6" fill="rgba(255,255,255,0.7)" />
-        </>
-      ) : (
-        <>
-          <circle cx="20" cy="15" r="6" fill="rgba(255,255,255,0.7)" />
-          <ellipse cx="20" cy="32" rx="9" ry="6" fill="rgba(255,255,255,0.7)" />
-          <path d="M14 15 Q20 8 26 15" fill="rgba(255,255,255,0.4)" />
-        </>
-      )}
+      <text x="20" y="25" textAnchor="middle" fontSize="14" fontWeight="700" fill="#fff">{initials}</text>
     </svg>
   );
 }
 
+const ChevronIcon = (
+  <svg viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+  </svg>
+);
+
 export default function TrackAnalysisPage() {
+  const user   = useSelector(selectUser);
+  const router = useRouter();
+
+  const [loading,         setLoading]         = useState(true);
+  const [coursesForDrop,  setCoursesForDrop]  = useState([]);
+  const [learners,        setLearners]        = useState([]);
+  const [assignments,     setAssignments]     = useState([]);
+  const [failureChapters, setFailureChapters] = useState([]);
+  const [selectedCourse,  setSelectedCourse]  = useState(null);
+  const [quizTopics,      setQuizTopics]      = useState([]);
+  const [courseAttempts,  setCourseAttempts]  = useState([]);
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      try {
+        let orgId = user?.orgId ? String(user.orgId) : null;
+        if (!orgId) {
+          const uid = user?._id || user?.id;
+          if (uid) {
+            const r   = await apiServiceHandler('GET', `user/admin/edit/${uid}`).catch(() => null);
+            const rec = r?.data ?? r;
+            orgId     = rec?.orgId ? String(rec.orgId) : null;
+          }
+        }
+        if (!orgId) return;
+
+        const [ocRes, learnerRes, assignRes] = await Promise.all([
+          apiServiceHandler('GET', `organization-course/list?orgId=${orgId}`).catch(() => null),
+          apiServiceHandler('GET', `user/admin/list?orgId=${orgId}&user_type=employee&orgRole=employee`).catch(() => null),
+          apiServiceHandler('GET', `course-assignment/list?organizationId=${orgId}`).catch(() => null),
+        ]);
+
+        const ocList     = toArr(ocRes);
+        const learnerList = toArr(learnerRes);
+        const assignList  = toArr(assignRes);
+
+        setLearners(learnerList);
+        setAssignments(assignList);
+
+        const courseIds = ocList.map(oc => {
+          const c = oc.courseId;
+          return c?._id ? String(c._id) : String(c);
+        }).filter(Boolean);
+
+        const drop = ocList.map(oc => {
+          const c = oc.courseId;
+          return c?._id ? { _id: String(c._id), title: c.title || 'Untitled' } : null;
+        }).filter(Boolean);
+        setCoursesForDrop(drop);
+
+        if (courseIds.length > 0) {
+          const attResults = await Promise.all(
+            courseIds.map(cid =>
+              apiServiceHandler('GET', `quiz-attempt/course-all?courseId=${cid}`).catch(() => null)
+            )
+          );
+          const allAttempts = attResults.flatMap(r => toArr(r));
+
+          const topicStats = {};
+          for (const att of allAttempts) {
+            const tid   = String(att.topicId?._id || att.topicId || '');
+            const tName = att.topicId?.title || '';
+            const cName = att.topicId?.chapterId?.title || att.chapterId?.title || '';
+            if (!tid) continue;
+            if (!topicStats[tid]) topicStats[tid] = { total: 0, failed: 0, label: cName ? `${cName} · ${tName}` : tName || 'Quiz' };
+            topicStats[tid].total++;
+            if (!att.passed) topicStats[tid].failed++;
+          }
+
+          const chapters = Object.values(topicStats)
+            .filter(d => d.total > 0)
+            .map(d => ({ label: d.label, pct: Math.round((d.failed / d.total) * 100), total: d.total }))
+            .sort((a, b) => b.pct - a.pct)
+            .slice(0, 5);
+
+          setFailureChapters(chapters);
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+    if (user) load();
+  }, [user?._id]);
+
+  // Load quiz topics + attempts for selected course
+  useEffect(() => {
+    if (!selectedCourse) { setQuizTopics([]); setCourseAttempts([]); return; }
+    async function loadCourse() {
+      const [topicRes, attRes] = await Promise.all([
+        apiServiceHandler('GET', `topic/list?courseId=${selectedCourse._id}`).catch(() => null),
+        apiServiceHandler('GET', `quiz-attempt/course-all?courseId=${selectedCourse._id}`).catch(() => null),
+      ]);
+      setQuizTopics(toArr(topicRes).filter(t => (t.video_type || t.type) === 'quiz'));
+      setCourseAttempts(toArr(attRes));
+    }
+    loadCourse();
+  }, [selectedCourse?._id]);
+
+  // Per-topic attempt stats for selected course
+  const topicStatMap = {};
+  for (const att of courseAttempts) {
+    const tid = String(att.topicId?._id || att.topicId || '');
+    if (!tid) continue;
+    if (!topicStatMap[tid]) topicStatMap[tid] = { total: 0, passed: 0 };
+    topicStatMap[tid].total++;
+    if (att.passed) topicStatMap[tid].passed++;
+  }
+
+  // Per-learner assignment count and latest course
+  const learnerAssignCount  = {};
+  const learnerLatestCourse = {};
+  for (const a of assignments) {
+    const uid   = String(a.userId?._id || a.userId || '');
+    const title = a.courseId?.title || '';
+    if (!uid) continue;
+    learnerAssignCount[uid] = (learnerAssignCount[uid] || 0) + 1;
+    if (title) learnerLatestCourse[uid] = title;
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
+        <div className={s.spinner} />
+      </div>
+    );
+  }
+
   return (
     <>
-
       {/* ── Chapter-wise failure analysis ── */}
       <div className={s.card}>
-        <h2 className={s.cardTitle}>Chapter-wise failure analysis</h2>
-        <div className={s.ringRow}>
-          {FAILURE_CHAPTERS.map(ch => (
-            <div key={ch.label} className={s.ringItem}>
-              <div className={s.ringLabel}>{ch.label}</div>
-              <Ring pct={ch.pct} />
+        <div className={s.cardHead}>
+          <h2 className={s.cardTitle}>Chapter-wise Failure Analysis</h2>
+          <span className={s.cardMeta}>
+            {failureChapters.length > 0
+              ? `Top ${failureChapters.length} by fail rate`
+              : 'No quiz attempt data yet'}
+          </span>
+        </div>
+        <div className={s.cardBody}>
+          {failureChapters.length > 0 ? (
+            <div className={s.ringRow}>
+              {failureChapters.map(ch => (
+                <div key={ch.label} className={s.ringItem}>
+                  <div className={s.ringLabel}>{ch.label}</div>
+                  <Ring pct={ch.pct} />
+                  <div className={s.ringMeta}>{ch.total} attempt{ch.total !== 1 ? 's' : ''}</div>
+                </div>
+              ))}
             </div>
-          ))}
+          ) : (
+            <p className={s.emptyNote} style={{ textAlign: 'center', padding: '16px 0' }}>No quiz attempts recorded yet for your courses.</p>
+          )}
         </div>
       </div>
 
@@ -96,56 +215,96 @@ export default function TrackAnalysisPage() {
 
         {/* Left: Learner progress detail */}
         <div className={s.card}>
-          <h3 className={s.cardTitle}>Learner progress detail</h3>
+          <div className={s.cardHead}>
+            <h3 className={s.cardTitle}>Learner Progress Detail</h3>
+            <span className={s.cardMeta}>{learners.length} learner{learners.length !== 1 ? 's' : ''}</span>
+          </div>
           <div className={s.learnerList}>
-            {LEARNERS.map(l => (
-              <div key={l.id} className={s.learnerRow}>
-                <Avatar color={l.color} isMale={l.isMale} />
-                <div className={s.learnerInfo}>
-                  <div className={s.learnerName}>{l.name}</div>
-                  <div className={s.learnerSub}>{l.sub}</div>
+            {learners.length === 0 && (
+              <p className={s.emptyNote} style={{ textAlign: 'center', padding: '16px 0' }}>No learners enrolled yet.</p>
+            )}
+            {learners.slice(0, 8).map((l, i) => {
+              const uid     = String(l._id || '');
+              const name    = l.name || l.fullName || `${l.firstName || ''} ${l.lastName || ''}`.trim() || 'Learner';
+              const courses = learnerAssignCount[uid] || 0;
+              const latest  = learnerLatestCourse[uid] || '—';
+              return (
+                <div key={uid || i} className={s.learnerRow}>
+                  <InitialAvatar name={name} idx={i} />
+                  <div className={s.learnerInfo}>
+                    <div className={s.learnerName}>{name}</div>
+                    <div className={s.learnerSub}>{latest}</div>
+                  </div>
+                  <div className={s.learnerStats}>
+                    <div className={s.statLabel}>COURSES</div>
+                    <div className={s.statVal}>{courses}</div>
+                  </div>
+                  <div className={s.learnerStats}>
+                    <div className={s.statLabel}>STATUS</div>
+                    <div className={s.statVal} style={{ textTransform: 'capitalize' }}>{l.status || 'Active'}</div>
+                  </div>
+                  <button className={s.btnView} onClick={() => router.push(`/storeowner/track-analysis/${uid}`)}>
+                    View Details
+                  </button>
                 </div>
-                <div className={s.learnerStats}>
-                  <div className={s.statLabel}>COURSES</div>
-                  <div className={s.statVal}>{l.courses}</div>
-                </div>
-                <div className={s.learnerStats}>
-                  <div className={s.statLabel}>DURATION</div>
-                  <div className={s.statVal}>{l.duration}</div>
-                </div>
-                <button className={s.btnView}>View Details</button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
-        {/* Right: Video completion tracking */}
+        {/* Right: Quiz completion tracking */}
         <div className={`${s.card} ${s.videoCard}`}>
-          <h3 className={s.cardTitle}>Video completion tracking</h3>
-
-          <div className={s.selectWrap}>
-            <select className={s.select} defaultValue="">
-              <option value="" disabled>Select Course</option>
-            </select>
-            <span className={s.chevron}>{chevronDownIcon}</span>
+          <div className={s.cardHead}>
+            <h3 className={s.cardTitle}>Quiz Completion Tracking</h3>
           </div>
+          <div className={s.cardBody}>
+            <div className={s.selectWrap}>
+              <select
+                className={s.select}
+                style={{ color: selectedCourse ? '#1a2b2b' : undefined }}
+                value={selectedCourse?._id || ''}
+                onChange={e => {
+                  const found = coursesForDrop.find(c => c._id === e.target.value);
+                  setSelectedCourse(found || null);
+                }}
+              >
+                <option value="" disabled>Select Course</option>
+                {coursesForDrop.map(c => (
+                  <option key={c._id} value={c._id}>{c.title}</option>
+                ))}
+              </select>
+              <span className={s.chevron}>{ChevronIcon}</span>
+            </div>
 
-          <div className={s.videoList}>
-            {VIDEO_ITEMS.map((v, i) => (
-              <div key={i} className={s.videoItem}>
-                <div className={s.videoTitle}>{v.title}</div>
-                <div className={s.videoSub}>{v.sub}</div>
-                <div className={s.videoProgressRow}>
-                  <div className={s.videoTrack}>
-                    <div className={s.videoFill} style={{ width: `${v.progress}%` }} />
-                  </div>
-                  <span className={s.videoScore}>{v.score}</span>
-                </div>
-                <div className={s.videoMeta}>
-                  Avg. watch time: {v.watch}&nbsp;&nbsp;{v.days}
-                </div>
+            {!selectedCourse && (
+              <p className={s.emptyNote}>Select a course to view quiz stats.</p>
+            )}
+            {selectedCourse && quizTopics.length === 0 && (
+              <p className={s.emptyNote}>No quiz topics in this course.</p>
+            )}
+
+            {quizTopics.length > 0 && (
+              <div className={s.videoList}>
+                {quizTopics.map(tp => {
+                  const tid   = String(tp._id);
+                  const stats = topicStatMap[tid] || { total: 0, passed: 0 };
+                  const pct   = stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0;
+                  return (
+                    <div key={tid} className={s.videoItem}>
+                      <div className={s.videoTitle}>{tp.title}</div>
+                      <div className={s.videoSub}>Quiz · {stats.total} attempt{stats.total !== 1 ? 's' : ''}</div>
+                      <div className={s.videoProgressRow}>
+                        <div className={s.videoTrack}>
+                          <div className={s.videoFill} style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className={s.videoScore}>{stats.passed}/{stats.total}</span>
+                      </div>
+                      <div className={s.videoMeta}>Pass rate: {pct}%</div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
+            )}
           </div>
         </div>
 

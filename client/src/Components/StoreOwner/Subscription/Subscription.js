@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import { selectUser } from '../../../redux/slices/authSlice';
-import s from './Subscription.module.css';
+import s from "./Subscription.module.css";
 import apiServiceHandler from '../../../service/apiService';
 
 function CheckCircle({ dark }) {
@@ -39,6 +39,8 @@ function fmtPrice(raw) {
   return n != null && !isNaN(n) ? `₹${n.toLocaleString('en-IN')}` : '—';
 }
 
+const PAGE_SIZE = 10;
+
 export default function SubscriptionPage() {
   const user = useSelector(selectUser);
 
@@ -48,6 +50,7 @@ export default function SubscriptionPage() {
   const [selectedCreditId, setSelectedCreditId] = useState('');
   const [purchasing, setPurchasing]           = useState(false);
   const [purchaseOrgId, setPurchaseOrgId]     = useState(null);
+  const [assignPage, setAssignPage]           = useState(1);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -84,16 +87,16 @@ export default function SubscriptionPage() {
     }
   }, [user?._id, user?.orgId]);
 
+  // Purchase -> the credit assignment is created directly server-side (see
+  // server/organization_credit_assignment/organization_credit_assignment.service.js).
   async function handlePurchase() {
     if (!selectedCreditId) return;
     if (!purchaseOrgId) { toast.error('Organisation not found.'); return; }
-    const userId = user?._id || getTokenUserId();
     setPurchasing(true);
     try {
       await apiServiceHandler('POST', 'organization-credit-assignment/create', {
-        orgId:      purchaseOrgId,
-        creditId:   selectedCreditId,
-        assignedBy: userId,
+        orgId:    purchaseOrgId,
+        creditId: selectedCreditId,
       });
       toast.success('Credit purchased successfully.');
       setSelectedCreditId('');
@@ -113,7 +116,6 @@ export default function SubscriptionPage() {
   const planPrice  = fmtPrice(credit?.price);
   const limitFrom  = credit?.limit_from;
   const limitTo    = credit?.limit_to;
-  const planStatus = (activePlan?.status || '').toLowerCase();
   const features   = (credit?.desc ?? '')
     .split(/\n|<br\s*\/?>/)
     .map(l => l.trim())
@@ -121,22 +123,6 @@ export default function SubscriptionPage() {
 
   return (
     <>
-      {/* Page header */}
-      <div className={s.pageHeader}>
-        <h1 className={s.pageTitle}>Subscription &amp; Billing</h1>
-        {!loading && activePlan && (
-          <span className={`${s.proBadge} ${planStatus !== 'active' ? s.proBadgeInactive : ''}`}>
-            {planTitle}
-          </span>
-        )}
-        {!loading && activePlan && (
-          <div className={s.headerMeta}>
-            <span>Assigned <strong>{formatDate(activePlan.createdAt)}</strong></span>
-            {limitTo != null && <span>Credit Limit <strong>{limitTo}</strong></span>}
-          </div>
-        )}
-      </div>
-
       {/* Main two-column grid */}
       <div className={s.mainGrid}>
 
@@ -145,6 +131,10 @@ export default function SubscriptionPage() {
 
           {/* Current plan card */}
           <div className={s.card}>
+            <div className={s.cardHead}>
+              <h3 className={s.cardTitle}>Current Plan</h3>
+            </div>
+            <div className={s.cardBody}>
             {loading ? (
               <div className={s.loadingMsg}>Loading plan…</div>
             ) : !activePlan ? (
@@ -191,83 +181,81 @@ export default function SubscriptionPage() {
                 <div className={s.planBottom}>
                   <div className={s.planChips}>
                     <span className={s.renewalChip}>Assigned {formatDate(activePlan.createdAt)}</span>
-                    <span className={planStatus === 'active' ? s.proChip : s.inactiveChip}>
-                      {planStatus}
-                    </span>
                   </div>
                 </div>
               </>
             )}
+            </div>
           </div>
 
           {/* Credit Assignment History */}
           <div className={s.card}>
-            <h3 className={s.cardTitle}>Credit Assignment History</h3>
+            <div className={s.cardHead}><h3 className={s.cardTitle}>Assignment History</h3></div>
+            <div className={s.cardBody}>
             {loading ? (
               <div className={s.loadingMsg}>Loading history…</div>
             ) : assignments.length === 0 ? (
               <div className={s.noplan}>No credit assignments found.</div>
-            ) : (
-              <table className={s.billingTable}>
-                <thead>
-                  <tr>
-                    <th></th>
-                    <th>Date</th>
-                    <th>Plan</th>
-                    <th>Credits</th>
-                    <th>Amount</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(() => {
-                    const sorted = [...assignments].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
-                    return sorted.map((a, i) => {
-                      const c = a.creditId ?? {};
-                      const isLatest = i === 0;
-                      return (
-                        <tr key={a._id ?? i}>
-                          <td>
-                            <span className={`${s.billingDot} ${isLatest ? s.billingDotFilled : ''}`} />
-                          </td>
-                          <td>{formatDate(a.createdAt)}</td>
-                          <td>{c.title ?? '—'}</td>
-                          <td>{c.limit_to != null ? c.limit_to : '—'}</td>
-                          <td>{fmtPrice(c.price)}</td>
-                          <td>
-                            {isLatest
-                              ? <span className={s.paidBadge}>ACTIVE</span>
-                              : <span className={s.inactiveBadgeTbl}>—</span>}
-                          </td>
+            ) : (() => {
+              const sorted = [...assignments].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+              const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
+              const paged = sorted.slice((assignPage - 1) * PAGE_SIZE, assignPage * PAGE_SIZE);
+              return (
+                <>
+                  <div className={s.tableScrollWrap}>
+                    <table className={s.billingTable}>
+                      <thead>
+                        <tr>
+                          <th>Sl.</th>
+                          <th>Date</th>
+                          <th>Plan</th>
+                          <th>Credits</th>
+                          <th>Amount</th>
                         </tr>
-                      );
-                    });
-                  })()}
-                </tbody>
-              </table>
-            )}
+                      </thead>
+                      <tbody>
+                        {paged.map((a, i) => {
+                          const globalIdx = (assignPage - 1) * PAGE_SIZE + i;
+                          const c = a.creditId ?? {};
+                          return (
+                            <tr key={a._id ?? i}>
+                              <td>{globalIdx + 1}</td>
+                              <td>{formatDate(a.createdAt)}</td>
+                              <td>{c.title ?? '—'}</td>
+                              <td>{c.limit_to != null ? c.limit_to : '—'}</td>
+                              <td>{fmtPrice(c.price)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className={s.pagination}>
+                    <span className={s.paginationInfo}>
+                      Showing {sorted.length === 0 ? 0 : (assignPage - 1) * PAGE_SIZE + 1}–{Math.min(assignPage * PAGE_SIZE, sorted.length)} of {sorted.length}
+                    </span>
+                    <div className={s.paginationBtns}>
+                      <button className={s.pageBtn} onClick={() => setAssignPage(p => Math.max(1, p - 1))} disabled={assignPage <= 1}>‹</button>
+                      {Array.from({ length: Math.max(1, totalPages) }, (_, i) => i + 1).map(p => (
+                        <button key={p} className={`${s.pageBtn} ${p === assignPage ? s.pageBtnActive : ''}`} onClick={() => setAssignPage(p)}>{p}</button>
+                      ))}
+                      <button className={s.pageBtn} onClick={() => setAssignPage(p => Math.min(totalPages, p + 1))} disabled={assignPage >= totalPages}>›</button>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+            </div>
           </div>
         </div>
 
         {/* ── Right column ── */}
         <div className={s.rightCol}>
 
-          {/* Upgrade Options */}
-          <div className={s.card}>
-            <h3 className={s.cardTitle}>Upgrade Options</h3>
-
-            <div className={s.enterpriseRow}>
-              <div>
-                <div className={s.enterpriseTitle}>Enterprise</div>
-                <div className={s.enterpriseSub}>Credit Packages &nbsp; Pricing</div>
-              </div>
-              <button className={s.btnContactUs}>Contact Us</button>
-            </div>
-          </div>
-
           {/* Purchase Credit */}
           <div className={s.card}>
-            <h3 className={s.cardTitle}>Purchase Credit</h3>
+            <div className={s.cardHead}><h3 className={s.cardTitle}>Purchase Credit</h3></div>
+            <div className={s.cardBody}>
             <div className={s.purchaseGrid}>
               <div className={s.purchaseGroup}>
                 <label className={s.purchaseLabel} htmlFor="creditSelect">Select Credit</label>
@@ -281,16 +269,16 @@ export default function SubscriptionPage() {
                   <option value="">Select a credit option</option>
                   {credits.map(c => {
                     const range = c.limit_from != null && c.limit_to != null
-                      ? `${c.limit_from}–${c.limit_to} credits`
+                      ? `${c.limit_from} -${c.limit_to} credits`
                       : c.limit_to != null
                         ? `${c.limit_to} credits`
                         : c.limit_from != null
                           ? `${c.limit_from}+ credits`
                           : null;
                     const price = c.price != null ? fmtPrice(c.price) : null;
-                    const parts = [c.title, range, price].filter(Boolean);
+                    const label = `${c.title ?? ''}${range ? `(${range})` : ''}${price ? ` - ${price}` : ''}`;
                     return (
-                      <option key={c._id} value={c._id}>{parts.join(' — ')}</option>
+                      <option key={c._id} value={c._id}>{label}</option>
                     );
                   })}
                 </select>
@@ -305,18 +293,12 @@ export default function SubscriptionPage() {
                 </button>
               </div>
             </div>
+            </div>
           </div>
 
         </div>
       </div>
 
-      {/* Downgrade Notice */}
-      <div className={s.card}>
-        <h3 className={s.cardTitle}>Downgrade Notice</h3>
-        <p className={s.downgradeText}>
-          Downgrades are applied at your next renewal date. Prorated upgrades take effect immediately.
-        </p>
-      </div>
     </>
   );
 }

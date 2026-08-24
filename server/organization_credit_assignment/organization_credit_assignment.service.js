@@ -4,8 +4,24 @@ import Credit from '../credits/credit.model.js';
 import Organization from '../organizations/organization.model.js';
 import Order from '../orders/order.model.js';
 import Invoice from '../invoices/invoice.model.js';
+import User from '../users/user.model.js';
 
 const { ObjectId } = mongoose.Types;
+
+// This router has no role gating (any authenticated user can hit it), and it's
+// reachable from the StoreOwner "Purchase Credit" page in addition to the SuperAdmin
+// assignment form — so a non-admin caller must only ever be able to assign credit to
+// their OWN organization, never an arbitrary one passed in the request body.
+async function assertCanAssignToOrg(callerId, orgId) {
+    if (!callerId) return; // no caller info available — nothing to check against
+    const caller = await User.findById(callerId).select('user_type orgId').lean();
+    if (!caller || caller.user_type === 'superadmin') return; // admins may assign to any org
+    if (String(caller.orgId || '') !== String(orgId || '')) {
+        const err = new Error('You are not authorized to assign credit to this organization.');
+        err.statusCode = 403;
+        throw err;
+    }
+}
 
 const buildQuery = (filters = {}) => {
     const query = { deletedAt: null };
@@ -24,12 +40,24 @@ const buildQuery = (filters = {}) => {
 
 const populateRefs = (query) =>
     query
-        .populate('orgId', '_id org_name org_phone org_email org_whatsapp')
+        .populate('orgId', '_id org_name org_phone org_email')
         .populate('creditId', '_id title limit_from limit_to price')
         .populate('assignedBy', '_id name email');
 
 export const createOrgCreditAssignment = async (data, assignedBy = null) => {
     try {
+        if (!data.orgId || !ObjectId.isValid(data.orgId)) {
+            const err = new Error('A valid orgId is required.');
+            err.statusCode = 400;
+            throw err;
+        }
+        if (!data.creditId || !ObjectId.isValid(data.creditId)) {
+            const err = new Error('A valid creditId is required.');
+            err.statusCode = 400;
+            throw err;
+        }
+        await assertCanAssignToOrg(assignedBy, data.orgId);
+
         const assignment = await new OrgCreditAssignment({
             orgId:      data.orgId,
             creditId:   data.creditId,
@@ -66,6 +94,7 @@ export const createOrgCreditAssignment = async (data, assignedBy = null) => {
             total_amount:   creditAmount,
             payment_status: 'paid',
             payment_method: 'manual',
+            transaction_id: null,
             payment_date:   new Date(),
             bill_name:      org?.org_name   || null,
             bill_email:     org?.org_email  || null,
@@ -88,7 +117,7 @@ export const editOrgCreditAssignment = async (editId) => {
     try {
         return await populateRefs(
             OrgCreditAssignment.findOne({ _id: editId, deletedAt: null })
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -105,7 +134,7 @@ export const updateOrgCreditAssignment = async (updateId, data) => {
         if (Object.keys(updateFields).length === 0) {
             return await populateRefs(
                 OrgCreditAssignment.findOne({ _id: updateId, deletedAt: null })
-            );
+            ).lean();
         }
 
         updateFields.updatedAt = new Date();
@@ -114,7 +143,7 @@ export const updateOrgCreditAssignment = async (updateId, data) => {
             { _id: updateId, deletedAt: null },
             { $set: updateFields },
             { new: false, runValidators: true }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -125,7 +154,7 @@ export const listOrgCreditAssignment = async (filters = {}) => {
         const query = buildQuery(filters);
         return await populateRefs(
             OrgCreditAssignment.find(query).sort({ createdAt: -1 })
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -139,7 +168,7 @@ export const listOrgCreditAssignmentPagination = async (page, limit, filters = {
                 .sort({ createdAt: -1 })
                 .skip((page - 1) * limit)
                 .limit(limit)
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -160,7 +189,7 @@ export const deleteOrgCreditAssignment = async (delId) => {
             { _id: delId, deletedAt: null },
             { $set: { deletedAt: new Date(), status: 'inactive' } },
             { new: false }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }

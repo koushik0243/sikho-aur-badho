@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 const Schema = mongoose.Schema;
 
 const TopicSchema = new Schema({
-  courseId: { type: mongoose.Schema.Types.ObjectId, ref: "Course", required: true },
-  chapterId: { type: mongoose.Schema.Types.ObjectId, ref: "Chapter", required: true },
+  courseId: { type: mongoose.Schema.Types.ObjectId, ref: "Course", required: true, index: true },
+  chapterId: { type: mongoose.Schema.Types.ObjectId, ref: "Chapter", required: true, index: true },
   title: { type: String, required: true },
   desc: { type: String, required: false, default: "" },  
 
@@ -24,5 +24,14 @@ const TopicSchema = new Schema({
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
+
+// listTopic/listTopicPagination (topic.service.js) filter by chapterId + deletedAt
+// and sort by order -- compound index covers the per-chapter listing hot path.
+TopicSchema.index({ chapterId: 1, deletedAt: 1, order: 1 });
+
+// course.service.js listCoursesWithStats aggregates Topic counts matching
+// { courseId: { $in: [...] }, deletedAt: null } grouped by courseId -- mirrors
+// the equivalent compound index on Chapter for the same aggregation shape.
+TopicSchema.index({ courseId: 1, deletedAt: 1 });
 
 export default mongoose.model("Topic", TopicSchema);

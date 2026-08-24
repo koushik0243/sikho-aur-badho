@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from './Payments.module.css';
+import s from "./AddOrder.module.css";
 import AppDatePicker from '../AppDatePicker';
 
 const BackArrow = () => (
@@ -141,7 +141,7 @@ export default function AddOrder() {
               <input
                 className={s.input}
                 type="text"
-                placeholder="e.g. manual, razorpay, stripe"
+                placeholder="e.g. manual, stripe, bank transfer"
                 value={form.payment_gateway}
                 onChange={e => setField('payment_gateway', e.target.value)}
                 autoComplete="off"

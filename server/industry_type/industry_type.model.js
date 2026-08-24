@@ -12,4 +12,8 @@ const IndustryTypeSchema = new Schema({
     updatedAt:   { type: Date, default: Date.now },
 });
 
+// Supports listIndustryTypes/listIndustryTypesPagination/getIndustryTypeCount,
+// which filter by deletedAt (+ optional status) and sort by name.
+IndustryTypeSchema.index({ deletedAt: 1, status: 1, name: 1 });
+
 export default mongoose.model('IndustryType', IndustryTypeSchema, 'industry_types');

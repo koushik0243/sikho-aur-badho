@@ -13,4 +13,10 @@ const OrderSchema = new Schema({
   updatedAt:       { type: Date, default: Date.now },
 });
 
+// listOrder/listOrderPagination always filter by deletedAt and sort by createdAt desc,
+// and buildQuery optionally filters by organizer_id / credit_id (foreign keys with no prior index).
+OrderSchema.index({ deletedAt: 1, createdAt: -1 });
+OrderSchema.index({ organizer_id: 1, deletedAt: 1 });
+OrderSchema.index({ credit_id: 1, deletedAt: 1 });
+
 export default mongoose.model("Order", OrderSchema);

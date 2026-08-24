@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
+import useScaledIframePreview from '../../../hooks/useScaledIframePreview';
 import SuperAdminShell from '../SuperAdminShell';
-import s from './AddEditCertificateTemplate.module.css';
+import s from "./AddCertificateTemplate.module.css";
 
 const CertIcon = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -261,9 +262,14 @@ export default function AddCertificateTemplate() {
 
   const [title, setTitle]           = useState(DEFAULT_CERT_TITLE);
   const [desc, setDesc]             = useState(DEFAULT_CERT_HTML);
+  // Live preview intentionally lags behind `desc` — it only re-syncs when the learner
+  // clicks/tabs out of the HTML textarea (onBlur), not on every keystroke. Re-rendering
+  // the iframe on every character would be wasteful and jumpy for a full HTML document.
+  const [previewHtml, setPreviewHtml] = useState(DEFAULT_CERT_HTML);
   const [errors, setErrors]         = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const { wrapRef, frameRef, handleLoad, wrapStyle, frameStyle } = useScaledIframePreview();
 
   function validate() {
     const e = {};
@@ -305,33 +311,48 @@ export default function AddCertificateTemplate() {
         <div className={s.card}>
           <div className={s.cardHeader}>{CertIcon} Template Information</div>
           <div className={s.cardBody}>
-            <div className={s.formGrid}>
-              <div className={s.formGroup}>
-                <label className={s.label}>Title <span className={s.required}>*</span></label>
-                <input
-                  className={s.input}
-                  type="text"
-                  placeholder="Enter certificate template title"
-                  value={title}
-                  onChange={e => setTitle(e.target.value)}
-                  autoComplete="off"
-                />
-                {errors.title && <span className={s.errorMsg}>{errors.title}</span>}
+            <div className={s.formGroup}>
+              <label className={s.label}>Title <span className={s.required}>*</span></label>
+              <input
+                className={s.input}
+                type="text"
+                placeholder="Enter certificate template title"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                autoComplete="off"
+              />
+              {errors.title && <span className={s.errorMsg}>{errors.title}</span>}
+            </div>
+
+            <div className={s.formGroup}>
+              <label className={s.label}>Template HTML <span className={s.required}>*</span></label>
+              <textarea
+                className={`${s.textarea} ${s.htmlTextarea}`}
+                placeholder="Paste or write the HTML template here..."
+                value={desc}
+                onChange={e => setDesc(e.target.value)}
+                onBlur={() => setPreviewHtml(desc)}
+              />
+              {errors.desc && <span className={s.errorMsg}>{errors.desc}</span>}
+              <div className={s.templateVars}>
+                <span>Name: <code>{'{{name}}'}</code></span>
+                <span>Course Name: <code>{'{{course}}'}</code></span>
+                <span>Marks: <code>{'{{marks}}'}</code></span>
               </div>
-              <div className={s.formGroup}>
-                <label className={s.label}>Template HTML <span className={s.required}>*</span></label>
-                <textarea
-                  className={s.textarea}
-                  placeholder="Paste or write the HTML template here..."
-                  value={desc}
-                  onChange={e => setDesc(e.target.value)}
+            </div>
+
+            <div className={s.formGroup}>
+              <label className={s.label}>Live Preview</label>
+              <div className={s.previewPane} ref={wrapRef} style={wrapStyle}>
+                <iframe
+                  ref={frameRef}
+                  className={s.previewPaneFrame}
+                  style={frameStyle}
+                  srcDoc={previewHtml}
+                  title="Certificate Live Preview"
+                  sandbox="allow-same-origin"
+                  onLoad={handleLoad}
                 />
-                {errors.desc && <span className={s.errorMsg}>{errors.desc}</span>}
-                <div className={s.templateVars}>
-                  <span>Name: <code>{'{{name}}'}</code></span>
-                  <span>Course Name: <code>{'{{course}}'}</code></span>
-                  <span>Marks: <code>{'{{marks}}'}</code></span>
-                </div>
               </div>
             </div>
           </div>

@@ -42,7 +42,7 @@ export const editOrgCourseAssignment = async (editId) => {
     try {
         return await populateRefs(
             OrgCourseAssignment.findOne({ _id: editId, deletedAt: null })
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -59,7 +59,7 @@ export const updateOrgCourseAssignment = async (updateId, data) => {
         if (Object.keys(updateFields).length === 0) {
             return await populateRefs(
                 OrgCourseAssignment.findOne({ _id: updateId, deletedAt: null })
-            );
+            ).lean();
         }
 
         updateFields.updatedAt = new Date();
@@ -68,7 +68,7 @@ export const updateOrgCourseAssignment = async (updateId, data) => {
             { _id: updateId, deletedAt: null },
             { $set: updateFields },
             { new: false, runValidators: true }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -79,7 +79,7 @@ export const listOrgCourseAssignment = async (filters = {}) => {
         const query = buildQuery(filters);
         return await populateRefs(
             OrgCourseAssignment.find(query).sort({ createdAt: -1 })
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -93,7 +93,7 @@ export const listOrgCourseAssignmentPagination = async (page, limit, filters = {
                 .sort({ createdAt: -1 })
                 .skip((page - 1) * limit)
                 .limit(limit)
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -114,7 +114,7 @@ export const deleteOrgCourseAssignment = async (delId) => {
             { _id: delId, deletedAt: null },
             { $set: { deletedAt: new Date(), status: 'inactive' } },
             { new: false }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }

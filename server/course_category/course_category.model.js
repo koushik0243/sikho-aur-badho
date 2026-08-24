@@ -15,5 +15,9 @@ const CourseCategorySchema = new Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+// listCourseCategory/listCourseCategoryPagination/listAllCategories always filter
+// by deletedAt and sort by title -- compound index covers both.
+CourseCategorySchema.index({ deletedAt: 1, title: 1 });
+
 export default mongoose.model("course_category", CourseCategorySchema);
 

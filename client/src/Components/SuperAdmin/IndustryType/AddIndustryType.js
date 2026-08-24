@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from './AddEditIndustryType.module.css';
+import s from "./AddIndustryType.module.css";
 
 const LayersIcon = (
   <svg viewBox="0 0 20 20" fill="currentColor">

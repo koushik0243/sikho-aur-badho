@@ -5,7 +5,7 @@ const CourseSchema = new Schema({
   title: { type: String, required: true },
   slug: { type: String, unique: true },
   desc: { type: String, required: true },
-  catId: { type: mongoose.Schema.Types.ObjectId, ref: "course_category", required: false, default: null },
+  catId: { type: mongoose.Schema.Types.ObjectId, ref: "course_category", required: false, default: null, index: true },
   subCatIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "course_subcategory", default: [] }],
   tagIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Tag", default: [] }],
   level: { type: String, enum: ["beginner", "intermediate", "advanced"], default: "beginner" },
@@ -23,14 +23,21 @@ const CourseSchema = new Schema({
   target_audience: { type: String, default: '' },
   materials_included: { type: String, default: '' },
   requirements: { type: String, default: '' },
+  aptitudeEnabled: { type: Boolean, default: false },
+  aptitudeContext: { type: String, default: '' },
+  aptitudeSelectedQuestionIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "aptitude_questions", default: [] }],
   certificate_template_id: { type: mongoose.Schema.Types.ObjectId, ref: 'certificate_template', default: null },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   deletedAt: { type: Date, required: false, default: null },
-  status: { type: String, enum: ['draft', 'published', 'deleted'], default: 'draft' },
+  status: { type: String, enum: ['draft', 'published', 'deleted'], default: 'draft', index: true },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
- 
+
+// listCourse/listCoursePagination/listCoursesWithStats always filter by deletedAt
+// and sort by createdAt -- compound index covers both.
+CourseSchema.index({ deletedAt: 1, createdAt: -1 });
+
 export default mongoose.model("Course", CourseSchema);
 
 

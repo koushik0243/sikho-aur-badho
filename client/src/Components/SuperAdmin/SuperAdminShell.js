@@ -3,8 +3,9 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSelector, useDispatch } from 'react-redux';
-import { selectUser, clearAuth } from '../../redux/slices/authSlice';
-import s from './SuperAdminShell.module.css';
+import { selectUser, selectAuthReady, selectIsAuthenticated, clearAuth } from '../../redux/slices/authSlice';
+import useIdleLogout from '../../hooks/useIdleLogout';
+import s from "./SuperAdminShell.module.css";
 
 // ── Section data ────────────────────────────────────────────────
 const SECTIONS = [
@@ -138,8 +139,6 @@ const SECTIONS = [
   },
 ];
 
-const LOGOUT_SECTION = { id: 'logout', label: 'Logout', items: [] };
-
 function getSectionForItem(itemId) {
   for (const sec of SECTIONS) {
     if (sec.items.some(i => i.id === itemId)) return sec;
@@ -168,14 +167,60 @@ const Icon = {
       <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
     </svg>
   ),
+  menu: (
+    <svg viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+    </svg>
+  ),
+  close: (
+    <svg viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+    </svg>
+  ),
 };
 export default function SuperAdminShell({ children, activeSection = 'dashboard' }) {
-  const user     = useSelector(selectUser);
+  const user          = useSelector(selectUser);
+  const authReady     = useSelector(selectAuthReady);
+  const isAuthed      = useSelector(selectIsAuthenticated);
   const dispatch = useDispatch();
   const router   = useRouter();
+  useIdleLogout();
+
+  // No manual-logout click involved here — this is the actual gate: once rehydration
+  // has run and there's still no valid session (never logged in, or rehydrateAuth
+  // rejected a stale/expired token), stop rendering this portal and bounce to login
+  // instead of silently showing an empty shell with no data.
+  useEffect(() => {
+    if (authReady && !isAuthed) router.replace('/login');
+  }, [authReady, isAuthed, router]);
 
   const [openSection, setOpenSection] = useState(() => getSectionForItem(activeSection));
   const [panelOpen, setPanelOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Redux's auth rehydration (from localStorage) can complete before this component's
+  // own hydration pass reaches it, so `user` may already differ from what the server
+  // rendered (which always sees a logged-out/null user). Gate the real name behind a
+  // mount flag so both the server and the client's FIRST paint agree on "Admin", then
+  // swap to the real name in an effect — a normal post-hydration update, not a mismatch.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
+  function closeMobileMenu() {
+    setMobileMenuOpen(false);
+    setPanelOpen(false);
+    setOpenSection(getSectionForItem(activeSection));
+    sessionStorage.setItem('sidebarPanelOpen', 'false');
+  }
+
+  function toggleMobileMenu() {
+    if (mobileMenuOpen) {
+      closeMobileMenu();
+    } else {
+      setMobileMenuOpen(true);
+      setPanelOpen(true);
+      sessionStorage.setItem('sidebarPanelOpen', 'true');
+    }
+  }
 
   useLayoutEffect(() => {
     if (sessionStorage.getItem('sidebarPanelOpen') === 'true') {
@@ -232,7 +277,7 @@ export default function SuperAdminShell({ children, activeSection = 'dashboard' 
     router.replace('/login');
   }
 
-  const userName = user?.name || user?.email || 'Admin';
+  const userName = mounted ? (user?.name || user?.email || 'Admin') : 'Admin';
   const initials = userName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
   const activeItem = SECTIONS.flatMap(sec => sec.items).find(i => i.id === activeSection);
@@ -241,7 +286,7 @@ export default function SuperAdminShell({ children, activeSection = 'dashboard' 
   return (
     <div className={s.shell} data-superadmin="true">
       {/* ── Sidebar ── */}
-      <aside className={s.sidebar}>
+      <aside className={`${s.sidebar}${mobileMenuOpen ? ` ${s.sidebarMobileOpen}` : ''}`}>
         {/* Left icon strip */}
         <div className={s.iconStrip}>
           {SECTIONS.map(sec => (
@@ -254,14 +299,14 @@ export default function SuperAdminShell({ children, activeSection = 'dashboard' 
               <span className={s.stripIcon}>{sec.icon}</span>
             </button>
           ))}
+          <div className={s.stripSpacer} />
           <button
-            className={`${s.stripBtn} ${openSection.id === 'logout' ? s.stripBtnActive : ''}`}
-            onClick={() => { setOpenSection(LOGOUT_SECTION); setPanelOpen(true); sessionStorage.setItem('sidebarPanelOpen', 'true'); }}
+            className={s.stripBtn}
+            onClick={handleLogout}
             title="Logout"
           >
             <span className={s.stripIcon}>{Icon.logout}</span>
           </button>
-          <div className={s.stripSpacer} />
         </div>
 
         {/* Right nav panel */}
@@ -270,37 +315,45 @@ export default function SuperAdminShell({ children, activeSection = 'dashboard' 
             <button
               className={s.backBtn}
               title="Collapse"
-              onClick={() => { setPanelOpen(false); setOpenSection(getSectionForItem(activeSection)); sessionStorage.setItem('sidebarPanelOpen', 'false'); }}
+              onClick={closeMobileMenu}
             >
               <span className={s.backBtnIcon}>{Icon.chevronLeft}</span>
             </button>
             <span className={s.navPanelTitle}>{openSection.label}</span>
           </div>
           <div className={s.navList}>
-            {openSection.id === 'logout' ? (
-              <button className={s.navItem} onClick={handleLogout}>
-                <span className={s.navItemIcon}>{Icon.logout}</span>
-                Logout
+            {openSection.items.map(item => (
+              <button
+                key={item.id}
+                className={`${s.navItem} ${activeSection === item.id ? s.navItemActive : ''}`}
+                onClick={() => { router.push(item.path); setMobileMenuOpen(false); }}
+              >
+                <span className={s.navItemIcon}>{item.icon}</span>
+                {item.label}
               </button>
-            ) : (
-              openSection.items.map(item => (
-                <button
-                  key={item.id}
-                  className={`${s.navItem} ${activeSection === item.id ? s.navItemActive : ''}`}
-                  onClick={() => router.push(item.path)}
-                >
-                  <span className={s.navItemIcon}>{item.icon}</span>
-                  {item.label}
-                </button>
-              ))
-            )}
+            ))}
           </div>
         </div>
       </aside>
 
+      {/* ── Mobile nav-panel backdrop ── */}
+      {mobileMenuOpen && (
+        <div
+          className={s.backdrop}
+          onClick={closeMobileMenu}
+        />
+      )}
+
       {/* ── Full-width topbar ── */}
       <header className={s.topbar}>
         <div className={s.topbarLeft}>
+          <button
+            className={s.hamburgerBtn}
+            title={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+            onClick={toggleMobileMenu}
+          >
+            {mobileMenuOpen ? Icon.close : Icon.menu}
+          </button>
           <div className={s.topbarLogo}>
             <img src="/logo.png" alt="sikhoaurbadho" className={s.logoImg} />
           </div>
@@ -366,7 +419,7 @@ export default function SuperAdminShell({ children, activeSection = 'dashboard' 
                 <div className={s.userMenuDropdown}>
                   <div className={s.userMenuHeader}>
                     <div className={s.userMenuAvatar}>{initials}</div>
-                    <div>
+                    <div className={s.userMenuInfo}>
                       <div className={s.userMenuName}>{userName}</div>
                       {user?.email && <div className={s.userMenuEmail}>{user.email}</div>}
                     </div>

@@ -12,4 +12,9 @@ const TagSchema = new Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+// listTags/listTagsPagination always filter by deletedAt, optionally by status,
+// and sort by createdAt (pagination) — slug already has a unique index above.
+TagSchema.index({ deletedAt: 1, status: 1 });
+TagSchema.index({ deletedAt: 1, createdAt: -1 });
+
 export default mongoose.model("tag", TagSchema);

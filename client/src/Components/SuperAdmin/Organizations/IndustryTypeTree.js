@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
-import s from './AddEditOrganization.module.css';
+import s from "./IndustryTypeTree.module.css";
 
 const SearchIcon = (
   <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13">
@@ -72,7 +72,7 @@ function TreeNode({ node, selectedIds, onToggle, expanded, onExpand }) {
   );
 }
 
-export default function IndustryTypeTree({ industryTypes, setIndustryTypes, selectedIds, setSelectedIds }) {
+export default function IndustryTypeTree({ industryTypes, setIndustryTypes, selectedIds, setSelectedIds, allowAdd = true }) {
   const [search, setSearch]           = useState('');
   const [expanded, setExpanded]       = useState(new Set());
   const [addOpen, setAddOpen]         = useState(false);
@@ -205,9 +205,11 @@ export default function IndustryTypeTree({ industryTypes, setIndustryTypes, sele
         )}
       </div>
 
-      <button type="button" className={s.itAddBtn} onClick={() => setAddOpen(true)}>
-        + Add
-      </button>
+      {allowAdd && (
+        <button type="button" className={s.itAddBtn} onClick={() => setAddOpen(true)}>
+          + Add
+        </button>
+      )}
     </div>
   );
 }

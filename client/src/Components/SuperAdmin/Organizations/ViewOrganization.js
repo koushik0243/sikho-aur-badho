@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import apiServiceHandler from '../../../service/apiService';
 import { API_URL } from '../../../lib/constant';
 import SuperAdminShell from '../SuperAdminShell';
-import s from './AddEditOrganization.module.css';
+import s from "./ViewOrganization.module.css";
 
 function fmtDate(val) {
   if (!val) return '—';

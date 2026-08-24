@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiServiceHandler from '../../service/apiService';
+import { markSessionAlive, isSessionExpired, clearStoredSession } from '../../utils/authSession';
 
 // ---------------------------------------------------------------------------
 // User type → dashboard route mapping
@@ -132,6 +133,7 @@ const initialState = {
   token: null,
   userType: null,
   isAuthenticated: false,
+  authReady: false,   // true after rehydrateAuth has run (even if nothing was found)
 
   // ── Auth screen flow ────────────────────────────────────────────────────
   // Values: 'login' | 'otp' | 'forgotPassword' | 'resetLinkSent' | 'setNewPassword' | 'welcome'
@@ -151,7 +153,7 @@ const initialState = {
   loading: false,
   error: null,
   loginAttempts: 0,
-  maxLoginAttempts: 3,
+  maxLoginAttempts: 5,
 };
 
 // ---------------------------------------------------------------------------
@@ -183,6 +185,33 @@ const authSlice = createSlice({
     clearAuth(state) {
       Object.assign(state, initialState);
     },
+
+    rehydrateAuth(state) {
+      state.authReady = true; // Always mark ready, even when nothing is found
+      if (typeof window === 'undefined') return;
+      try {
+        const token    = localStorage.getItem('adminToken') || localStorage.getItem('BHARAT_TOKEN');
+        const userRaw  = localStorage.getItem('authUser');
+        const userType = localStorage.getItem('authUserType');
+        if (!token || !userRaw) return;
+
+        // The stored token belongs to a previous session that's since gone stale —
+        // either the tab/browser was closed and reopened, or it's been idle past the
+        // 30-minute timeout (e.g. left open overnight). Treat it as logged out rather
+        // than rehydrating a session the server would reject anyway.
+        if (isSessionExpired()) {
+          clearStoredSession();
+          return;
+        }
+
+        state.user            = JSON.parse(userRaw);
+        state.token           = token;
+        state.userType        = userType || null;
+        state.isAuthenticated = true;
+      } catch {
+        // Malformed localStorage data — leave state as-is
+      }
+    },
   },
 
   extraReducers: (builder) => {
@@ -196,7 +225,6 @@ const authSlice = createSlice({
         state.loading = false;
         // apiService returns response.data directly — action.payload IS the response body
         const res = action.payload;
-        console.log('[authSlice] loginUser.fulfilled payload:', res);
 
         if (res?.requiresOtp) {
           state.otpIdentifier = action.meta.arg.identifier;
@@ -227,10 +255,14 @@ const authSlice = createSlice({
         state.token = tokenValue;
         state.userType = userType;
         state.isAuthenticated = true;
+        state.authReady = true;
         state.loginAttempts = 0;
 
         if (typeof window !== 'undefined') {
           localStorage.setItem('adminToken', tokenValue);
+          localStorage.setItem('authUser', JSON.stringify(userObj));
+          localStorage.setItem('authUserType', userType || '');
+          markSessionAlive();
         }
       })
       .addCase(loginUser.rejected, (state, action) => {
@@ -248,8 +280,6 @@ const authSlice = createSlice({
       .addCase(verifyOtp.fulfilled, (state, action) => {
         state.loading = false;
         const res = action.payload;
-        const payload = res?.user ? res : (res?.data ?? res);
-
         const flat = res?.data ?? res;
         const userObj = flat?.user ?? flat;
         const tokenValue = flat?.token || flat?.secret || flat?.user?.token || flat?.user?.secret;
@@ -259,11 +289,15 @@ const authSlice = createSlice({
         state.token = tokenValue;
         state.userType = userType;
         state.isAuthenticated = true;
+        state.authReady = true;
         state.loginAttempts = 0;
         state.otpIdentifier = null;
 
         if (typeof window !== 'undefined') {
           localStorage.setItem('adminToken', tokenValue);
+          localStorage.setItem('authUser', JSON.stringify(userObj));
+          localStorage.setItem('authUserType', userType || '');
+          markSessionAlive();
         }
       })
       .addCase(verifyOtp.rejected, (state, action) => {
@@ -327,8 +361,6 @@ const authSlice = createSlice({
       .addCase(activateAccount.fulfilled, (state, action) => {
         state.loading = false;
         const res = action.payload;
-        const payload = res?.user ? res : (res?.data ?? res);
-
         const flat = res?.data ?? res;
         const userObj = flat?.user ?? flat;
         const tokenValue = flat?.token || flat?.secret || flat?.user?.token || flat?.user?.secret;
@@ -338,10 +370,14 @@ const authSlice = createSlice({
         state.token = tokenValue;
         state.userType = userType;
         state.isAuthenticated = true;
+        state.authReady = true;
         state.welcomeData = null;
 
         if (typeof window !== 'undefined') {
           localStorage.setItem('adminToken', tokenValue);
+          localStorage.setItem('authUser', JSON.stringify(userObj));
+          localStorage.setItem('authUserType', userType || '');
+          markSessionAlive();
         }
       })
       .addCase(activateAccount.rejected, (state, action) => {
@@ -351,10 +387,7 @@ const authSlice = createSlice({
 
     // ── logoutUser ─────────────────────────────────────────────────────────
     builder.addCase(logoutUser.fulfilled, (state) => {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('adminToken');
-        localStorage.removeItem('BHARAT_TOKEN');
-      }
+      clearStoredSession();
       Object.assign(state, initialState);
     });
   },
@@ -363,11 +396,12 @@ const authSlice = createSlice({
 // ---------------------------------------------------------------------------
 // Actions & Selectors
 // ---------------------------------------------------------------------------
-export const { setAuthView, setWelcomeData, setResetToken, clearError, clearAuth } =
+export const { setAuthView, setWelcomeData, setResetToken, clearError, clearAuth, rehydrateAuth } =
   authSlice.actions;
 
 export const selectAuth = (state) => state.auth;
 export const selectIsAuthenticated = (state) => state.auth.isAuthenticated;
+export const selectAuthReady = (state) => state.auth.authReady;
 export const selectUser = (state) => state.auth.user;
 export const selectUserType = (state) => state.auth.userType;
 export const selectToken = (state) => state.auth.token;

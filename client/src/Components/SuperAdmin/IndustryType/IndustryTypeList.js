@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from './IndustryType.module.css';
+import s from "./IndustryTypeList.module.css";
 
 const Icon = {
   search: (
@@ -165,7 +165,7 @@ export default function IndustryTypeList() {
         onCancel={() => setBulkConfirm(false)}
       />
 
-      <div className={s.pageHeader}>
+      <div className={s.pageHeader} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '12px' }}>
         <div>
           <h1 className={s.pageTitle}>Industry Type</h1>
           <p className={s.pageSubtitle}>Manage multi-level industry types</p>
@@ -207,7 +207,9 @@ export default function IndustryTypeList() {
                 <tr className={s.emptyRow}><td colSpan={7}>No items found.</td></tr>
               ) : pageItems.map(item => (
                 <tr key={item._id} style={{ cursor: 'pointer' }} onClick={() => toggleOne(item._id)}>
-                  <td className={s.checkTd}><input type="checkbox" checked={selected.includes(item._id)} onChange={() => toggleOne(item._id)} /></td>
+                  <td className={s.checkTd} onClick={e => e.stopPropagation()}>
+                    <input type="checkbox" checked={selected.includes(item._id)} onChange={() => toggleOne(item._id)} />
+                  </td>
                   <td>
                     <div className={s.nameCell} style={{ paddingLeft: item.depth * 20 }}>
                       {item.depth > 0 && <span className={s.treeArrow}>↳</span>}

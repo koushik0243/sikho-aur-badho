@@ -27,4 +27,9 @@ const TicketSchema = new Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+// listTickets filters by deletedAt (always) + optional status/orgId, and sorts by createdAt.
+TicketSchema.index({ deletedAt: 1, createdAt: -1 });
+TicketSchema.index({ orgId: 1 });
+TicketSchema.index({ status: 1 });
+
 export default mongoose.model("support_tickets", TicketSchema);

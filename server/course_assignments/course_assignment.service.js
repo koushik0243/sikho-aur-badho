@@ -46,7 +46,8 @@ export const editCourseAssignment = async (editId) => {
             .populate('organizationId', '_id name')
             .populate('userId', '_id name email')
             .populate('topicId', '_id title')
-            .populate('courseId', '_id title');
+            .populate('courseId', '_id title')
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -69,14 +70,15 @@ export const updateCourseAssignment = async (updateId, data) => {
                 .populate('organizationId', '_id name')
                 .populate('userId', '_id name email')
                 .populate('topicId', '_id title')
-                .populate('courseId', '_id title');
+                .populate('courseId', '_id title')
+                .lean();
         }
 
         return await CourseAssignment.findByIdAndUpdate(
             updateId,
             { $set: updateFields },
             { new: false, runValidators: true }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -90,7 +92,8 @@ export const listCourseAssignment = async (filters = {}) => {
             .populate('userId', '_id name email')
             .populate('topicId', '_id title')
             .populate('courseId', '_id title')
-            .sort({ attemptedAt: -1 });
+            .sort({ attemptedAt: -1 })
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -106,7 +109,8 @@ export const listCourseAssignmentPagination = async (page, limit, filters = {}) 
             .populate('courseId', '_id title')
             .sort({ attemptedAt: -1 })
             .skip((page - 1) * limit)
-            .limit(limit);
+            .limit(limit)
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -123,7 +127,7 @@ export const getCourseAssignmentCount = async (filters = {}) => {
 
 export const deleteCourseAssignment = async (delId) => {
     try {
-        return await CourseAssignment.findByIdAndDelete(delId);
+        return await CourseAssignment.findByIdAndDelete(delId).lean();
     } catch (error) {
         throw error;
     }

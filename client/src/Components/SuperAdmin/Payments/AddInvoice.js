@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from './Payments.module.css';
+import s from "./AddInvoice.module.css";
 import AppDatePicker from '../AppDatePicker';
 
 const BackArrow = () => (

@@ -20,5 +20,13 @@ const SubscriptionSchema = new Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+// Every list/pagination query filters by deletedAt and sorts by createdAt (see listSubscription,
+// listSubscriptionPagination in subscription.service.js).
+SubscriptionSchema.index({ deletedAt: 1, createdAt: -1 });
+// organizationId / planId / status are used as optional equality filters in buildQuery().
+SubscriptionSchema.index({ organizationId: 1 });
+SubscriptionSchema.index({ planId: 1 });
+SubscriptionSchema.index({ status: 1 });
+
 export default mongoose.model("Subscription", SubscriptionSchema);
 

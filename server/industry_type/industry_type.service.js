@@ -15,7 +15,7 @@ export const createIndustryType = async (data) => {
         const baseSlug = generateSlug(data.name);
         let slug = baseSlug;
         let counter = 1;
-        while (await IndustryType.findOne({ slug })) {
+        while (await IndustryType.findOne({ slug }).lean()) {
             slug = `${baseSlug}-${counter++}`;
         }
         return await new IndustryType({
@@ -32,7 +32,7 @@ export const createIndustryType = async (data) => {
 
 export const editIndustryType = async (editId) => {
     try {
-        return await IndustryType.findOne({ _id: editId, deletedAt: null });
+        return await IndustryType.findOne({ _id: editId, deletedAt: null }).lean();
     } catch (error) {
         throw error;
     }
@@ -50,14 +50,14 @@ export const updateIndustryType = async (updateId, data) => {
         if (data.status !== undefined) updateFields.status = data.status;
 
         if (Object.keys(updateFields).length === 0) {
-            return await IndustryType.findOne({ _id: updateId, deletedAt: null });
+            return await IndustryType.findOne({ _id: updateId, deletedAt: null }).lean();
         }
         updateFields.updatedAt = new Date();
         return await IndustryType.findOneAndUpdate(
             { _id: updateId, deletedAt: null },
             { $set: updateFields },
             { new: true, runValidators: true }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -74,7 +74,7 @@ export const listAllIndustryTypes = async () => {
 export const listIndustryTypes = async (filters = {}) => {
     try {
         const query = buildQuery(filters);
-        return await IndustryType.find(query).sort({ name: 1 });
+        return await IndustryType.find(query).sort({ name: 1 }).lean();
     } catch (error) {
         throw error;
     }
@@ -83,7 +83,7 @@ export const listIndustryTypes = async (filters = {}) => {
 export const listIndustryTypesPagination = async (page, limit, filters = {}) => {
     try {
         const query = buildQuery(filters);
-        return await IndustryType.find(query).sort({ name: 1 }).skip((page - 1) * limit).limit(limit);
+        return await IndustryType.find(query).sort({ name: 1 }).skip((page - 1) * limit).limit(limit).lean();
     } catch (error) {
         throw error;
     }
@@ -101,7 +101,7 @@ export const checkIndustryTypeName = async (name, excludeId = null) => {
     try {
         const query = { name: { $regex: `^${name}$`, $options: 'i' }, deletedAt: null };
         if (excludeId) query._id = { $ne: excludeId };
-        return await IndustryType.findOne(query).select('_id name');
+        return await IndustryType.findOne(query).select('_id name').lean();
     } catch (error) {
         throw error;
     }
@@ -109,7 +109,7 @@ export const checkIndustryTypeName = async (name, excludeId = null) => {
 
 export const deleteIndustryTypeTree = async (rootId) => {
     try {
-        const all = await IndustryType.find({ deletedAt: null }).lean();
+        const all = await IndustryType.find({ deletedAt: null }).select('_id parentId').lean();
         const childMap = {};
         all.forEach(n => {
             const pid = n.parentId ? String(n.parentId) : null;

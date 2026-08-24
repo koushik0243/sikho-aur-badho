@@ -40,7 +40,8 @@ export const editSubscription = async (editId) => {
     try {
         return await Subscription.findOne({ _id: editId, deletedAt: null })
             .populate('organizationId', '_id org_name')
-            .populate('planId', '_id title price billingCycle maxUsers');
+            .populate('planId', '_id title price billingCycle maxUsers')
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -59,7 +60,7 @@ export const updateSubscription = async (updateId, data) => {
         }
 
         if (Object.keys(updateFields).length === 0) {
-            return await Subscription.findOne({ _id: updateId, deletedAt: null });
+            return await Subscription.findOne({ _id: updateId, deletedAt: null }).lean();
         }
 
         updateFields.updatedAt = new Date();
@@ -68,7 +69,7 @@ export const updateSubscription = async (updateId, data) => {
             { _id: updateId, deletedAt: null },
             { $set: updateFields },
             { returnDocument: 'before', runValidators: true }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -80,7 +81,8 @@ export const listSubscription = async (filters = {}) => {
         return await Subscription.find(query)
             .populate('organizationId', '_id org_name')
             .populate('planId', '_id title price billingCycle maxUsers')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -94,7 +96,8 @@ export const listSubscriptionPagination = async (page, limit, filters = {}) => {
             .populate('planId', '_id title price billingCycle maxUsers')
             .sort({ createdAt: -1 })
             .skip((page - 1) * limit)
-            .limit(limit);
+            .limit(limit)
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -115,7 +118,7 @@ export const deleteSubscription = async (delId) => {
             { _id: delId, deletedAt: null },
             { $set: { deletedAt: new Date(), status: 'inactive' } },
             { returnDocument: 'before' }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }

@@ -18,12 +18,16 @@ const MENU_ITEMS = [
     { key: 'industry_type',         label: 'Industry Type' },
     { key: 'credits',               label: 'Credits' },
     { key: 'employees',             label: 'User (Employees)' },
+    // Payments
+    { key: 'orders',                label: 'Orders' },
+    { key: 'invoices',              label: 'Invoices' },
     // Users
     { key: 'users',                 label: 'Users' },
     // Settings
     { key: 'roles',                 label: 'Roles' },
     { key: 'permissions',           label: 'Permissions' },
     { key: 'assign_role',           label: 'Assign Role' },
+    { key: 'support_tickets',       label: 'Support Tickets' },
 ];
 
 const toDisplayAction = (action) => action.charAt(0).toUpperCase() + action.slice(1);
@@ -73,7 +77,7 @@ export const createPermission = async (newPermission) => {
 
 export const editPermission = async (editId) => {
     try {
-        return await Permission.findOne({ _id: editId, deletedAt: null });
+        return await Permission.findOne({ _id: editId, deletedAt: null }).lean();
     } catch (error) {
         throw error;
     }
@@ -90,7 +94,7 @@ export const updatePermission = async (updateId, updatePermissionData) => {
         if (status !== undefined) updateFields.status = status;
 
         if (Object.keys(updateFields).length === 0) {
-            return await Permission.findOne({ _id: updateId, deletedAt: null });
+            return await Permission.findOne({ _id: updateId, deletedAt: null }).lean();
         }
 
         return await Permission.findOneAndUpdate(
@@ -99,7 +103,7 @@ export const updatePermission = async (updateId, updatePermissionData) => {
                 $set: updateFields
             },
             { returnDocument: 'before', runValidators: true }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }
@@ -108,7 +112,7 @@ export const updatePermission = async (updateId, updatePermissionData) => {
 export const listPermission = async (filters = {}) => {
     try {
         const query = buildPermissionQuery(filters);
-        return await Permission.find(query).sort({ display_name: 1, name: 1 });
+        return await Permission.find(query).sort({ display_name: 1, name: 1 }).lean();
     } catch (error) {
         throw error;
     }
@@ -120,7 +124,8 @@ export const listPermissionPagination = async (page, limit, filters = {}) => {
         return await Permission.find(query)
             .sort({ display_name: 1, name: 1 })
             .skip((page - 1) * limit)
-            .limit(limit);
+            .limit(limit)
+            .lean();
     } catch (error) {
         throw error;
     }
@@ -146,7 +151,7 @@ export const deletePermission = async (delId) => {
                 }
             },
             { returnDocument: 'before' }
-        );
+        ).lean();
     } catch (error) {
         throw error;
     }

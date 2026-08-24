@@ -15,5 +15,10 @@ const CreditSchema = new Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+// listCredit sorts by limit_to and listCreditPagination sorts by createdAt; buildQuery
+// filters by deletedAt/status — cover both query shapes with indexes.
+CreditSchema.index({ deletedAt: 1, status: 1 });
+CreditSchema.index({ deletedAt: 1, createdAt: -1 });
+
 export default mongoose.model("Credit", CreditSchema);
 

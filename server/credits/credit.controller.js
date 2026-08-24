@@ -47,8 +47,10 @@ const listCreditPagination = async (req, res, next) => {
         const limit = parseInt(req.query.limit) || 10;
         const { status } = req.query;
 
-        const credits = await CreditHelper.listCreditPagination(page, limit, { status });
-        const total = await CreditHelper.getCreditCount({ status });
+        const [credits, total] = await Promise.all([
+            CreditHelper.listCreditPagination(page, limit, { status }),
+            CreditHelper.getCreditCount({ status }),
+        ]);
         res.status(200).json({
             status: 200,
             message: "Successfully fetched.",

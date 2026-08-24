@@ -109,8 +109,10 @@ const listOrganizationPagination = async (req, res, next) => {
         const limit = parseInt(req.query.limit) || 10;
         const { status, ownerId, search } = req.query;
 
-        const organizations = await OrganizationHelper.listOrganizationPagination(page, limit, { status, ownerId, search });
-        const total = await OrganizationHelper.getOrganizationCount({ status, ownerId, search });
+        const [organizations, total] = await Promise.all([
+            OrganizationHelper.listOrganizationPagination(page, limit, { status, ownerId, search }),
+            OrganizationHelper.getOrganizationCount({ status, ownerId, search })
+        ]);
         res.status(200).json({
             status: 200,
             message: "Successfully fetched.",

@@ -73,8 +73,10 @@ const listRolePagination = async (req, res, next) => {
         if (user_type) filters.user_type = user_type;
         if (orgId !== undefined) filters.organizationId = orgId || null;
 
-        const roles = await RoleHelper.listRolePagination(page, limit, filters);
-        const totalRoles = await RoleHelper.getRoleCount(filters);
+        const [roles, totalRoles] = await Promise.all([
+            RoleHelper.listRolePagination(page, limit, filters),
+            RoleHelper.getRoleCount(filters)
+        ]);
         const return_data = {
             status: 200,
             message: "Successfully fetched.",

@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 const Schema = mongoose.Schema;
 
 const OrganizationsSchema = new Schema({
-  ownerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: false, default: null },
+  ownerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: false, default: null, index: true },
 
   //organization information
   org_name: { type: String, required: false, default: null },        
@@ -17,14 +17,12 @@ const OrganizationsSchema = new Schema({
   org_country: { type: String, required: false, default: null },
   org_zipcode: { type: String, required: false, default: null },
   org_website: { type: String, required: false, default: null },
-  org_whatsapp: { type: String, required: false, default: null },
   hr_manager_email: { type: String, required: false, default: null },
   hr_manager_no: { type: String, required: false, default: null },
   industry: { type: String, required: false, default: null },
   industryTypeIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'IndustryType' }],
   course_ids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
   emp_count: { type: String, required: false, default: null },
-  whatsapp_noti: { type: Boolean, required: false, default: false },
   email_digest: { type: Boolean, required: false, default: false },
   credit_alert: { type: Boolean, required: false, default: false },
   zoom_reminder: { type: Boolean, required: false, default: false },
@@ -37,6 +35,10 @@ const OrganizationsSchema = new Schema({
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
+
+// listOrganization/listOrganizationPagination/getOrganizationCount always filter by
+// deletedAt (optionally status/ownerId) and sort by createdAt -- compound index covers it.
+OrganizationsSchema.index({ deletedAt: 1, createdAt: -1 });
 
 export default mongoose.model("Organization", OrganizationsSchema);
 
