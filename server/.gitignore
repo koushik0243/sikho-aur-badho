@@ -21,6 +21,7 @@
 /build
 
 /public/uploads/lesson-videos
+/public/uploads/courses/videos
 
 # misc
 .DS_Store
