@@ -67,7 +67,7 @@ const allowedOrigins = [
     'http://localhost:3001',
     'http://localhost:3002',
     'https://staging.sikhoaurbadho.com',
-    'https://api.staging.sikhoaurbadho.com'
+    'https://api.sikhoaurbadho.com'
 ];
 
 app.use(cors({
