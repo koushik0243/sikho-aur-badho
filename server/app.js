@@ -66,8 +66,8 @@ const allowedOrigins = [
     'http://localhost:3000',
     'http://localhost:3001',
     'http://localhost:3002',
-    'https://lms.thinksurfmedia.co.in',
-    'https://api.thinksurfmedia.co.in',
+    'https://staging.sikhoaurbadho.com',
+    'https://api.staging.sikhoaurbadho.com'
 ];
 
 app.use(cors({
