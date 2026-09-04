@@ -1,4 +1,4 @@
-export const API_URL = "https://api.staging.sikhoaurbadho.com";
+export const API_URL = "https://api.sikhoaurbadho.com";
 
 // User types
 export const USER_TYPES = {
