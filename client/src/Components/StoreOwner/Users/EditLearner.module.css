@@ -255,6 +255,8 @@
 
 .btnCancel:hover:not(:disabled) { background: #f4f6f8; }
 
+.btnCancel:disabled { opacity: 0.6; cursor: not-allowed; }
+
 
 
 /* ─── Not found ──────────────────────────────────────────────── */

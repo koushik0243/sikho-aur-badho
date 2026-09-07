@@ -1,45 +1,5 @@
 
 
-/* ─── Back button ─────────────────────────────────────────────── */
-.backBtn {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
-  border: 1px solid #047279; border-radius: 6px; color: #fff;
-  font-size: 13px; font-weight: 500; cursor: pointer;
-  padding: 7px 14px; margin-bottom: 16px;
-  transition: opacity 0.15s;
-  white-space: nowrap;
-}
-
-.backBtn:hover { opacity: 0.88; }
-
-.backBtn svg { width: 16px; height: 16px; }
-
-.backBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #4a6060;
-  padding: 4px;
-  border-radius: 6px;
-  margin-right: 2px;
-  white-space: nowrap;
-}
-
-/* ── Back button ────────────────────────────────────────────── */
-.backBtn {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
-  border: 1px solid #047279; border-radius: 6px; color: #fff;
-  font-size: 13px; font-weight: 500; cursor: pointer;
-  padding: 7px 14px; margin-bottom: 16px;
-  transition: opacity 0.15s;
-  white-space: nowrap;
-}
-
 .breadcrumb strong { color: #1a2b2b; font-weight: 600; }
 
 .breadcrumb {
@@ -135,22 +95,21 @@
   transition: opacity 0.15s;
 }
 
-/* ─── Back icon button ────────────────────────────────────────── */
-.btnBackIcon {
-  width: 28px; height: 28px;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
-  background: #fff;
-  color: #4a6060;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-  transition: background 0.15s, color 0.15s;
+/* ── Back button ─────────────────────────────────────────────── */
+.backBtn {
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
+  border: 1px solid #047279; border-radius: 6px; color: #fff;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  padding: 7px 14px; margin-bottom: 16px;
+  transition: opacity 0.15s;
+  white-space: nowrap;
 }
 
-.btnBackIcon svg { width: 14px; height: 14px; }
+.backBtn:hover { opacity: 0.88; }
 
-.btnBackIcon:hover { background: #f0f7f7; color: #0b7b7b; }
+.backBtn svg { width: 16px; height: 16px; }
 
 /* ─── Edit button (secondary, next to Add Learner) ──────────────── */
 .btnEditLearner {
@@ -244,19 +203,6 @@
   margin-bottom: 16px;
 }
 
-.btnBack {
-  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 10px 20px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.btnBack:hover { opacity: 0.88; }
 
 /* ─── Profile header card ─────────────────────────────────────── */
 .profileHeader {
@@ -620,6 +566,8 @@
 }
 
 @media (max-width: 480px) {
+  .backBtn { width: auto; white-space: nowrap; }
+
   .sectionRow {
     flex-direction: column;
     align-items: flex-start;

@@ -6,7 +6,7 @@ const CourseCategorySchema = new Schema({
   slug: { type: String, unique: true },
   desc: { type: String, default: '' },
   parentId: { type: mongoose.Schema.Types.ObjectId, ref: 'course_category', default: null },
-  cat_image: { type: String, required: false, default: null },
+  cat_subcat_image: { type: String, required: false, default: null },
   totalCourses: { type: Number, required: true, default: 0 },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: false, default: null },
   deletedAt: { type: Date, required: false, default: null },

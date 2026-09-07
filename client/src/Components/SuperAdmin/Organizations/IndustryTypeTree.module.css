@@ -120,10 +120,11 @@
 .itBtnCancel {
   background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
   border: none;
+  border-radius: 5px;
   font-size: 13px;
   color: #fff;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 5px 16px;
 }
 
 

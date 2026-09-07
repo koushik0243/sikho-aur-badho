@@ -22,7 +22,7 @@ export const createCourseCategory = async (data, userId = null) => {
             slug,
             desc: data.desc || '',
             parentId: data.parentId || null,
-            cat_image: data.cat_image || null,
+            cat_subcat_image: data.cat_subcat_image || null,
             totalCourses: data.totalCourses || 0,
             createdBy: userId,
             status: data.status || 'active'
@@ -42,7 +42,7 @@ export const editCourseCategory = async (editId) => {
 
 export const updateCourseCategory = async (updateId, data) => {
     try {
-        const { title, desc, cat_image, totalCourses, status } = data;
+        const { title, desc, cat_subcat_image, totalCourses, status } = data;
         const updateFields = {};
 
         if (title !== undefined) {
@@ -50,7 +50,7 @@ export const updateCourseCategory = async (updateId, data) => {
             updateFields.slug = generateSlug(title);
         }
         if (desc !== undefined) updateFields.desc = desc;
-        if (cat_image !== undefined) updateFields.cat_image = cat_image;
+        if (cat_subcat_image !== undefined) updateFields.cat_subcat_image = cat_subcat_image;
         if (totalCourses !== undefined) updateFields.totalCourses = totalCourses;
         if (status !== undefined) updateFields.status = status;
         if ('parentId' in data) updateFields.parentId = data.parentId || null;

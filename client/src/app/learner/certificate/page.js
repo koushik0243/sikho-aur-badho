@@ -1,9 +1,16 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSelector } from 'react-redux';
 import { selectUser, selectAuthReady } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
 import s from "./Certificate.module.css";
+
+const BackArrow = (
+  <svg viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+  </svg>
+);
 
 // Certificate templates are fixed-width HTML documents (e.g. `.certificate { width: 900px }`
 // with body padding on top) — wide enough that the preview panel is almost always narrower
@@ -103,6 +110,7 @@ function printCertHtml(html) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function CertificatePage() {
+  const router    = useRouter();
   const user      = useSelector(selectUser);
   const authReady = useSelector(selectAuthReady);
   const userId    = user ? String(user._id || user.id || '') : '';
@@ -265,6 +273,13 @@ export default function CertificatePage() {
 
   return (
     <div className={s.page}>
+
+      <button
+        className={s.backBtn}
+        onClick={() => router.push(selectedId ? `/learner/courses/${selectedId}` : '/learner/courses')}
+      >
+        {BackArrow} Back to {selectedId ? 'Course' : 'Courses'}
+      </button>
 
       {/* Selector card */}
       <div className={s.selectorCard}>

@@ -6,6 +6,7 @@ const CourseSubCategorySchema = new Schema({
   slug: { type: String, unique: true },
   description: { type: String, required: true },
   categoryId: { type: mongoose.Schema.Types.ObjectId, ref: "course_category", required: true },
+  cat_subcat_image: { type: String, required: false, default: null },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: false, default: null },
   deletedAt: { type: Date, required: false, default: null },
   status: { type: String, enum: ['active', 'inactive'], default: 'active' },

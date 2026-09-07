@@ -285,8 +285,8 @@
 .table thead th {
   padding: 4px 12px;
   text-align: left;
-  font-weight: 600;
-  color: #374151;
+  font-weight: 700;
+  color: #188985;
   background: #f9fafb;
   border-bottom: 1px solid #e5e7eb;
   white-space: nowrap;
@@ -658,23 +658,6 @@
 }
 
 
-.btnView, .btnEdit, .btnDelete {
-  width: 26px; height: 26px; border-radius: 5px; border: none; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; transition: background 0.15s;
-}
-
-
-
-/* View button */
-.btnView {
-  width: 28px; height: 28px;
-  border-radius: 5px; border: none;
-  background: linear-gradient(180deg, #047279 0%, #299c8f 100%); color: #fff;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: opacity 0.15s;
-}
-
 
 .btnView:hover { opacity: 0.88; }
 
@@ -692,15 +675,6 @@
   transition: opacity 0.15s;
 }
 
-
-
-.btnDelete {
-  width: 28px; height: 28px;
-  border-radius: 5px; border: none;
-  background: #dc2626; color: #fff;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-}
 
 
 .btnDelete:hover { background: #b91c1c; }

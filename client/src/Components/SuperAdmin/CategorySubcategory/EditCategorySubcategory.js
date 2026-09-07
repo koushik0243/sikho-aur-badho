@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
+import { API_URL } from '../../../lib/constant';
 import SuperAdminShell from '../SuperAdminShell';
 import s from "./EditCategorySubcategory.module.css";
 
@@ -111,7 +112,7 @@ export default function EditCategorySubcategory() {
           setParentId(row?.parentId ? String(row.parentId) : '');
         }
         setStatus(row?.status ?? 'active');
-        if (row?.cat_subcat_image) setExistingImage(row.cat_subcat_image);
+        if (row?.cat_subcat_image) setExistingImage(`${API_URL}${row.cat_subcat_image}`);
         setAllCategories(unified);
       })
       .catch(() => setErrors({ fetch: 'Failed to load item.' }))

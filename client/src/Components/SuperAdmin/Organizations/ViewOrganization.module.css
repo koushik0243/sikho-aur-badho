@@ -17,30 +17,6 @@
   font-weight: 600;
   letter-spacing: 0.02em;
 }
-/* ================================================================
-   SuperAdmin — global shared stylesheet.
-   Every SuperAdmin component imports this ONE file. Edit a class
-   here and the change applies everywhere that class is used.
-   ================================================================ */
-
-
-.backBtn {
-  display: inline-flex;
-  align-self: flex-start;
-  align-items: center;
-  gap: 6px;
-  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
-  border: 1px solid #047279;
-  border-radius: 6px;
-  padding: 7px 14px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #fff;
-  cursor: pointer;
-  margin-bottom: 16px;
-  transition: opacity 0.15s;
-  white-space: nowrap;
-}
 
 
 .backBtn:hover { opacity: 0.88; }
@@ -50,62 +26,8 @@
 
 
 
-/* Back button */
-.backBtn {
-  display: inline-flex;
-  align-self: flex-start;
-  align-items: center;
-  gap: 6px;
-  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
-  border: 1px solid #047279;
-  border-radius: 6px;
-  padding: 7px 14px;
-  font-size: 13px;
-  color: #fff;
-  cursor: pointer;
-  font-weight: 500;
-  margin-bottom: 14px;
-  transition: opacity 0.15s;
-  white-space: nowrap;
-}
-
-
-
-/* Back button */
-.backBtn {
-  display: inline-flex;
-  align-self: flex-start;
-  align-items: center;
-  gap: 6px;
-  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
-  border: 1px solid #0b7b7b;
-  border-radius: 6px;
-  padding: 7px 14px;
-  font-size: 13px;
-  color: #fff;
-  cursor: pointer;
-  font-weight: 500;
-  margin-bottom: 14px;
-  transition: opacity 0.15s;
-  white-space: nowrap;
-}
-
-
-
-/* Form */
-.backBtn {
- display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
- border: 1px solid #0b7b7b; border-radius: 6px; color: #fff; font-size: 13px;
- font-weight: 500; cursor: pointer; padding: 7px 14px; margin-bottom: 16px;
- transition: opacity 0.15s;
- 
-  white-space: nowrap;
-}
-
-
-
 /* ── Back button ─────────────────────────────────────────────── */
-.backBtn {
+.backBtn { align-self: flex-start;
  display: inline-flex; align-items: center; gap: 6px;
  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
  border: 1px solid #047279; border-radius: 6px; color: #fff;
@@ -293,11 +215,18 @@
 
 
 .btnEdit {
-  width: 28px; height: 28px;
-  border-radius: 5px; border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto; height: auto;
+  border-radius: 7px; border: none;
   background: linear-gradient(180deg, #047279 0%, #299c8f 100%); color: #fff;
   cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: background 0.15s;
 }
 
@@ -317,7 +246,7 @@
 }
 
 
-.btnView, .btnEdit, .btnDelete {
+.btnView, .btnDelete {
   width: 26px; height: 26px; border-radius: 5px; border: none; cursor: pointer;
   display: flex; align-items: center; justify-content: center; transition: background 0.15s;
 }

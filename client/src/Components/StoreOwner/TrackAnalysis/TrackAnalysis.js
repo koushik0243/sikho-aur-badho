@@ -52,6 +52,13 @@ const ChevronIcon = (
   </svg>
 );
 
+const EyeIcon = (
+  <svg viewBox="0 0 20 20" fill="currentColor">
+    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+    <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+  </svg>
+);
+
 export default function TrackAnalysisPage() {
   const user   = useSelector(selectUser);
   const router = useRouter();
@@ -223,6 +230,23 @@ export default function TrackAnalysisPage() {
             {learners.length === 0 && (
               <p className={s.emptyNote} style={{ textAlign: 'center', padding: '16px 0' }}>No learners enrolled yet.</p>
             )}
+            {learners.length > 0 && (
+              <div className={s.learnerHeaderRow}>
+                <div className={s.headerAvatarSpacer} />
+                <div className={s.learnerInfo}>
+                  <div className={s.statLabel}>LEARNER</div>
+                </div>
+                <div className={s.learnerStats}>
+                  <div className={s.statLabel}>COURSES</div>
+                </div>
+                <div className={s.learnerStats}>
+                  <div className={s.statLabel}>STATUS</div>
+                </div>
+                <div className={s.headerActionsLabel}>
+                  <div className={s.statLabel}>ACTIONS</div>
+                </div>
+              </div>
+            )}
             {learners.slice(0, 8).map((l, i) => {
               const uid     = String(l._id || '');
               const name    = l.name || l.fullName || `${l.firstName || ''} ${l.lastName || ''}`.trim() || 'Learner';
@@ -236,15 +260,13 @@ export default function TrackAnalysisPage() {
                     <div className={s.learnerSub}>{latest}</div>
                   </div>
                   <div className={s.learnerStats}>
-                    <div className={s.statLabel}>COURSES</div>
                     <div className={s.statVal}>{courses}</div>
                   </div>
                   <div className={s.learnerStats}>
-                    <div className={s.statLabel}>STATUS</div>
                     <div className={s.statVal} style={{ textTransform: 'capitalize' }}>{l.status || 'Active'}</div>
                   </div>
                   <button className={s.btnView} onClick={() => router.push(`/storeowner/track-analysis/${uid}`)}>
-                    View Details
+                    {EyeIcon} View Details
                   </button>
                 </div>
               );

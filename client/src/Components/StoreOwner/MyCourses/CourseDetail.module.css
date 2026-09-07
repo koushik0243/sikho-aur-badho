@@ -2,8 +2,9 @@
 
 .loadingText { padding: 40px; color: #6b7280; font-size: 14px; }
 
-/* ─── Back button ─────────────────────────────────────────────── */
+/* ── Back button ─────────────────────────────────────────────── */
 .backBtn {
+  align-self: flex-start;
   display: inline-flex; align-items: center; gap: 6px;
   background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
   border: 1px solid #047279; border-radius: 6px; color: #fff;
@@ -16,31 +17,6 @@
 .backBtn:hover { opacity: 0.88; }
 
 .backBtn svg { width: 16px; height: 16px; }
-
-.backBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #4a6060;
-  padding: 4px;
-  border-radius: 6px;
-  margin-right: 2px;
-  white-space: nowrap;
-}
-
-/* ── Back button ────────────────────────────────────────────── */
-.backBtn {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
-  border: 1px solid #047279; border-radius: 6px; color: #fff;
-  font-size: 13px; font-weight: 500; cursor: pointer;
-  padding: 7px 14px; margin-bottom: 16px;
-  transition: opacity 0.15s;
-  white-space: nowrap;
-}
 
 .breadcrumb strong { color: #1a2b2b; font-weight: 600; }
 
@@ -606,6 +582,8 @@
 }
 
 @media (max-width: 480px) {
+  .backBtn { width: auto; white-space: nowrap; }
+
   .sectionRow {
     flex-direction: column;
     gap: 4px;

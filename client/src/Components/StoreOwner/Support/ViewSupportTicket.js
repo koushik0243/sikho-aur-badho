@@ -6,6 +6,12 @@ import apiServiceHandler from '../../../service/apiService';
 import vp from "./ViewSupportTicket.module.css";
 import s from "./ViewSupportTicket.module.css";
 
+const BackArrow = (
+  <svg viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+  </svg>
+);
+
 function formatDate(iso) {
   if (!iso) return '—';
   try {
@@ -100,8 +106,8 @@ export default function ViewSupportTicketPage() {
     return (
       <div className={s.notFound}>
         <div className={s.notFoundTitle}>Ticket not found</div>
-        <button className={s.btnBack} onClick={() => router.push('/storeowner/support')}>
-          ← Back to Support
+        <button className={s.backBtn} onClick={() => router.push('/storeowner/support')}>
+          {BackArrow} Back to Support
         </button>
       </div>
     );
@@ -114,8 +120,8 @@ export default function ViewSupportTicketPage() {
       <Toast toast={toast} />
 
       {/* ── Back button ── */}
-      <button className={s.btnBackTop} onClick={() => router.push('/storeowner/support')}>
-        ← Back
+      <button className={s.backBtn} onClick={() => router.push('/storeowner/support')}>
+        {BackArrow} Back to Support
       </button>
 
       {/* ── Breadcrumb ── */}

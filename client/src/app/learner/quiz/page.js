@@ -1,9 +1,16 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSelector } from 'react-redux';
 import { selectUser, selectAuthReady } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
 import s from "./Quiz.module.css";
+
+const BackArrow = (
+  <svg viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+  </svg>
+);
 
 function toArr(res) {
   if (Array.isArray(res))              return res;
@@ -51,6 +58,7 @@ function ResultCircle({ passed }) {
 }
 
 export default function QuizResultPage() {
+  const router    = useRouter();
   const user      = useSelector(selectUser);
   const authReady = useSelector(selectAuthReady);
   const userId    = user ? String(user._id || user.id || '') : '';
@@ -142,6 +150,13 @@ export default function QuizResultPage() {
 
   return (
     <div className={s.page}>
+
+      <button
+        className={s.backBtn}
+        onClick={() => router.push(selectedCourse ? `/learner/courses/${selectedCourse}` : '/learner/courses')}
+      >
+        {BackArrow} Back to {selectedCourse ? 'Course' : 'Courses'}
+      </button>
 
       {/* ── Filter bar ── */}
       <div className={s.filterCard}>

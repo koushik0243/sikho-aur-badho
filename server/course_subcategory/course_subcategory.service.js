@@ -18,6 +18,7 @@ export const createCourseSubCategory = async (data, userId = null) => {
             slug,
             description: data.description,
             categoryId: data.categoryId,
+            cat_subcat_image: data.cat_subcat_image || null,
             createdBy: userId,
             status: data.status || 'active'
         }).save();
@@ -36,7 +37,7 @@ export const editCourseSubCategory = async (editId) => {
 
 export const updateCourseSubCategory = async (updateId, data) => {
     try {
-        const { name, description, categoryId, status } = data;
+        const { name, description, categoryId, status, cat_subcat_image } = data;
         const updateFields = {};
 
         if (name !== undefined) {
@@ -46,6 +47,7 @@ export const updateCourseSubCategory = async (updateId, data) => {
         if (description !== undefined) updateFields.description = description;
         if (categoryId !== undefined) updateFields.categoryId = categoryId;
         if (status !== undefined) updateFields.status = status;
+        if (cat_subcat_image !== undefined) updateFields.cat_subcat_image = cat_subcat_image;
 
         if (Object.keys(updateFields).length === 0) {
             return await CourseSubCategory.findOne({ _id: updateId, deletedAt: null }).lean();

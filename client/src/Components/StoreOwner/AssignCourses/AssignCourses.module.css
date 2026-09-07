@@ -544,8 +544,8 @@
 .th {
   text-align: left;
   font-size: 11px;
-  font-weight: 600;
-  color: #7a9090;
+  font-weight: 700;
+  color: #188985;
   padding: 3px 10px;
   border-bottom: 1px solid #f0f4f4;
   white-space: nowrap;
@@ -853,7 +853,9 @@
 
 
 
-.modalBtnCancel:hover { background: linear-gradient(180deg, #036067 0%, #23897d 100%); }
+.modalBtnCancel:hover:not(:disabled) { background: linear-gradient(180deg, #036067 0%, #23897d 100%); }
+
+.modalBtnCancel:disabled { opacity: 0.6; cursor: not-allowed; }
 
 
 
@@ -871,7 +873,9 @@
 
 
 
-.modalBtnDelete:hover { background: linear-gradient(180deg, #036067 0%, #23897d 100%); }
+.modalBtnDelete:hover:not(:disabled) { background: linear-gradient(180deg, #036067 0%, #23897d 100%); }
+
+.modalBtnDelete:disabled { opacity: 0.6; cursor: not-allowed; }
 
 
 

@@ -6,6 +6,12 @@ import { selectUser } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
 import s from "./Reports.module.css";
 
+const DownloadIcon = () => (
+  <svg viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clipRule="evenodd" />
+  </svg>
+);
+
 function toArr(res) {
   if (Array.isArray(res))             return res;
   if (Array.isArray(res?.data))       return res.data;
@@ -399,7 +405,7 @@ export default function ReportsPage() {
                 disabled={loading || exporting === r.key || exporting === `${r.key}_pdf`}
                 onClick={() => handleCsv(r.key)}
               >
-                {exporting === r.key ? '…' : 'CSV'}
+                <DownloadIcon /> {exporting === r.key ? '…' : 'CSV'}
               </button>
               <button
                 suppressHydrationWarning
@@ -407,7 +413,7 @@ export default function ReportsPage() {
                 disabled={loading || exporting === r.key || exporting === `${r.key}_pdf`}
                 onClick={() => handlePdf(r.key)}
               >
-                {exporting === `${r.key}_pdf` ? '…' : 'PDF'}
+                <DownloadIcon /> {exporting === `${r.key}_pdf` ? '…' : 'PDF'}
               </button>
             </div>
           </div>

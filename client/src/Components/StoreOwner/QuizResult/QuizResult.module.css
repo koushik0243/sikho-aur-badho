@@ -1,5 +1,21 @@
 .page { display: flex; flex-direction: column; gap: 16px; }
 
+/* ── Back button ─────────────────────────────────────────── */
+.backBtn {
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
+  border: 1px solid #047279; border-radius: 6px; color: #fff;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  padding: 7px 14px; margin-bottom: 16px;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+
+.backBtn:hover { opacity: 0.88; }
+
+.backBtn svg { width: 16px; height: 16px; }
+
 /* ── Filter card ─────────────────────────────────────────── */
 .filterCard {
   background: #fff;
@@ -231,6 +247,8 @@
 }
 
 @media (max-width: 480px) {
+  .backBtn { width: auto; white-space: nowrap; }
+
   .filterCard,
   .summaryCard,
   .compareCard {

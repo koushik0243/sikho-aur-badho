@@ -5,6 +5,12 @@ import { useRouter, useParams } from 'next/navigation';
 import apiServiceHandler from '../../../service/apiService';
 import vp from "./ViewOrder.module.css";
 
+const BackArrow = (
+  <svg viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+  </svg>
+);
+
 const STATUS_BADGE = {
   success:  'badgePaid',
   pending:  'badgePending',
@@ -48,6 +54,9 @@ export default function ViewOrder() {
   if (loading) return <p className={vp.loadingText}>Loading…</p>;
   if (!order?._id) return (
     <>
+      <button className={vp.backBtn} onClick={() => router.push('/storeowner/orders')}>
+        {BackArrow} Back to Orders
+      </button>
       <nav className={vp.breadcrumb}>
         <button className={vp.breadcrumbLink} onClick={() => router.push('/storeowner/orders')}>Orders</button>
         <span className={vp.breadcrumbSep}>›</span>
@@ -71,6 +80,9 @@ export default function ViewOrder() {
 
   return (
     <>
+      <button className={vp.backBtn} onClick={() => router.push('/storeowner/orders')}>
+        {BackArrow} Back to Orders
+      </button>
       <nav className={vp.breadcrumb}>
         <button className={vp.breadcrumbLink} onClick={() => router.push('/storeowner/orders')}>Orders</button>
         <span className={vp.breadcrumbSep}>›</span>

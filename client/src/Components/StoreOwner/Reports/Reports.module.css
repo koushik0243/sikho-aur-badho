@@ -166,20 +166,32 @@
 
 
 
-.btnCsv {
-  padding: 5px 14px;
-  border: none;
-  border-radius: 6px;
-  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+.btnCsv,
+.btnPdf {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 
-.btnCsv:hover { background: linear-gradient(180deg, #036067 0%, #23897d 100%); border-color: #0b7b7b; color: #0b7b7b; }
+.btnCsv svg,
+.btnPdf svg { width: 14px; height: 14px; }
+
+
+.btnCsv {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 7px;
+  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+
+.btnCsv:hover { background: linear-gradient(180deg, #036067 0%, #23897d 100%); }
 
 
 .btnCsv:disabled,
@@ -188,12 +200,12 @@
 
 
 .btnPdf {
-  padding: 5px 14px;
+  padding: 8px 20px;
   border: none;
-  border-radius: 6px;
+  border-radius: 7px;
   background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
   color: #fff;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.15s;

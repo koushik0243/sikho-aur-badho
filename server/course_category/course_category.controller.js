@@ -1,16 +1,50 @@
 import express from 'express';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import multer from 'multer';
 import * as CourseCategoryHelper from './course_category.service.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const Router = express.Router();
 
-const createCourseCategory = async (req, res, next) => {
-    try {
-        const userId = req.user?._id || null;
-        const data = await CourseCategoryHelper.createCourseCategory(req.body, userId);
-        res.status(200).json({ status: 200, message: "Successfully added.", data });
-    } catch (error) {
-        next(error);
+// ── Multer configuration ──────────────────────────────────────────────────────
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadDir = path.join(__dirname, '..', 'public', 'uploads', 'course_category');
+        fs.mkdirSync(uploadDir, { recursive: true });
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        cb(null, `${Date.now()}-${file.originalname}`);
     }
+});
+const categoryUpload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } })
+    .single('cat_subcat_image');
+
+// Helper: parse body + attach uploaded file path
+const parseBodyWithFile = (req) => {
+    const body = { ...req.body };
+    if (req.file) {
+        body.cat_subcat_image = `/uploads/course_category/${req.file.filename}`;
+    }
+    return body;
+};
+
+const createCourseCategory = async (req, res, next) => {
+    categoryUpload(req, res, async (err) => {
+        if (err) return next(err);
+        try {
+            const userId = req.user?._id || null;
+            const data = await CourseCategoryHelper.createCourseCategory(parseBodyWithFile(req), userId);
+            res.status(200).json({ status: 200, message: "Successfully added.", data });
+        } catch (error) {
+            next(error);
+        }
+    });
 };
 
 const editCourseCategory = async (req, res, next) => {
@@ -23,12 +57,15 @@ const editCourseCategory = async (req, res, next) => {
 };
 
 const updateCourseCategory = async (req, res, next) => {
-    try {
-        const data = await CourseCategoryHelper.updateCourseCategory(req.params.id, req.body);
-        res.status(200).json({ status: 200, message: "Successfully updated.", data });
-    } catch (error) {
-        next(error);
-    }
+    categoryUpload(req, res, async (err) => {
+        if (err) return next(err);
+        try {
+            const data = await CourseCategoryHelper.updateCourseCategory(req.params.id, parseBodyWithFile(req));
+            res.status(200).json({ status: 200, message: "Successfully updated.", data });
+        } catch (error) {
+            next(error);
+        }
+    });
 };
 
 const listCourseCategory = async (req, res, next) => {

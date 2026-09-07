@@ -10,12 +10,9 @@
   text-transform: capitalize;
 }
 
-.statusActiveReal    { border: 1px solid #b2ddd4; }
-.statusInactiveReal  { border: 1px solid #f5b8b8; }
-.statusSuspendedReal { border: 1px solid #f5d98a; }
-
 .statusBadgeLink {
   font-family: inherit;
+  border: none;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
@@ -94,7 +91,6 @@
 .modalBtnSave:hover:not(:disabled) { opacity: 0.88; }
 
 .modalBtnSave:disabled, .modalBtnCancel:disabled { opacity: 0.6; cursor: not-allowed; }
-.statusDeletedReal   { border: 1px solid #d1d5db; }
 
 
 
@@ -305,9 +301,9 @@
 .th {
   text-align: left;
   font-size: 11px;
-  font-weight: 600;
-  color: #7a9090;
-  padding: 3px 10px;
+  font-weight: 700;
+  color: #188985;
+  padding: 9px 10px;
   border-bottom: 1px solid #f0f4f4;
   white-space: nowrap;
 }
@@ -332,7 +328,7 @@
 
 
 .td {
-  padding: 3px 10px;
+  padding: 9px 10px;
   font-size: 13px;
   color: #1a2b2b;
   vertical-align: middle;

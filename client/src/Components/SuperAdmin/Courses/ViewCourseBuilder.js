@@ -8,6 +8,11 @@ import SuperAdminShell from '../SuperAdminShell';
 import s from "./ViewCourseBuilder.module.css";
 
 /* ── Icons ──────────────────────────────────────────────────────── */
+const BackArrow = (
+  <svg viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+  </svg>
+);
 const MenuIcon = (
   <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
     <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
@@ -449,6 +454,9 @@ export default function ViewCourseBuilder() {
   /* ── Main render ──────────────────────────────────────────── */
   return (
     <SuperAdminShell activeSection="course-builder">
+      <button className={s.backBtn} onClick={() => router.push('/superadmin/course-builder')}>
+        {BackArrow} Back to Course Builder
+      </button>
       <div style={{ background: '#fff', margin: '-24px -28px', minHeight: 'calc(100vh - 58px)' }}>
       {/* Top bar — same structure as CourseBuilder */}
       <div className={s.topBar}>

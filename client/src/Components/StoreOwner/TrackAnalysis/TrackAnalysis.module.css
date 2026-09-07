@@ -209,6 +209,30 @@
 
 
 
+.learnerHeaderRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #f4f6f8;
+}
+
+
+
+.headerAvatarSpacer {
+  width: 30px;
+  flex-shrink: 0;
+}
+
+
+
+.headerActionsLabel {
+  min-width: 118px;
+  flex-shrink: 0;
+}
+
+
+
 .learnerRow:last-child { border-bottom: none; }
 
 
@@ -235,7 +259,7 @@
 
 
 .learnerStats {
-  min-width: 70px;
+  min-width: 110px;
 }
 
 
@@ -257,6 +281,11 @@
 
 /* ─── View button ────────────────────────────────────────────── */
 .btnView {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 118px;
   background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
   color: #fff;
   border: none;
@@ -269,6 +298,8 @@
   transition: background 0.15s;
   white-space: nowrap;
 }
+
+.btnView svg { width: 13px; height: 13px; flex-shrink: 0; }
 
 
 
@@ -486,5 +517,10 @@
   /* Avatar + name stay paired on the first line; stats + button wrap to a second line */
   .learnerInfo + .learnerStats {
     flex-basis: 100%;
+  }
+
+  /* Column alignment is meaningless once rows wrap to a stacked layout */
+  .learnerHeaderRow {
+    display: none;
   }
 }

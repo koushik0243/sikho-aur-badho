@@ -74,12 +74,13 @@ export default function LearnerDetailPage() {
 
   return (
     <>
+      <button className={s.backBtn} onClick={() => router.push('/storeowner/users')}>
+        {Icon.back} Back to User Management
+      </button>
+
       {/* ── Breadcrumb ── */}
       <nav className={vp.breadcrumb} style={{ justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button className={s.btnBackIcon} onClick={() => router.push('/storeowner/users')} title="Back">
-            {Icon.back}
-          </button>
           <button className={vp.breadcrumbLink} onClick={() => router.push('/storeowner/users')}>
             User Management
           </button>
@@ -112,7 +113,6 @@ export default function LearnerDetailPage() {
       ) : notFound ? (
         <div className={s.notFound}>
           <div className={s.notFoundTitle}>Learner not found</div>
-          <button className={s.btnBack} onClick={() => router.push('/storeowner/users')}>← Back to User Management</button>
         </div>
       ) : (
         <>

@@ -241,8 +241,8 @@
 
 .historyTable th {
   font-size: 11px;
-  font-weight: 600;
-  color: #9aadad;
+  font-weight: 700;
+  color: #188985;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 0 0 8px;
@@ -365,10 +365,10 @@
 
 
 
-.statusBadgeActive  { background: transparent; color: #000; border: 1px solid #b2ddd4; }
+.statusBadgeActive  { background: transparent; color: #000; }
 
 
-.statusBadgeInactive { background: transparent; color: #000; border: 1px solid #f5b8b8; }
+.statusBadgeInactive { background: transparent; color: #000; }
 
 
 

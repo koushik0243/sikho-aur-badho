@@ -244,8 +244,9 @@
 .ctrlBtn {
   background: none; border: none;
   color: rgba(255,255,255,0.75);
-  cursor: pointer; padding: 4px;
-  display: flex; align-items: center;
+  cursor: pointer; padding: 0;
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
   border-radius: 4px;
   transition: color 0.15s;
 }
@@ -405,7 +406,9 @@
 .noteDeleteBtn {
   background: none; border: none;
   color: #c0cece; font-size: 12px;
-  cursor: pointer; padding: 2px 4px;
+  cursor: pointer; padding: 0;
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
   border-radius: 4px; line-height: 1;
   transition: color 0.15s, background 0.15s;
 }
@@ -1413,7 +1416,7 @@
 
 
 .quizBackBtn {
-  padding: 10px 20px;
+  padding: 11px 24px;
   background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
   color: #fff;
   border: none;
@@ -1429,7 +1432,7 @@
 
 
 .quizSubmitAnswerBtn {
-  padding: 11px 28px;
+  padding: 11px 24px;
   background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
   color: #fff;
   border: none;
@@ -1446,7 +1449,7 @@
 
 
 .quizSkipBtn {
-  padding: 10px 24px;
+  padding: 11px 24px;
   background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
   color: #fff;
   border: none;
@@ -1499,18 +1502,6 @@
 
 
 
-.loadingWrap { display: flex; justify-content: center; padding: 80px 0; }
-
-
-
-/* ─── Loading / error ────────────────────────────────────── */
-.loadingWrap {
-  display: flex; align-items: center;
-  justify-content: center; height: 240px;
-}
-
-
-
 /* ── Loading / empty ─────────────────────────────────────── */
 .loadingWrap { display: flex; justify-content: center; padding: 80px 0; }
 
@@ -1527,17 +1518,27 @@
 }
 
 
-.errorWrap button {
-  margin-top: 12px; padding: 8px 20px;
-  background: linear-gradient(180deg, #047279 0%, #299c8f 100%); color: #fff;
-  border: none; border-radius: 8px;
-  cursor: pointer; font-size: 14px; transition: opacity 0.15s;
-}
-
-
-.errorWrap button:hover { opacity: 0.88; }
+.errorWrap .backBtn { margin-top: 12px; }
 
 .page { display: flex; flex-direction: column; gap: 16px; /* max-width: 760px; */ }
+
+
+
+/* ── Back button ─────────────────────────────────────────────── */
+.backBtn {
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
+  border: 1px solid #047279; border-radius: 6px; color: #fff;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  padding: 7px 14px; margin-bottom: 16px;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+
+.backBtn:hover { opacity: 0.88; }
+
+.backBtn svg { width: 16px; height: 16px; }
 
 
 

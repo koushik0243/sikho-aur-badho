@@ -1,4 +1,4 @@
-export const API_URL = "https://api.sikhoaurbadho.com";
+export const API_URL = "http://localhost:3001";
 
 // User types
 export const USER_TYPES = {

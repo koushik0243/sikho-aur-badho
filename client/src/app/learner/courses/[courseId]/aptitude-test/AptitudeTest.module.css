@@ -358,7 +358,7 @@
 }
 
 .backBtn {
-  padding: 10px 20px;
+  padding: 11px 24px;
   background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
   color: #fff;
   border: none;
@@ -374,7 +374,7 @@
 
 .submitBtn {
   margin-left: auto;
-  padding: 11px 28px;
+  padding: 11px 24px;
   background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
   color: #fff;
   border: none;
@@ -389,7 +389,7 @@
 .submitBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .skipBtn {
-  padding: 10px 24px;
+  padding: 11px 24px;
   background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
   color: #fff;
   border: none;

@@ -7,6 +7,11 @@ import SuperAdminShell from '../SuperAdminShell';
 import { generateInvoicePDF } from '../../../lib/generateInvoicePDF';
 import vp from "./ViewInvoice.module.css";
 
+const BackArrow = (
+  <svg viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+  </svg>
+);
 const PdfIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
     <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clipRule="evenodd" />
@@ -58,6 +63,9 @@ export default function ViewInvoice() {
   if (loading) return <SuperAdminShell activeSection="invoices"><p className={vp.loadingText}>Loading…</p></SuperAdminShell>;
   if (!invoice) return (
     <SuperAdminShell activeSection="invoices">
+      <button className={vp.backBtn} onClick={() => router.push('/superadmin/payments/invoices')}>
+        {BackArrow} Back to Invoices
+      </button>
       <nav className={vp.breadcrumb}>
         <button className={vp.breadcrumbLink} onClick={() => router.push('/superadmin/payments/invoices')}>Invoices</button>
         <span className={vp.breadcrumbSep}>›</span>
@@ -76,6 +84,9 @@ export default function ViewInvoice() {
 
   return (
     <SuperAdminShell activeSection="invoices">
+      <button className={vp.backBtn} onClick={() => router.push('/superadmin/payments/invoices')}>
+        {BackArrow} Back to Invoices
+      </button>
       <nav className={vp.breadcrumb}>
         <button className={vp.breadcrumbLink} onClick={() => router.push('/superadmin/payments/invoices')}>Invoices</button>
         <span className={vp.breadcrumbSep}>›</span>

@@ -6,6 +6,12 @@ import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import vp from "./ViewOrder.module.css";
 
+const BackArrow = (
+  <svg viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+  </svg>
+);
+
 function fmtDate(val) {
   if (!val) return '—';
   const d = new Date(val);
@@ -43,6 +49,9 @@ export default function ViewOrder() {
   if (loading) return <SuperAdminShell activeSection="orders"><p className={vp.loadingText}>Loading…</p></SuperAdminShell>;
   if (!order)  return (
     <SuperAdminShell activeSection="orders">
+      <button className={vp.backBtn} onClick={() => router.push('/superadmin/payments/orders')}>
+        {BackArrow} Back to Orders
+      </button>
       <p className={vp.loadingText}>Order not found.</p>
     </SuperAdminShell>
   );
@@ -54,6 +63,9 @@ export default function ViewOrder() {
 
   return (
     <SuperAdminShell activeSection="orders">
+      <button className={vp.backBtn} onClick={() => router.push('/superadmin/payments/orders')}>
+        {BackArrow} Back to Orders
+      </button>
       <nav className={vp.breadcrumb}>
         <button className={vp.breadcrumbLink} onClick={() => router.push('/superadmin/payments/orders')}>Orders</button>
         <span className={vp.breadcrumbSep}>›</span>

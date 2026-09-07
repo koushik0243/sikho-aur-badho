@@ -207,39 +207,21 @@
 
 
 
-.btnBack {
-  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 10px 20px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-
-
-.btnBack:hover { opacity: 0.88; }
-
-
-
-.btnBackTop {
+/* ── Back button ─────────────────────────────────────────────── */
+.backBtn {
+  align-self: flex-start;
   display: inline-flex; align-items: center; gap: 6px;
   background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
-  border: none; color: #fff;
-  font-size: 13px; cursor: pointer;
-  margin-bottom: 16px;
+  border: 1px solid #047279; border-radius: 6px; color: #fff;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  padding: 7px 14px; margin-bottom: 16px;
   transition: opacity 0.15s;
-  border-radius: 7px; padding: 8px 16px; font-weight: 600; width: 80px;
+  white-space: nowrap;
 }
 
+.backBtn:hover { opacity: 0.88; }
 
-.btnBackTop:hover { opacity: 0.88; }
-
-
-.btnBackTop svg { width: 16px; height: 16px; }
+.backBtn svg { width: 16px; height: 16px; }
 
 
 
@@ -600,6 +582,8 @@
 }
 
 @media (max-width: 480px) {
+  .backBtn { width: auto; white-space: nowrap; }
+
   .sectionRow {
     flex-direction: column;
     align-items: flex-start;

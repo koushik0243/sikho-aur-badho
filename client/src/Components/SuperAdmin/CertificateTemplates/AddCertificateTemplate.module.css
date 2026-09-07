@@ -5,25 +5,6 @@
    ================================================================ */
 
 
-.backBtn {
-  display: inline-flex;
-  align-self: flex-start;
-  align-items: center;
-  gap: 6px;
-  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
-  border: 1px solid #047279;
-  border-radius: 6px;
-  padding: 7px 14px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #fff;
-  cursor: pointer;
-  margin-bottom: 16px;
-  transition: opacity 0.15s;
-  white-space: nowrap;
-}
-
-
 .backBtn:hover { opacity: 0.88; }
 
 
@@ -31,62 +12,8 @@
 
 
 
-/* Back button */
-.backBtn {
-  display: inline-flex;
-  align-self: flex-start;
-  align-items: center;
-  gap: 6px;
-  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
-  border: 1px solid #047279;
-  border-radius: 6px;
-  padding: 7px 14px;
-  font-size: 13px;
-  color: #fff;
-  cursor: pointer;
-  font-weight: 500;
-  margin-bottom: 14px;
-  transition: opacity 0.15s;
-  white-space: nowrap;
-}
-
-
-
-/* Back button */
-.backBtn {
-  display: inline-flex;
-  align-self: flex-start;
-  align-items: center;
-  gap: 6px;
-  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
-  border: 1px solid #0b7b7b;
-  border-radius: 6px;
-  padding: 7px 14px;
-  font-size: 13px;
-  color: #fff;
-  cursor: pointer;
-  font-weight: 500;
-  margin-bottom: 14px;
-  transition: opacity 0.15s;
-  white-space: nowrap;
-}
-
-
-
-/* Form */
-.backBtn {
- display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
- border: 1px solid #0b7b7b; border-radius: 6px; color: #fff; font-size: 13px;
- font-weight: 500; cursor: pointer; padding: 7px 14px; margin-bottom: 16px;
- transition: opacity 0.15s;
- 
-  white-space: nowrap;
-}
-
-
-
 /* ── Back button ─────────────────────────────────────────────── */
-.backBtn {
+.backBtn { align-self: flex-start;
  display: inline-flex; align-items: center; gap: 6px;
  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
  border: 1px solid #047279; border-radius: 6px; color: #fff;
@@ -556,8 +483,8 @@
   color: #fff;
   border: none;
   border-radius: 6px;
-  padding: 10px 26px;
-  font-size: 13.5px;
+  padding: 9px 22px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.15s;
@@ -575,7 +502,7 @@
   color: #fff;
   border: none;
   border-radius: 6px;
-  padding: 9px 20px;
+  padding: 9px 22px;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -639,7 +566,7 @@
   color: #fff;
   border: none;
   border-radius: 6px;
-  padding: 7px 18px;
+  padding: 9px 22px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;

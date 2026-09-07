@@ -820,7 +820,7 @@
 }
 
 
-.btnAdded:hover { background: #f0f7f7; }
+.btnDetails.btnAdded:hover { background: #f0f7f7; color: #0b7b7b; }
 
 
 
