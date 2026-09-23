@@ -158,15 +158,17 @@ Return ONLY a valid JSON array (no markdown fences, no extra text) in this exact
 
   // Remove questions/answers that contain non-Latin script characters from the transcript
   // (Khmer, Thai, Arabic, CJK, Devanagari, etc.) — they indicate leaked transcript text
-  const NON_LATIN_SCRIPT = /[؀-ۿݐ-ݿ฀-๿ऀ-ॿঀ-৿ក-៿⺀-⻿぀-ヿ㐀-䶿一-鿿가-힯]/;
-  questions = questions.filter(q => {
-    const combined = (q.question || '') + ' ' + (q.answer || '');
-    return !NON_LATIN_SCRIPT.test(combined);
-  });
+  
+  
+  // const NON_LATIN_SCRIPT = /[؀-ۿݐ-ݿ฀-๿ऀ-ॿঀ-৿ក-៿⺀-⻿぀-ヿ㐀-䶿一-鿿가-힯]/;
+  // questions = questions.filter(q => {
+  //   const combined = (q.question || '') + ' ' + (q.answer || '');
+  //   return !NON_LATIN_SCRIPT.test(combined);
+  // });
 
-  if (questions.length === 0) {
-    throw new Error('All generated questions were filtered out due to non-Latin characters in the content. Please ensure the lesson has English text.');
-  }
+  // if (questions.length === 0) {
+  //   throw new Error('All generated questions were filtered out due to non-Latin characters in the content. Please ensure the lesson has English text.');
+  // }
 
   const lastBatch = await QuizQuestion.findOne(
     { quizId, deletedAt: null },
