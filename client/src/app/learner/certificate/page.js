@@ -1,6 +1,6 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSelector } from 'react-redux';
 import { selectUser, selectAuthReady } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
@@ -110,7 +110,17 @@ function printCertHtml(html) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function CertificatePage() {
-  const router    = useRouter();
+  return (
+    <Suspense fallback={null}>
+      <CertificatePageInner />
+    </Suspense>
+  );
+}
+
+function CertificatePageInner() {
+  const router      = useRouter();
+  const searchParams = useSearchParams();
+  const courseIdParam = searchParams.get('courseId') || '';
   const user      = useSelector(selectUser);
   const authReady = useSelector(selectAuthReady);
   const userId    = user ? String(user._id || user.id || '') : '';
@@ -122,6 +132,8 @@ export default function CertificatePage() {
   const [progress,       setProgress]       = useState(null);
   const [quizScore,      setQuizScore]      = useState(null);
   const [chapters,       setChapters]       = useState([]);
+  const [topics,         setTopics]         = useState([]);
+  const [quizAttempts,   setQuizAttempts]   = useState([]);
   const [assignment,     setAssignment]     = useState(null);
   const [loadingCourses, setLoadingCourses] = useState(true);
   const [loadingData,    setLoadingData]    = useState(false);
@@ -181,6 +193,9 @@ export default function CertificatePage() {
           list = all.map(c => ({ assignment: null, course: c }));
         }
         setCourses(list);
+        if (courseIdParam && list.some(x => String(x.course?._id) === courseIdParam)) {
+          setSelectedId(courseIdParam);
+        }
       } finally {
         if (!cancelled) setLoadingCourses(false);
       }
@@ -193,7 +208,7 @@ export default function CertificatePage() {
   useEffect(() => {
     if (!selectedId) {
       setCourseObj(null); setTemplate(null); setProgress(null);
-      setQuizScore(null); setChapters([]); setAssignment(null);
+      setQuizScore(null); setChapters([]); setTopics([]); setQuizAttempts([]); setAssignment(null);
       return;
     }
     let cancelled = false;
@@ -226,17 +241,20 @@ export default function CertificatePage() {
           setTemplate(tmplRef);
         }
 
-        const [progRes, quizRes, chRes] = await Promise.all([
+        const [progRes, quizRes, chRes, topicRes] = await Promise.all([
           apiServiceHandler('GET', `progress/course?courseId=${selectedId}`).catch(() => null),
           apiServiceHandler('GET', `quiz-attempt/course?courseId=${selectedId}`).catch(() => null),
           apiServiceHandler('GET', `chapter/list?courseId=${selectedId}`).catch(() => null),
+          apiServiceHandler('GET', `topic/list?courseId=${selectedId}`).catch(() => null),
         ]);
         if (cancelled) return;
 
         setProgress(progRes?.data ?? progRes ?? null);
         setChapters(toArr(chRes));
+        setTopics(toArr(topicRes));
         setAssignment(entry?.assignment || null);
         const ql = toArr(quizRes);
+        setQuizAttempts(ql);
         setQuizScore(ql.length > 0 ? Number(ql[0].totalScore || 0) : null);
       } finally {
         if (!cancelled) setLoadingData(false);
@@ -253,13 +271,33 @@ export default function CertificatePage() {
                       || '—';
   const overallPct    = Number(progress?.overallPercent ?? 0);
   const score         = quizScore !== null ? quizScore : overallPct;
-  const completedDate = assignment?.completedAt || assignment?.updatedAt || null;
   const chapterCount  = chapters.length;
   const hasData       = selectedId && !loadingData;
-  // The certificate is only unlocked once every chapter (all video lessons, plus
-  // any quizzes/assignments/zoom sessions they gate) has been completed — video
-  // watch progress reaching 100% is the single aggregate signal we have for that.
-  const isCourseComplete = overallPct >= 100;
+
+  // A chapter unlocks the next one once its own quiz is passed (matches the
+  // gating rule in the course-player) — a chapter with no quiz has nothing to
+  // gate on. The course is complete once every chapter clears that bar.
+  const passedTopicIds = new Set(
+    quizAttempts.filter(a => a.passed).map(a => String(a.topicId?._id || a.topicId || ''))
+  );
+  const isCourseComplete = chapters.length > 0 && chapters.every(ch => {
+    const chId = String(ch._id);
+    const quizTopics = topics.filter(t =>
+      String(t.chapterId?._id || t.chapterId || '') === chId
+      && String(t.video_type || '').toLowerCase() === 'quiz'
+    );
+    return quizTopics.length === 0 || quizTopics.every(t => passedTopicIds.has(String(t._id)));
+  });
+
+  // Completion date: most recent passed quiz attempt is the best signal of
+  // "when the learner actually finished" — fall back to the org-assignment
+  // record if no quiz attempts exist (e.g. the course has none).
+  const latestPassedAttemptDate = quizAttempts
+    .filter(a => a.passed)
+    .map(a => a.evaluatedAt || a.createdAt)
+    .filter(Boolean)
+    .sort((a, b) => new Date(b) - new Date(a))[0] || null;
+  const completedDate = latestPassedAttemptDate || assignment?.completedAt || assignment?.updatedAt || null;
   const certHtml      = hasData ? buildCertHtml(template, userName, courseName, score, completedDate, chapterCount) : null;
   const canShowCertificate = hasData && isCourseComplete && !!certHtml;
   const certId        = certNumber(template?._id);
@@ -365,7 +403,7 @@ export default function CertificatePage() {
                 </svg>
                 <p className={s.noTemplateTitle}>Certificate not yet available</p>
                 <p className={s.noTemplateSub}>
-                  Complete all chapters and zoom sessions in this course to unlock your certificate.
+                  Pass the quiz in every chapter of this course to unlock your certificate.
                 </p>
               </div>
             ) : canShowCertificate ? (

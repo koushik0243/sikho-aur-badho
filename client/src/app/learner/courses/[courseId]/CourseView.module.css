@@ -1552,6 +1552,42 @@
 }
 
 
+
+.certBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 14px 18px;
+  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
+  border-radius: 10px;
+}
+
+.certBannerText {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #fff;
+}
+
+.certBannerBtn {
+  flex-shrink: 0;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 7px;
+  background: #fff;
+  color: #047279;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.certBannerBtn:hover { opacity: 0.88; }
+
+
 .breadItem  { font-size: 13px; color: #6b7a7a; }
 
 

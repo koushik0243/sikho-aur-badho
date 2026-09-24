@@ -1453,6 +1453,7 @@ export default function CourseDetailPage({ params }) {
   const overallPercent = totalProgDur > 0 ? Math.min(100, Math.round((totalWatched / totalProgDur) * 100)) : 0;
   const topicType = getTopicType(activeTopic);
   const watchTitle = `Watch — ${activeTopic ? activeTopic.title : course.title}`;
+  const courseFullyComplete = chapters.length > 0 && chapters.every((_, i) => isChapterComplete(i));
 
   return (
     <div className={s.page}>
@@ -1472,6 +1473,20 @@ export default function CourseDetailPage({ params }) {
           </>
         )}
       </div>
+
+      {courseFullyComplete && (
+        <div className={s.certBanner}>
+          <span className={s.certBannerText}>
+            🎉 Congratulations! You&apos;ve completed every chapter and quiz in this course.
+          </span>
+          <button
+            className={s.certBannerBtn}
+            onClick={() => router.push(`/learner/certificate?courseId=${courseId}`)}
+          >
+            View Certificate
+          </button>
+        </div>
+      )}
 
       <div className={s.layout}>
         {/* ── Left: header (bare) → stats (bare) → content card → tabs card ── */}

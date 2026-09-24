@@ -196,6 +196,18 @@ export default function AddCourseBuilder({ editId } = {}) {
     toast.success('Item order saved.');
   }
 
+  // New topics must be ordered after every existing topic in the chapter
+  // regardless of type — lessons, quizzes, zoom links and assignments are
+  // tracked as separate arrays, but they all share one per-chapter sequence
+  // on the server. Using a type's own array length here (the old behavior)
+  // let a lesson and a quiz both land on order 1, and the DB sort then broke
+  // the tie alphabetically by title instead of respecting creation order.
+  function nextChapterTopicOrder(chIdx) {
+    const ch = chapters[chIdx] || {};
+    return (ch.lessons?.length || 0) + (ch.quizzes?.length || 0)
+         + (ch.zoomLinks?.length || 0) + (ch.assignments?.length || 0) + 1;
+  }
+
   async function reorderChapters(fromIdx, toIdx) {
     if (fromIdx == null || fromIdx === toIdx) return;
 
@@ -320,7 +332,7 @@ export default function AddCourseBuilder({ editId } = {}) {
       const autoTitle = quizForm.title.trim() || `${chapters[chIdx]?.title || 'Chapter'} Quiz`;
 
       if (!quizServerId) {
-        const order = (chapters[chIdx].quizzes?.length || 0) + 1;
+        const order = nextChapterTopicOrder(chIdx);
         const saveRes = await apiServiceHandler('POST', 'topic/create', {
           courseId, chapterId: chServerId,
           title: autoTitle,
@@ -378,7 +390,7 @@ export default function AddCourseBuilder({ editId } = {}) {
     if (!chServerId) { toast.error('Please save the chapter first.'); return; }
     const isEdit = quizModal.editIdx != null;
     const existingQuiz = isEdit ? chapters[chIdx].quizzes[quizModal.editIdx] : null;
-    const order = isEdit ? quizModal.editIdx + 1 : (chapters[chIdx].quizzes?.length || 0) + 1;
+    const order = isEdit ? undefined : nextChapterTopicOrder(chIdx);
     const selectedQuestionIds = quizQASelected.map(q => q._id);
     const quizBase = {
       _id: isEdit ? existingQuiz._id : Date.now(),
@@ -490,6 +502,18 @@ export default function AddCourseBuilder({ editId } = {}) {
     }
   }
 
+  async function handleAptitudeEnabledToggle(checked) {
+    setField('aptitudeEnabled', checked);
+    if (!courseId) return; // course not created yet — value is included in the next save
+    try {
+      await apiServiceHandler('PUT', `course/update/${courseId}`, { aptitudeEnabled: checked });
+      toast.success(`Aptitude test ${checked ? 'enabled' : 'disabled'}.`);
+    } catch (err) {
+      setField('aptitudeEnabled', !checked);
+      toast.error(err?.message || 'Failed to update aptitude test status.');
+    }
+  }
+
   async function saveAptitudeTest() {
     const e = {};
     if (!form.title.trim()) e.title = 'Course title is required.';
@@ -567,7 +591,7 @@ export default function AddCourseBuilder({ editId } = {}) {
     if (!chServerId) { toast.error('Please save the chapter first.'); return; }
     const isEdit = lessonModal.editIdx != null;
     const existingLesson = isEdit ? chapters[chIdx].lessons[lessonModal.editIdx] : null;
-    const order = isEdit ? lessonModal.editIdx + 1 : (chapters[chIdx].lessons?.length || 0) + 1;
+    const order = isEdit ? undefined : nextChapterTopicOrder(chIdx);
     const lessonBase = {
       _id: isEdit ? existingLesson._id : Date.now(),
       serverId: isEdit ? existingLesson.serverId : null,
@@ -592,7 +616,7 @@ export default function AddCourseBuilder({ editId } = {}) {
       payload.append('duration_hr', lessonBase.playbackHour || '0');
       payload.append('duration_min', lessonBase.playbackMin || '0');
       payload.append('duration_sec', lessonBase.playbackSec || '0');
-      payload.append('order', String(order));
+      if (order !== undefined) payload.append('order', String(order));
       payload.append('isPreview', 'false');
       payload.append('status', 'active');
       if (lessonBase.featuredImage) payload.append('lesson_image', lessonBase.featuredImage);
@@ -718,7 +742,7 @@ export default function AddCourseBuilder({ editId } = {}) {
     if (!chServerId) { toast.error('Please save the chapter first.'); return; }
     const isEdit = zoomModal.editIdx != null;
     const existingZoom = isEdit ? chapters[chIdx].zoomLinks[zoomModal.editIdx] : null;
-    const order = isEdit ? zoomModal.editIdx + 1 : (chapters[chIdx].zoomLinks?.length || 0) + 1;
+    const order = isEdit ? undefined : nextChapterTopicOrder(chIdx);
     const itemBase = {
       _id: isEdit ? existingZoom._id : Date.now(),
       serverId: isEdit ? existingZoom.serverId : null,
@@ -927,7 +951,7 @@ export default function AddCourseBuilder({ editId } = {}) {
     const isEdit = assignModal.editIdx != null;
     const existingAssign = isEdit ? chapters[chIdx].assignments[assignModal.editIdx] : null;
     if (!isEdit && !assignForm.file) { toast.error('Please upload a file.'); return; }
-    const order = isEdit ? assignModal.editIdx + 1 : (chapters[chIdx].assignments?.length || 0) + 1;
+    const order = isEdit ? undefined : nextChapterTopicOrder(chIdx);
     const itemBase = {
       _id: isEdit ? existingAssign._id : Date.now(),
       serverId: isEdit ? existingAssign.serverId : null,
@@ -941,7 +965,7 @@ export default function AddCourseBuilder({ editId } = {}) {
     fd.append('title', itemBase.title);
     fd.append('desc', '');
     fd.append('video_type', 'assignment');
-    fd.append('order', String(order));
+    if (order !== undefined) fd.append('order', String(order));
     fd.append('isPreview', 'false');
     fd.append('status', 'active');
     if (assignForm.file) fd.append('assignment_file', assignForm.file);
@@ -2595,6 +2619,16 @@ export default function AddCourseBuilder({ editId } = {}) {
           <div className={s.formCard}>
             <div className={s.formCardHeader}>
               <div className={s.formCardHeaderLeft}>{MenuIcon} Aptitude Test</div>
+              <div className={s.formCardHeaderRight}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: form.aptitudeEnabled ? '#16a34a' : '#dc2626' }}>
+                  {form.aptitudeEnabled ? 'Enabled' : 'Disabled'}
+                </span>
+                <label className={s.toggle}>
+                  <input type="checkbox" checked={!!form.aptitudeEnabled}
+                    onChange={e => handleAptitudeEnabledToggle(e.target.checked)} />
+                  <span className={s.toggleSlider} />
+                </label>
+              </div>
             </div>
             <div className={s.formCardBody}>
               <span className={s.quizRightChapterLabel}>Selected Questions</span>

@@ -1766,6 +1766,10 @@
 
 
 
+.formCardHeaderRight { display: flex; align-items: center; gap: 10px; }
+
+
+
 /* ── Options left nav (General / Content Drip / Enrollment) ──── */
 .optionsLayout { display: grid; grid-template-columns: 150px 1fr; gap: 0; }
 
