@@ -37,6 +37,8 @@ const Icon = {
   camera:   <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm12.553 1.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z"/></svg>,
   clipCheck:<svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>,
   fileDown: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd"/></svg>,
+  expand:   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3"/></svg>,
+  compress: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v3a2 2 0 01-2 2H3M21 8h-3a2 2 0 01-2-2V3M3 16h3a2 2 0 012 2v3M16 21v-3a2 2 0 012-2h3"/></svg>,
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -63,6 +65,11 @@ function fmtSecs(secs) {
   if (m > 0) return `${m}:${String(s).padStart(2, '0')} min`;
   return `${s}s`;
 }
+function ordinal(n) {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+  return `${n}${({ 1: 'st', 2: 'nd', 3: 'rd' })[n % 10] || 'th'}`;
+}
 function timeAgo(d) {
   if (!d) return 'Recently';
   const days = Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
@@ -74,8 +81,9 @@ function timeAgo(d) {
 }
 
 // ── VideoPlayer ───────────────────────────────────────────────────────────────
-function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange, topicId, courseId, savedPosition, onProgress, onDurationLoad, isCompleted, serverPct }) {
+function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange, topicId, courseId, savedPosition, onProgress, onDurationLoad, isCompleted, serverPct, onVideoEnded, playCommand, courseCompleted }) {
   const videoRef      = useRef(null);
+  const containerRef  = useRef(null);
   const lastSavedRef  = useRef(0);
   const maxReachedRef = useRef(0); // furthest second ever reached this session
   const [paused,   setPaused]   = useState(true);
@@ -84,6 +92,25 @@ function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange,
   const [speed,    setSpeed]    = useState(1);
   const [captionsOn, setCaptionsOn] = useState(false);
   const [feedback, setFeedback] = useState(null); // 'up' | 'down' | null
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    function onFsChange() {
+      setIsFullscreen(document.fullscreenElement === containerRef.current);
+    }
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  function toggleFullscreen() {
+    const el = containerRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.();
+    } else {
+      el.requestFullscreen?.();
+    }
+  }
 
   // When topic changes: restore saved position and reset session tracking
   useEffect(() => {
@@ -96,6 +123,18 @@ function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange,
     setPaused(true);
     onPlayStateChange?.(false);
   }, [topicId]);
+
+  // Play requests from the sidebar's play icon. Declared after the topic-change
+  // effect so a newly selected lesson restores its saved position before playing.
+  useEffect(() => {
+    if (!playCommand?.n || playCommand.topicId !== topicId) return;
+    if (Date.now() - (playCommand.at || 0) > 2000) return; // stale request replayed on remount
+    const v = videoRef.current;
+    if (!v) return;
+    if (playCommand.toggle && !v.paused) v.pause();
+    else v.play()?.catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playCommand?.n]);
 
   function saveProgress(v) {
     if (!topicId || !courseId || !v.duration) return;
@@ -127,6 +166,8 @@ function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange,
     maxReachedRef.current = d;
     setPaused(true);
     onPlayStateChange?.(false);
+    if (document.fullscreenElement) document.exitFullscreen?.();
+    onVideoEnded?.();
   }
 
   function handleLoadedMetadata(e) {
@@ -189,16 +230,20 @@ function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange,
     return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
   }
 
+  // A completed course (certificate earned) is read-only and always shows the
+  // lesson fully watched, with the cursor parked at the end of the bar.
   // localPct: real-time playback position bar
-  const localPct   = dur > 0 ? Math.min(100, Math.round((timeNow / dur) * 100)) : 0;
+  const localPct   = courseCompleted ? 100
+    : dur > 0 ? Math.min(100, Math.round((timeNow / dur) * 100)) : 0;
   // displayPct: best-ever watched % (server-persisted, shown as badge)
-  const displayPct = serverPct > 0 ? serverPct : Math.min(100, dur > 0 ? Math.round((maxReachedRef.current / dur) * 100) : 0);
+  const displayPct = courseCompleted ? 100
+    : serverPct > 0 ? serverPct : Math.min(100, dur > 0 ? Math.round((maxReachedRef.current / dur) * 100) : 0);
   // Show Re-watch when video is server-completed and currently paused at start
-  const showRewatch = isCompleted && paused && timeNow < 1;
+  const showRewatch = !courseCompleted && isCompleted && paused && timeNow < 1;
 
   if (videoSrc) {
     return (
-      <>
+      <div ref={containerRef} className={s.videoPlayerRoot}>
         <div className={s.videoWrap}>
           <video
             ref={videoRef}
@@ -216,7 +261,9 @@ function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange,
 
           {/* Watched % badge — top-right */}
           <div className={s.watchPctBadge}>
-            {isCompleted
+            {courseCompleted
+              ? <span className={s.watchPctCompleted}>{Icon.check} 100% watched</span>
+              : isCompleted
               ? <span className={s.watchPctCompleted}>{Icon.check} Completed</span>
               : displayPct > 0
                 ? <span>{displayPct}% watched</span>
@@ -261,7 +308,7 @@ function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange,
             <button className={s.videoCtrlIconBtn} onClick={() => seekRelative(10)} title="Forward 10s">
               {Icon.forward}
             </button>
-            <span className={s.videoTimeTxt}>{fmtT(timeNow)} / {fmtT(dur)}</span>
+            <span className={s.videoTimeTxt}>{fmtT(courseCompleted ? dur : timeNow)} / {fmtT(dur)}</span>
           </div>
           <div className={s.videoControlRight}>
             <button
@@ -285,9 +332,15 @@ function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange,
             <button className={s.videoCtrlIconBtn} title="Settings">
               {Icon.settings}
             </button>
+            <button
+              className={s.videoCtrlIconBtn}
+              onClick={toggleFullscreen}
+              title={isFullscreen ? 'Exit full screen' : 'Full screen'}>
+              {isFullscreen ? Icon.compress : Icon.expand}
+            </button>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
@@ -657,7 +710,7 @@ function getTopicIcon(topic, isActive) {
 }
 
 // ── ZoomPanel ─────────────────────────────────────────────────────────────────
-function ZoomPanel({ topic }) {
+function ZoomPanel({ topic, onContinue }) {
   const link = topic.videoUrl || topic.zoom_link || topic.zoomUrl || topic.link || '';
   const rawTime = topic.zoom_time || topic.scheduled_at || topic.start_time || null;
 
@@ -694,6 +747,11 @@ function ZoomPanel({ topic }) {
         </a>
       ) : (
         <p className={s.panelNote}>Zoom link will be available when the session goes live.</p>
+      )}
+      {onContinue && (
+        <button className={s.panelBtn} onClick={onContinue} style={{ marginTop: 16 }}>
+          Continue
+        </button>
       )}
     </div>
   );
@@ -745,7 +803,7 @@ const QRowXIcon = (
   </svg>
 );
 
-function QuizPanel({ topic, chapterTitle, onQuizPass }) {
+function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCount = 0, onContinue }) {
   const [phase,       setPhase]       = useState('start');
   const [questions,   setQuestions]   = useState([]);
   const [currentIdx,  setCurrentIdx]  = useState(0);
@@ -862,6 +920,7 @@ function QuizPanel({ topic, chapterTitle, onQuizPass }) {
       const res    = await apiServiceHandler('POST', 'quiz-attempt/submit', payload);
       const result = res?.data || res;
       setEvalResult(result);
+      onQuizAttempt?.(String(topic._id));
       if (result?.passed) onQuizPass?.(String(topic._id));
       setPhase('results');
     } catch {
@@ -877,8 +936,13 @@ function QuizPanel({ topic, chapterTitle, onQuizPass }) {
         <h3 className={s.panelTitle}>{topic.title}</h3>
         <p className={s.panelSub}>Complete this quiz to test your understanding of the chapter</p>
         <button className={s.panelBtn} onClick={startQuiz} disabled={phase === 'loading'}>
-          {phase === 'loading' ? 'Loading…' : 'Start Quiz'}
+          {phase === 'loading' ? 'Loading…' : attemptCount > 0 ? 'Re-Take Quiz' : 'Start Quiz'}
         </button>
+        {attemptCount > 0 && (
+          <p className={s.attemptNote}>
+            This will be your {ordinal(attemptCount + 1)} attempt at this quiz
+          </p>
+        )}
       </div>
     );
   }
@@ -992,9 +1056,19 @@ function QuizPanel({ topic, chapterTitle, onQuizPass }) {
         <div className={s.resultBtns}>
           <button className={s.panelBtn}
             onClick={() => { setAnswers({}); setCurrentIdx(0); setQuizTimeLeft(3600); setEvalResult(null); setPhase('question'); }}>
-            Retake Quiz
+            Re-Take Quiz
           </button>
+          {passed && onContinue && (
+            <button className={s.panelBtn} onClick={onContinue}>
+              Continue
+            </button>
+          )}
         </div>
+        {!passed && (
+          <p className={s.attemptNote}>
+            Re-taking will be your {ordinal(attemptCount + 1)} attempt at this quiz
+          </p>
+        )}
       </div>
     );
   }
@@ -1237,7 +1311,10 @@ export default function CourseDetailPage({ params }) {
   const [notes,           setNotes]           = useState([]);
   const [progressMap,     setProgressMap]     = useState({}); // topicId -> progress record
   const [quizPassedMap,   setQuizPassedMap]   = useState({}); // topicId -> true if any attempt passed
+  const [quizAttemptCounts, setQuizAttemptCounts] = useState({}); // topicId -> number of attempts made
   const [assignDoneMap,   setAssignDoneMap]   = useState({}); // topicId -> true if marked done
+  const [pendingAdvanceFrom, setPendingAdvanceFrom] = useState(null); // topicId just completed
+  const [playCommand, setPlayCommand] = useState({ n: 0, topicId: null, toggle: false }); // sidebar play-icon requests
   const [videoDurMap,     setVideoDurMap]     = useState({}); // topicId -> actual duration seconds
   const [enrolledCount,   setEnrolledCount]   = useState(0); // distinct learners assigned this course, across all orgs
 
@@ -1307,11 +1384,15 @@ export default function CourseDetailPage({ params }) {
         const attempts = toArr(quizRes);
         if (attempts.length > 0) {
           const qmap = {};
+          const counts = {};
           attempts.forEach(a => {
             const tid = String(a.topicId?._id || a.topicId || '');
-            if (tid && a.passed) qmap[tid] = true;
+            if (!tid) return;
+            counts[tid] = (counts[tid] || 0) + 1;
+            if (a.passed) qmap[tid] = true;
           });
           setQuizPassedMap(qmap);
+          setQuizAttemptCounts(counts);
         }
 
         // Load assignment-done state from localStorage
@@ -1387,23 +1468,54 @@ export default function CourseDetailPage({ params }) {
     const ch = chapters[chIdx];
     if (!ch) return false;
     const chTopics = topicsByChapter[String(ch._id)] || [];
-    const quizTopics = chTopics.filter(t => getTopicType(t) === 'quiz');
-    // A chapter unlocks the next one once its own quiz is passed — lesson-watch
-    // percentage and assignment status no longer gate progression. A chapter
-    // with no quiz has nothing to gate on, so it doesn't block the next chapter.
-    if (quizTopics.length === 0) return true;
-    return quizTopics.every(t => quizPassedMap[String(t._id)] === true);
+    // A chapter is complete only once every topic in it is done (lessons
+    // watched, quizzes passed, assignments marked done) — passing the quiz
+    // alone is not enough. This gates the next chapter and the certificate.
+    return chTopics.every(isTopicDone);
   }
   function isChapterUnlocked(chIdx) {
     return chIdx === 0 || isChapterComplete(chIdx - 1);
   }
 
+  // Once every chapter is complete the certificate is earned and the course
+  // becomes read-only — no chapter, topic or player interaction is allowed.
+  const courseFullyComplete = chapters.length > 0
+    && chapters.some(ch => (topicsByChapter[String(ch._id)] || []).length > 0)
+    && chapters.every((_, i) => isChapterComplete(i));
+
   function handleDurationLoad(topicId, secs) {
     if (topicId && secs > 0) setVideoDurMap(prev => ({ ...prev, [topicId]: secs }));
   }
 
+  // ── Topic gating (within a chapter) ───────────────────────────────────────
+  // Topics unlock strictly in order: each one opens only after every topic
+  // before it in the same chapter is done. A lesson with no video has nothing
+  // to watch, and a zoom session has no completion signal, so both count as done.
+  function isTopicDone(topic) {
+    const topId = String(topic._id);
+    const tType = getTopicType(topic);
+    if (tType === 'zoom')       return true;
+    if (tType === 'quiz')       return quizPassedMap[topId] === true;
+    if (tType === 'assignment') return assignDoneMap[topId] === true;
+    if (!topic.videoUrl)        return true;
+    return progressMap[topId]?.completed === true;
+  }
+  function isTopicUnlocked(chIdx, topId) {
+    if (!isChapterUnlocked(chIdx)) return false;
+    const ch = chapters[chIdx];
+    if (!ch) return false;
+    const chTopics = topicsByChapter[String(ch._id)] || [];
+    const idx = chTopics.findIndex(t => String(t._id) === String(topId));
+    if (idx === -1) return false;
+    return chTopics.slice(0, idx).every(isTopicDone);
+  }
+
   function handleQuizPass(topicId) {
     setQuizPassedMap(prev => ({ ...prev, [topicId]: true }));
+  }
+
+  function handleQuizAttempt(topicId) {
+    setQuizAttemptCounts(prev => ({ ...prev, [topicId]: (prev[topicId] || 0) + 1 }));
   }
 
   function handleAssignmentDone(topicId) {
@@ -1415,19 +1527,79 @@ export default function CourseDetailPage({ params }) {
       } catch { /* ignore */ }
       return next;
     });
+    setPendingAdvanceFrom(topicId);
+  }
+
+  function handleVideoEnded(topicId) {
+    // Mark the lesson done locally right away so the next topic unlocks
+    // without waiting for the progress request to round-trip.
+    setProgressMap(prev => ({
+      ...prev,
+      [topicId]: { ...(prev[topicId] || {}), topicId, completed: true, percentage: 100 },
+    }));
+    setPendingAdvanceFrom(topicId);
   }
 
   function toggleChapter(chId) {
+    if (courseFullyComplete) return;
     setExpanded(prev => ({ ...prev, [chId]: !prev[chId] }));
   }
+
+  // Sidebar play icon: plays the lesson (toggles if it's already the current one).
+  function handleTopicPlayClick(e, chIdx, chId, topic) {
+    e.stopPropagation();
+    const topId = String(topic._id);
+    if (courseFullyComplete || !isTopicUnlocked(chIdx, topId)) return;
+    const isCurrent = topId === activeTopId;
+    if (!isCurrent) selectTopic(chIdx, chId, topId);
+    if (getTopicType(topic) === 'lesson') {
+      setPlayCommand(c => ({ n: c.n + 1, topicId: topId, toggle: isCurrent, at: Date.now() }));
+    }
+  }
+
   function selectTopic(chIdx, chId, topId) {
-    if (!isChapterUnlocked(chIdx)) return;
+    if (courseFullyComplete) return;
+    if (!isTopicUnlocked(chIdx, topId)) return;
     setActiveChId(chId);
     setActiveTopId(topId);
     setPlaying(false);
     setVideoPlaying(false);
     setExpanded(prev => ({ ...prev, [chId]: true }));
   }
+
+  // Moves to the next topic in the current chapter, or to the first topic of
+  // the next chapter once this one runs out (selectTopic still enforces the
+  // chapter lock, so a not-yet-passed quiz blocks crossing into it).
+  function advanceToNextTopic(fromTopicId) {
+    const chIdx = chapters.findIndex(c => String(c._id) === activeChId);
+    if (chIdx === -1) return;
+    const chId = String(chapters[chIdx]._id);
+    const chTopics = topicsByChapter[chId] || [];
+    const idx = chTopics.findIndex(t => String(t._id) === String(fromTopicId));
+
+    if (idx !== -1 && idx + 1 < chTopics.length) {
+      selectTopic(chIdx, chId, String(chTopics[idx + 1]._id));
+      return;
+    }
+
+    const nextChIdx = chIdx + 1;
+    if (nextChIdx >= chapters.length) return;
+    const nextChId = String(chapters[nextChIdx]._id);
+    const nextChTopics = topicsByChapter[nextChId] || [];
+    if (nextChTopics.length > 0) {
+      selectTopic(nextChIdx, nextChId, String(nextChTopics[0]._id));
+    }
+  }
+
+  // Completing a topic updates the maps that gate the next one; advancing in the
+  // same handler would read the pre-update state and find the next topic still
+  // locked, so the move happens here, after the update has rendered.
+  useEffect(() => {
+    if (!pendingAdvanceFrom) return;
+    advanceToNextTopic(pendingAdvanceFrom);
+    setPendingAdvanceFrom(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingAdvanceFrom]);
 
   if (loading) {
     return <div className={s.loadingWrap}><div className={s.spinner}/></div>;
@@ -1450,11 +1622,11 @@ export default function CourseDetailPage({ params }) {
   const progValues  = videoTopics.map(t => progressMap[String(t._id)]);
   const totalProgDur = progValues.reduce((s, p) => s + (p?.durationSeconds || 0), 0);
   const totalWatched = progValues.reduce((s, p) => s + Math.min(p?.watchedSeconds || 0, p?.durationSeconds || 0), 0);
-  const overallPercent = totalProgDur > 0 ? Math.min(100, Math.round((totalWatched / totalProgDur) * 100)) : 0;
+  // A completed course (certificate earned) always reports full video progress.
+  const overallPercent = courseFullyComplete ? 100
+    : totalProgDur > 0 ? Math.min(100, Math.round((totalWatched / totalProgDur) * 100)) : 0;
   const topicType = getTopicType(activeTopic);
   const watchTitle = `Watch — ${activeTopic ? activeTopic.title : course.title}`;
-  const courseFullyComplete = chapters.length > 0 && chapters.every((_, i) => isChapterComplete(i));
-
   return (
     <div className={s.page}>
       <button className={s.backBtn} onClick={() => router.push('/learner/courses')}>
@@ -1522,13 +1694,20 @@ export default function CourseDetailPage({ params }) {
           </div>
 
           {/* Content — video / zoom / quiz / assignment — its own background card */}
-          <div className={s.contentCard}>
-            {topicType === 'zoom'       && activeTopic && <ZoomPanel topic={activeTopic}/>}
+          <div className={`${s.contentCard} ${courseFullyComplete ? s.readOnly : ''}`}
+            aria-disabled={courseFullyComplete || undefined}>
+            {topicType === 'zoom'       && activeTopic && (
+              <ZoomPanel topic={activeTopic} onContinue={() => advanceToNextTopic(activeTopId)}/>
+            )}
             {topicType === 'quiz'       && activeTopic && (
               <QuizPanel
+                key={activeTopId}
                 topic={activeTopic}
                 chapterTitle={activeChapter?.title}
                 onQuizPass={handleQuizPass}
+                onQuizAttempt={handleQuizAttempt}
+                attemptCount={quizAttemptCounts[activeTopId] || 0}
+                onContinue={() => advanceToNextTopic(activeTopId)}
               />
             )}
             {topicType === 'assignment' && activeTopic && (
@@ -1556,6 +1735,9 @@ export default function CourseDetailPage({ params }) {
                   onDurationLoad={handleDurationLoad}
                   isCompleted={topProg?.completed === true}
                   serverPct={topProg?.percentage ?? 0}
+                  onVideoEnded={() => handleVideoEnded(activeTopId)}
+                  playCommand={playCommand}
+                  courseCompleted={courseFullyComplete}
                 />
               );
             })()}
@@ -1604,7 +1786,8 @@ export default function CourseDetailPage({ params }) {
             {chapters.length > 0 ? chapters.map((ch, idx) => {
               const chId      = String(ch._id || '');
               const isActive  = chId === activeChId;
-              const isOpen    = !!expanded[chId];
+              // Completed course: show everything the learner covered, but read-only.
+              const isOpen    = courseFullyComplete || !!expanded[chId];
               const chTopics  = topicsByChapter[chId] || [];
               const topCount  = chTopics.length || Number(ch.totalTopics || 0);
               const dur       = ch.duration || (topCount > 0 ? `${topCount * 4}:00 min` : null);
@@ -1612,7 +1795,7 @@ export default function CourseDetailPage({ params }) {
               const chDone    = isChapterComplete(idx);
 
               return (
-                <div key={chId || idx} className={`${s.chapterCard} ${isActive ? s.chapterActive : ''} ${!unlocked ? s.chapterLocked : ''}`}>
+                <div key={chId || idx} className={`${s.chapterCard} ${isActive ? s.chapterActive : ''} ${!unlocked ? s.chapterLocked : ''} ${courseFullyComplete ? s.readOnly : ''}`}>
                   <div className={s.chapterHeader} onClick={() => unlocked ? toggleChapter(chId) : undefined}>
                     {!unlocked && (
                       <span className={s.chLeadLockIcon}>{Icon.lock}</span>
@@ -1656,19 +1839,24 @@ export default function CourseDetailPage({ params }) {
                         const topDur = fmtSecs(videoDurMap[topId]) || fmtDur(topic.duration_hr, topic.duration_min, topic.duration_sec);
                         const prog   = progressMap[topId];
                         const pct    = prog?.percentage ?? 0;
-                        // Per-topic completion
-                        const topicDone = tType === 'zoom'       ? true
-                                        : tType === 'quiz'       ? quizPassedMap[topId] === true
-                                        : tType === 'assignment' ? assignDoneMap[topId] === true
-                                        : prog?.completed === true;
+                        const topicDone   = isTopicDone(topic);
+                        const topicLocked = !isTopicUnlocked(idx, topId);
                         return (
                           <div key={topId}
-                            className={`${s.topicRow} ${isCurr ? s.topicActive : ''}`}
+                            className={`${s.topicRow} ${isCurr ? s.topicActive : ''} ${topicLocked ? s.topicLocked : ''}`}
+                            title={courseFullyComplete ? 'Course completed — read only'
+                                 : topicLocked ? 'Complete the previous topic to unlock' : undefined}
                             onClick={() => selectTopic(idx, chId, topId)}>
-                            <span className={`${s.topicPlayIcon} ${s['topicIcon__' + tType] || ''}`}>
-                              {topicDone && tType !== 'lesson'
-                                ? <span className={s.topicDoneCheck}>{Icon.check}</span>
-                                : getTopicIcon(topic, isCurr && videoPlaying)
+                            <span
+                              className={`${s.topicPlayIcon} ${s['topicIcon__' + tType] || ''} ${tType === 'lesson' && !topicLocked && !courseFullyComplete ? s.topicPlayClickable : ''}`}
+                              onClick={e => handleTopicPlayClick(e, idx, chId, topic)}
+                              title={tType === 'lesson' && !topicLocked && !courseFullyComplete
+                                ? (isCurr && videoPlaying ? 'Pause' : 'Play') : undefined}>
+                              {topicLocked
+                                ? <span className={s.topicLockIcon}>{Icon.lock}</span>
+                                : topicDone && tType !== 'lesson'
+                                  ? <span className={s.topicDoneCheck}>{Icon.check}</span>
+                                  : getTopicIcon(topic, isCurr && videoPlaying)
                               }
                             </span>
                             <div className={s.topicInfo}>

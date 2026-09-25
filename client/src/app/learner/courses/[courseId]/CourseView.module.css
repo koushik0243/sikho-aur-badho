@@ -9,6 +9,41 @@
 }
 
 
+
+/* Wraps video + progress bar + controls so full screen keeps the custom
+   controls (and their seek restrictions) instead of the native ones. */
+.videoPlayerRoot { width: 100%; }
+
+.videoPlayerRoot:fullscreen {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+}
+
+.videoPlayerRoot:fullscreen .videoWrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+}
+
+.videoPlayerRoot:fullscreen .videoElement {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  object-fit: contain;
+}
+
+.videoPlayerRoot:fullscreen .videoProgressWrap,
+.videoPlayerRoot:fullscreen .videoControlBar {
+  background: #fff;
+}
+
+
 .videoElement {
   width: 100%;
   aspect-ratio: 2 / 1;
@@ -796,6 +831,17 @@
 
 .panelNote {
   font-size: 13px; color: #9aa5b4; margin: 0;
+}
+
+
+
+/* "This will be your Nth attempt" — shown under the quiz start/re-take button */
+.attemptNote {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #d97706;
+  margin: 10px 0 0;
+  text-align: center;
 }
 
 
@@ -1949,6 +1995,36 @@
 
 
 .topicDoneCheck svg { width: 15px; height: 15px; }
+
+
+
+.topicPlayClickable {
+  cursor: pointer;
+  border-radius: 50%;
+  transition: transform 0.12s, color 0.12s;
+}
+
+.topicPlayClickable:hover { transform: scale(1.18); color: #047279; }
+
+
+
+/* Completed course — everything stays visible but nothing is clickable. */
+.readOnly { pointer-events: none; user-select: none; }
+
+.contentCard.readOnly { opacity: 0.75; }
+
+
+
+.topicLocked { cursor: not-allowed; opacity: 0.55; }
+
+.topicLocked:hover { background: transparent; }
+
+.topicLockIcon {
+  display: flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; color: #9aa5a5;
+}
+
+.topicLockIcon svg { width: 14px; height: 14px; margin-top: 0; }
 
 
 

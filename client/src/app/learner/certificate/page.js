@@ -274,20 +274,37 @@ function CertificatePageInner() {
   const chapterCount  = chapters.length;
   const hasData       = selectedId && !loadingData;
 
-  // A chapter unlocks the next one once its own quiz is passed (matches the
-  // gating rule in the course-player) — a chapter with no quiz has nothing to
-  // gate on. The course is complete once every chapter clears that bar.
+  // Same completion rule as the course player: a chapter is complete only when
+  // every topic in it is done, and the course only when every chapter is.
   const passedTopicIds = new Set(
     quizAttempts.filter(a => a.passed).map(a => String(a.topicId?._id || a.topicId || ''))
   );
-  const isCourseComplete = chapters.length > 0 && chapters.every(ch => {
-    const chId = String(ch._id);
-    const quizTopics = topics.filter(t =>
-      String(t.chapterId?._id || t.chapterId || '') === chId
-      && String(t.video_type || '').toLowerCase() === 'quiz'
-    );
-    return quizTopics.length === 0 || quizTopics.every(t => passedTopicIds.has(String(t._id)));
-  });
+  const progressByTopic = Object.fromEntries(
+    (Array.isArray(progress?.topics) ? progress.topics : []).map(p => [String(p.topicId), p])
+  );
+  // Assignments are marked done in the course player, which stores them here.
+  let assignDone = {};
+  try {
+    const raw = selectedId && userId ? localStorage.getItem(`lms_assign_${userId}_${selectedId}`) : null;
+    if (raw) assignDone = JSON.parse(raw) || {};
+  } catch { /* unavailable or malformed — treat as none done */ }
+
+  function isTopicDone(t) {
+    const topId = String(t._id);
+    const vt = String(t.video_type || '').toLowerCase();
+    if (vt === 'zoom_link')  return true;
+    if (vt === 'quiz')       return passedTopicIds.has(topId);
+    if (vt === 'assignment') return assignDone[topId] === true;
+    if (!t.videoUrl)         return true;
+    return progressByTopic[topId]?.completed === true;
+  }
+  const topicsInChapter = ch =>
+    topics.filter(t => String(t.chapterId?._id || t.chapterId || '') === String(ch._id));
+  const isCourseComplete = chapters.length > 0
+    && chapters.some(ch => topicsInChapter(ch).length > 0)
+    && chapters.every(ch => topicsInChapter(ch).every(isTopicDone));
+  // A completed course (certificate earned) always reports full video progress.
+  const videoPct = isCourseComplete ? 100 : overallPct;
 
   // Completion date: most recent passed quiz attempt is the best signal of
   // "when the learner actually finished" — fall back to the org-assignment
@@ -467,9 +484,9 @@ function CertificatePageInner() {
                 <span className={s.summaryLabel}>Video Progress</span>
                 <div className={s.progressWrap}>
                   <div className={s.progressTrack}>
-                    <div className={s.progressFill} style={{ width: `${overallPct}%` }}/>
+                    <div className={s.progressFill} style={{ width: `${videoPct}%` }}/>
                   </div>
-                  <span className={s.progressPct}>{overallPct}%</span>
+                  <span className={s.progressPct}>{videoPct}%</span>
                 </div>
               </div>
               <div className={s.summaryRow}>
