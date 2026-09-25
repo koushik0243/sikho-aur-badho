@@ -57,7 +57,7 @@ export const submitAttempt = async ({ userId, topicId, courseId, chapterId, answ
   }));
 
   const totalScore = Math.min(100, Math.round(evaluated.reduce((s, a) => s + a.aiScore, 0)));
-  const passed = totalScore >= 60;
+  const passed = totalScore >= 20;
 
   const attempt = await QuizAttempt.create({
     userId, topicId, courseId, chapterId,
