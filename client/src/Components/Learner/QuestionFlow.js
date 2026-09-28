@@ -29,6 +29,26 @@ export function prevUnansweredBefore(questions, answers, fromIdx) {
   return -1;
 }
 
+// Cycling variants: Next/Previous only ever land on unanswered questions, and
+// wrap past the end/start. Returns -1 when no OTHER question is unanswered.
+export function nextUnansweredCycling(questions, answers, fromIdx) {
+  const n = questions.length;
+  for (let step = 1; step < n; step++) {
+    const i = (fromIdx + step) % n;
+    if (!isQuestionAnswered(answers, questions[i])) return i;
+  }
+  return -1;
+}
+
+export function prevUnansweredCycling(questions, answers, fromIdx) {
+  const n = questions.length;
+  for (let step = 1; step < n; step++) {
+    const i = (fromIdx - step + n) % n;
+    if (!isQuestionAnswered(answers, questions[i])) return i;
+  }
+  return -1;
+}
+
 /**
  * Lists the questions still waiting for an answer, as "Q1. <question>" lines.
  * @param {{ items: {n: number, question: string}[], onClose: () => void }} props

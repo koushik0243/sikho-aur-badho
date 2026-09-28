@@ -1,6 +1,8 @@
 import OpenAI from 'openai';
 import QuizAttempt from './quiz_attempt.model.js';
 import QuizLock, { VideoLock } from './quiz_lock.model.js';
+import Topic from '../topics/topic.model.js';
+import { normalizeQuizSettings } from './quiz_settings.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -35,9 +37,21 @@ async function evaluateAnswer(questionText, userAnswer, maxScore) {
   }
 }
 
+const httpError = (status, message) => Object.assign(new Error(message), { status });
+
 export const submitAttempt = async ({ userId, topicId, courseId, chapterId, answers }) => {
   const n = answers.length;
   if (n === 0) throw new Error('No answers submitted.');
+
+  // The quiz's own settings (course builder → Settings tab) decide the rules.
+  const topic = await Topic.findById(topicId).select('quizSettings').lean();
+  const settings = normalizeQuizSettings(topic?.quizSettings);
+  if (settings.attemptsAllowed > 0) {
+    const used = await QuizAttempt.countDocuments({ userId, topicId });
+    if (used >= settings.attemptsAllowed) {
+      throw httpError(403, `No attempts left — this quiz allows ${settings.attemptsAllowed} attempt${settings.attemptsAllowed === 1 ? '' : 's'}.`);
+    }
+  }
 
   const base = Math.floor(100 / n);
   const remainder = 100 - base * n;
@@ -58,13 +72,14 @@ export const submitAttempt = async ({ userId, topicId, courseId, chapterId, answ
   }));
 
   const totalScore = Math.min(100, Math.round(evaluated.reduce((s, a) => s + a.aiScore, 0)));
-  const passed = totalScore >= 20;
+  const passed = totalScore >= settings.passingGrade;
 
   const attempt = await QuizAttempt.create({
     userId, topicId, courseId, chapterId,
     answers: evaluated,
     totalScore,
     passed,
+    passingGrade: settings.passingGrade,
     status: 'evaluated',
     evaluatedAt: new Date(),
   });

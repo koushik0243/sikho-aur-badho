@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useSelector } from 'react-redux';
 import { selectUser, selectAuthReady } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
+import { fetchCourseCompletion, recordCourseCompletion } from '../../../Components/Learner/courseCompletion';
 import s from "./Certificate.module.css";
 
 const BackArrow = (
@@ -135,6 +136,7 @@ function CertificatePageInner() {
   const [topics,         setTopics]         = useState([]);
   const [quizAttempts,   setQuizAttempts]   = useState([]);
   const [assignment,     setAssignment]     = useState(null);
+  const [completion,     setCompletion]     = useState(null); // permanent certificate record, or null
   const [loadingCourses, setLoadingCourses] = useState(true);
   const [loadingData,    setLoadingData]    = useState(false);
   const [downloading,    setDownloading]    = useState(false);
@@ -208,7 +210,7 @@ function CertificatePageInner() {
   useEffect(() => {
     if (!selectedId) {
       setCourseObj(null); setTemplate(null); setProgress(null);
-      setQuizScore(null); setChapters([]); setTopics([]); setQuizAttempts([]); setAssignment(null);
+      setQuizScore(null); setChapters([]); setTopics([]); setQuizAttempts([]); setAssignment(null); setCompletion(null);
       return;
     }
     let cancelled = false;
@@ -241,13 +243,16 @@ function CertificatePageInner() {
           setTemplate(tmplRef);
         }
 
-        const [progRes, quizRes, chRes, topicRes] = await Promise.all([
+        const [progRes, quizRes, chRes, topicRes, completionRec] = await Promise.all([
           apiServiceHandler('GET', `progress/course?courseId=${selectedId}`).catch(() => null),
           apiServiceHandler('GET', `quiz-attempt/course?courseId=${selectedId}`).catch(() => null),
           apiServiceHandler('GET', `chapter/list?courseId=${selectedId}`).catch(() => null),
           apiServiceHandler('GET', `topic/list?courseId=${selectedId}`).catch(() => null),
+          fetchCourseCompletion(selectedId),
         ]);
         if (cancelled) return;
+
+        setCompletion(completionRec);
 
         setProgress(progRes?.data ?? progRes ?? null);
         setChapters(toArr(chRes));
@@ -271,7 +276,8 @@ function CertificatePageInner() {
                       || '—';
   const overallPct    = Number(progress?.overallPercent ?? 0);
   const score         = quizScore !== null ? quizScore : overallPct;
-  const chapterCount  = chapters.length;
+  // The certificate counts the chapters the learner actually completed.
+  const chapterCount  = completion ? completion.chapterIds.length : chapters.length;
   const hasData       = selectedId && !loadingData;
 
   // Same completion rule as the course player: a chapter is complete only when
@@ -300,9 +306,21 @@ function CertificatePageInner() {
   }
   const topicsInChapter = ch =>
     topics.filter(t => String(t.chapterId?._id || t.chapterId || '') === String(ch._id));
-  const isCourseComplete = chapters.length > 0
+  const allChaptersDone = chapters.length > 0
     && chapters.some(ch => topicsInChapter(ch).length > 0)
     && chapters.every(ch => topicsInChapter(ch).every(isTopicDone));
+  // The certificate is permanent: chapters the admin adds after the learner
+  // finished the course don't take it away.
+  const isCourseComplete = !!completion || allChaptersDone;
+
+  // Finished but not yet recorded (e.g. the learner came straight here): record it.
+  const completionCourseId = completion ? String(completion.courseId) : '';
+  useEffect(() => {
+    if (!hasData || !allChaptersDone || completionCourseId === selectedId) return;
+    let cancelled = false;
+    recordCourseCompletion(selectedId).then(rec => { if (!cancelled && rec) setCompletion(rec); });
+    return () => { cancelled = true; };
+  }, [hasData, allChaptersDone, completionCourseId, selectedId]);
   // A completed course (certificate earned) always reports full video progress.
   const videoPct = isCourseComplete ? 100 : overallPct;
 
@@ -314,7 +332,7 @@ function CertificatePageInner() {
     .map(a => a.evaluatedAt || a.createdAt)
     .filter(Boolean)
     .sort((a, b) => new Date(b) - new Date(a))[0] || null;
-  const completedDate = latestPassedAttemptDate || assignment?.completedAt || assignment?.updatedAt || null;
+  const completedDate = completion?.completedAt || latestPassedAttemptDate || assignment?.completedAt || assignment?.updatedAt || null;
   const certHtml      = hasData ? buildCertHtml(template, userName, courseName, score, completedDate, chapterCount) : null;
   const canShowCertificate = hasData && isCourseComplete && !!certHtml;
   const certId        = certNumber(template?._id);

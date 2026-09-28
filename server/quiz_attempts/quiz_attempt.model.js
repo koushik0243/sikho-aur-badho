@@ -18,6 +18,7 @@ const quizAttemptSchema = new mongoose.Schema({
   answers:     [answerSchema],
   totalScore:  { type: Number, default: 0 },
   passed:      { type: Boolean, default: false },
+  passingGrade: { type: Number }, // the quiz's pass mark (%) when this attempt was marked
   status:      { type: String, enum: ['pending', 'evaluated'], default: 'evaluated' },
   evaluatedAt: { type: Date },
 }, { timestamps: true });

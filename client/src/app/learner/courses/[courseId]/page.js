@@ -6,8 +6,10 @@ import { selectUser } from '../../../../redux/slices/authSlice';
 import apiServiceHandler, { clearGetCache } from '../../../../service/apiService';
 import { API_URL } from '../../../../lib/constant';
 import useVoiceAnswer from '../../../../hooks/useVoiceAnswer';
+import { normalizeQuizSettings } from '../../../../Components/Learner/quizSettings';
+import { fetchCourseCompletion, recordCourseCompletion, completedChapterIdSet } from '../../../../Components/Learner/courseCompletion';
 import {
-  unansweredIndexes, nextUnansweredAfter, prevUnansweredBefore, UnansweredAlert,
+  unansweredIndexes, nextUnansweredCycling, prevUnansweredCycling,
 } from '../../../../Components/Learner/QuestionFlow';
 import s from "./CourseView.module.css";
 
@@ -855,6 +857,16 @@ const QRowXIcon = (
   </svg>
 );
 
+// Start screen summary of the quiz's rules (from its builder settings).
+function QuizRulesNote({ settings }) {
+  const items = [`Pass mark: ${settings.passingGrade}%`];
+  const t = settings.timeLimitSeconds;
+  if (t > 0) items.push(t < 60 ? `Time limit: ${t}s` : `Time limit: ${Math.round(t / 60)} min`);
+  if (settings.attemptsAllowed > 0) items.push(`Attempts allowed: ${settings.attemptsAllowed}`);
+  if (settings.maxQuestions > 0) items.push(`Up to ${settings.maxQuestions} questions`);
+  return <p className={s.quizRulesNote}>{items.join(' · ')}</p>;
+}
+
 function QuizVideoBlockedNote() {
   return (
     <p className={s.quizBlockedNote}>
@@ -864,7 +876,14 @@ function QuizVideoBlockedNote() {
   );
 }
 
-function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCount = 0, onContinue, onActiveChange, videoBlocked = false, onVideoConflict, onWatchLesson }) {
+function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCount = 0, isPassed = false, onContinue, onActiveChange, videoBlocked = false, onVideoConflict, onWatchLesson }) {
+  // The quiz's own rules from the course builder's Settings tab.
+  const qSettings = normalizeQuizSettings(topic.quizSettings);
+  const timeLimit = qSettings.timeLimitSeconds; // 0 = no limit
+  const attemptsLeft = qSettings.attemptsAllowed > 0
+    ? Math.max(0, qSettings.attemptsAllowed - attemptCount)
+    : Infinity;
+  const outOfAttempts = attemptsLeft <= 0;
   const [phase,       setPhase]       = useState('start');
   const [checkingLock, setCheckingLock] = useState(false);
   const [cancelNotice, setCancelNotice] = useState(false); // quiz was cancelled by a lesson video playing elsewhere
@@ -873,9 +892,9 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
   const [questions,   setQuestions]   = useState([]);
   const [currentIdx,  setCurrentIdx]  = useState(0);
   const [answers,     setAnswers]     = useState({});   // qId -> { transcript, status }
-  const [quizTimeLeft, setQuizTimeLeft] = useState(3600); // 60-minute total timer
+  const [quizElapsed, setQuizElapsed] = useState(0); // seconds spent on this attempt
+  const [submitError, setSubmitError] = useState('');
   const [evalResult,   setEvalResult]   = useState(null);
-  const [unansweredAlert, setUnansweredAlert] = useState(null); // [{ n, question }] | null
 
   // While a quiz is being taken the rest of the course is read-only — tell the
   // page so it can lock lesson playback and navigation.
@@ -886,11 +905,31 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
   }, [quizActive]);
   useEffect(() => () => onActiveChange?.(false), []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // No refreshing mid-quiz: F5 / Ctrl+F5 / Ctrl+R / Ctrl+Shift+R (Cmd+R on Mac)
+  // are swallowed, and the browser's own reload/close asks for confirmation.
+  useEffect(() => {
+    if (!quizActive) return;
+    const onKeyDown = (e) => {
+      const key = String(e.key || '').toLowerCase();
+      if (key === 'f5' || ((e.ctrlKey || e.metaKey) && key === 'r')) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    const onBeforeUnload = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('keydown', onKeyDown, true);
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true);
+      window.removeEventListener('beforeunload', onBeforeUnload);
+    };
+  }, [quizActive]);
+
   // A lesson video of this course started playing in another tab/device while
   // the quiz was running — the latest activity wins, so the quiz is abandoned.
   function cancelForVideo() {
     setPhase(p => (p === 'question' || p === 'loading' ? 'start' : p));
-    setAnswers({}); setCurrentIdx(0); setQuizTimeLeft(3600); setEvalResult(null); setUnansweredAlert(null);
+    setAnswers({}); setCurrentIdx(0); setQuizElapsed(0); setEvalResult(null);
     resetVoiceInput?.('');
     setCancelNotice(true);
   }
@@ -927,7 +966,7 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
   const {
     transcript, setTranscript,
     isRecording, recordTime, micError, isTranscribing,
-    startRecording, stopRecording, reset: resetVoiceInput, usesFallback,
+    startRecording, stopRecording, reset: resetVoiceInput, clear: clearVoiceInput, usesFallback,
   } = useVoiceAnswer();
   const answersRef     = useRef({});
   answersRef.current   = answers;
@@ -951,13 +990,17 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
   }
 
   async function beginRetake() {
+    if (outOfAttempts) return;
     if (videoBlocked || await isVideoPlayingElsewhere()) return;
-    setAnswers({}); setCurrentIdx(0); setQuizTimeLeft(3600); setEvalResult(null); setPhase('question');
+    setSubmitError('');
+    setAnswers({}); setCurrentIdx(0); setQuizElapsed(0); setEvalResult(null); setPhase('question');
   }
 
   async function startQuiz() {
+    if (outOfAttempts) return;
     if (videoBlocked || await isVideoPlayingElsewhere()) return;
     setCancelNotice(false);
+    setSubmitError('');
     setPhase('loading');
     try {
       // forLearner=true opts into the server's aptitude-level-weighted question selection
@@ -965,29 +1008,36 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
       const res = await apiServiceHandler('GET', `quiz-questions/list?quizId=${topic._id}&forLearner=true`);
       const qs  = toArr(res);
       if (qs.length === 0) { setPhase('empty'); return; }
-      const diffOrder = { beginner: 0, intermediate: 1, advanced: 2 };
-      const sorted = [...qs].sort((a, b) => {
-        const da = diffOrder[String(a.difficulty || '').toLowerCase()] ?? 1;
-        const db = diffOrder[String(b.difficulty || '').toLowerCase()] ?? 1;
-        return da - db;
-      });
-      setQuestions(sorted);
+      // The server already applied Question Order + Max Question Allowed.
+      setQuestions(qs);
       setCurrentIdx(0);
       setAnswers({});
       setEvalResult(null);
-      setQuizTimeLeft(3600);
+      setQuizElapsed(0);
       if (phaseRef.current !== 'loading') return; // cancelled while loading
       setPhase('question');
     } catch { setPhase('empty'); }
   }
 
-  // 60-minute total quiz countdown
+  // Quiz clock: counts up; with a Time Limit set, the quiz auto-submits when it runs out.
+  const quizTimeLeft = timeLimit > 0 ? Math.max(0, timeLimit - quizElapsed) : null;
   useEffect(() => {
     if (phase !== 'question') return;
-    if (quizTimeLeft <= 0) { handleTimeExpired(); return; }
-    const t = setTimeout(() => setQuizTimeLeft(n => n - 1), 1000);
+    if (timeLimit > 0 && quizElapsed >= timeLimit) { handleTimeExpired(); return; }
+    const t = setTimeout(() => setQuizElapsed(n => n + 1), 1000);
     return () => clearTimeout(t);
-  }, [phase, quizTimeLeft]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, quizElapsed]);
+
+  // Quiz Auto Start: open straight into the questions (not after a pass, and
+  // only while attempts remain). Only on first open, not after a cancel.
+  const autoStartedRef = useRef(false);
+  useEffect(() => {
+    if (autoStartedRef.current || !qSettings.quizAutoStart || isPassed || outOfAttempts) return;
+    autoStartedRef.current = true;
+    startQuiz();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Reset mic + restore saved transcript on question change (timer continues across questions)
   useEffect(() => {
@@ -1000,7 +1050,10 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
   }, [currentIdx, phase]);
 
   function fmtSecs(n) {
-    return `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
+    const h = Math.floor(n / 3600);
+    const mm = String(Math.floor((n % 3600) / 60)).padStart(2, '0');
+    const ss = String(n % 60).padStart(2, '0');
+    return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
   }
 
   function handleTimeExpired() {
@@ -1024,22 +1077,20 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
     moveOnOrSubmit(newAnswers);
   }
 
-  // Goes to the next unanswered question. With none left after this one, the
-  // quiz submits only if every question is answered; otherwise the learner is
-  // shown which ones are missing and taken to the first of them.
+  // Goes to the next unanswered question, wrapping round to the first
+  // unanswered one after the last question (skipped questions come back until
+  // they're answered). The quiz submits once every question is answered.
   function moveOnOrSubmit(answersMap) {
-    const next = nextUnansweredAfter(questions, answersMap, currentIdx);
-    if (next !== -1) { setCurrentIdx(next); return; }
-    const missing = unansweredIndexes(questions, answersMap);
-    if (missing.length === 0) { submitQuiz(questions, answersMap); return; }
-    setUnansweredAlert(missing.map(i => ({ n: i + 1, question: questions[i].question })));
-    setCurrentIdx(missing[0]);
+    if (unansweredIndexes(questions, answersMap).length === 0) { submitQuiz(questions, answersMap); return; }
+    const next = nextUnansweredCycling(questions, answersMap, currentIdx);
+    if (next !== -1) setCurrentIdx(next);
+    // else: the current question is the only one left — stay on it
   }
 
-  // Back only steps through questions that still need an answer.
+  // Back only steps through questions that still need an answer (wrapping).
   function goBack() {
     stopRecording();
-    const prev = prevUnansweredBefore(questions, answers, currentIdx);
+    const prev = prevUnansweredCycling(questions, answers, currentIdx);
     if (prev !== -1) setCurrentIdx(prev);
   }
 
@@ -1068,8 +1119,10 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
       onQuizAttempt?.(String(topic._id));
       if (result?.passed) onQuizPass?.(String(topic._id));
       setPhase('results');
-    } catch {
-      setPhase('results');
+    } catch (err) {
+      // e.g. no attempts left (403) — back to the start screen with the reason.
+      setSubmitError(err?.response?.data?.message || 'Your quiz could not be submitted. Please try again.');
+      setPhase('start');
     }
   }
 
@@ -1081,12 +1134,12 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
         <h3 className={s.panelTitle}>{topic.title}</h3>
         <p className={s.panelSub}>Complete this quiz to test your understanding of the chapter</p>
         <div className={s.startBtns}>
-          <button className={s.panelBtn} onClick={startQuiz} disabled={phase === 'loading' || checkingLock || videoBlocked}>
+          <button className={s.panelBtn} onClick={startQuiz} disabled={phase === 'loading' || checkingLock || videoBlocked || outOfAttempts}>
             {phase === 'loading' ? 'Loading…' : checkingLock ? 'Checking…' : attemptCount > 0 ? 'Re-Take Quiz' : 'Start Quiz'}
           </button>
           {onWatchLesson && (
             <button className={s.panelBtnOutline} onClick={onWatchLesson} disabled={phase === 'loading' || checkingLock}>
-              Watch Lesson
+              Re-watch Lesson
             </button>
           )}
         </div>
@@ -1097,9 +1150,16 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
             Start the quiz again when you&apos;re ready.
           </p>
         )}
-        {attemptCount > 0 && (
+        {submitError && <p className={s.quizBlockedNote}>{submitError}</p>}
+        <QuizRulesNote settings={qSettings} />
+        {outOfAttempts ? (
+          <p className={s.quizBlockedNote}>
+            You&apos;ve used all {qSettings.attemptsAllowed} attempt{qSettings.attemptsAllowed === 1 ? '' : 's'} for this quiz.
+          </p>
+        ) : attemptCount > 0 && (
           <p className={s.attemptNote}>
             This will be your {ordinal(attemptCount + 1)} attempt at this quiz
+            {Number.isFinite(attemptsLeft) ? ` (${attemptsLeft} left)` : ''}
           </p>
         )}
       </div>
@@ -1134,7 +1194,8 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
     const score       = evalResult?.totalScore ?? 0;
     const passed      = evalResult?.passed     ?? false;
     const evaluated   = evalResult?.answers    ?? [];
-    const timeTaken   = Math.max(0, 3600 - quizTimeLeft);
+    const timeTaken   = quizElapsed;
+    const passMark    = evalResult?.passingGrade ?? qSettings.passingGrade;
     const timeTakenStr = `${Math.floor(timeTaken / 60)}m ${timeTaken % 60}s`;
     const correctCount = evaluated.filter(a => a.status !== 'skipped' && a.maxScore > 0 && (a.aiScore / a.maxScore) * 100 >= 60).length;
     const chapterLabel  = chapterTitle ? `${chapterTitle} — ${topic.title}` : topic.title;
@@ -1173,7 +1234,7 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
               </div>
             </div>
 
-            <p className={s.threshold}>Pass Threshold: 60%</p>
+            <p className={s.threshold}>Pass Threshold: {passMark}%</p>
           </div>
         </div>
 
@@ -1213,9 +1274,11 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
         )}
 
         <div className={s.resultBtns}>
-          <button className={s.panelBtn} onClick={beginRetake} disabled={checkingLock || videoBlocked}>
-            {checkingLock ? 'Checking…' : 'Re-Take Quiz'}
-          </button>
+          {!outOfAttempts && (
+            <button className={s.panelBtn} onClick={beginRetake} disabled={checkingLock || videoBlocked}>
+              {checkingLock ? 'Checking…' : 'Re-Take Quiz'}
+            </button>
+          )}
           {passed && onContinue && (
             <button className={s.panelBtn} onClick={onContinue}>
               Continue
@@ -1223,11 +1286,16 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
           )}
         </div>
         {videoBlocked && <QuizVideoBlockedNote />}
-        {!passed && (
+        {!passed && (!outOfAttempts ? (
           <p className={s.attemptNote}>
             Re-taking will be your {ordinal(attemptCount + 1)} attempt at this quiz
+            {Number.isFinite(attemptsLeft) ? ` (${attemptsLeft} left)` : ''}
           </p>
-        )}
+        ) : (
+          <p className={s.quizBlockedNote}>
+            You&apos;ve used all {qSettings.attemptsAllowed} attempt{qSettings.attemptsAllowed === 1 ? '' : 's'} for this quiz.
+          </p>
+        ))}
       </div>
     );
   }
@@ -1238,13 +1306,12 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
   const qId        = String(q._id);
   const savedAns   = answers[qId];
   const isAnswered = savedAns?.status === 'answered';
-  const hasBack    = prevUnansweredBefore(questions, answers, currentIdx) !== -1;
+  const hasBack    = prevUnansweredCycling(questions, answers, currentIdx) !== -1;
   const allAnswered = unansweredIndexes(questions, answers).length === 0;
   const hasSpeech  = !!String(transcript || '').trim();
 
   return (
     <div className={s.quizVoiceWrap}>
-      <UnansweredAlert items={unansweredAlert} onClose={() => setUnansweredAlert(null)} />
       {/* Header bar */}
       <div className={s.quizVoiceHeader}>
         <div className={s.quizVoiceHeaderLeft}>
@@ -1258,29 +1325,52 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
           </span>
         </div>
         <div className={s.quizVoiceStats}>
-          <div className={s.quizVoiceStat}>
-            <span className={s.quizVoiceStatLbl}>Watch</span>
-            <span className={s.quizVoiceStatIcon}>
-              <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
-                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
-                <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd"/>
-              </svg>
-            </span>
-          </div>
-          <div className={s.quizVoiceStatDivider}/>
-          <div className={s.quizVoiceStat}>
-            <span className={s.quizVoiceStatLbl}>Time</span>
-            <span className={s.quizVoiceStatVal} style={{ color: quizTimeLeft <= 300 ? '#dc2626' : undefined }}>
-              {fmtSecs(quizTimeLeft)}
-            </span>
-          </div>
-          <div className={s.quizVoiceStatDivider}/>
-          <div className={s.quizVoiceStat}>
-            <span className={s.quizVoiceStatLbl}>Q. No</span>
-            <span className={s.quizVoiceStatVal}>Q{currentIdx + 1}/{total}</span>
-          </div>
+          {!qSettings.hideQuizTime && (
+            <>
+              <div className={s.quizVoiceStat}>
+                <span className={s.quizVoiceStatLbl}>{quizTimeLeft === null ? 'Time' : 'Time Left'}</span>
+                <span className={s.quizVoiceStatVal}
+                  style={{ color: quizTimeLeft !== null && quizTimeLeft <= 60 ? '#dc2626' : undefined }}>
+                  {fmtSecs(quizTimeLeft === null ? quizElapsed : quizTimeLeft)}
+                </span>
+              </div>
+            </>
+          )}
+          {!qSettings.hideQuestionNumber && (
+            <>
+              {/* Divider only between two visible stats */}
+              {!qSettings.hideQuizTime && <div className={s.quizVoiceStatDivider}/>}
+              <div className={s.quizVoiceStat}>
+                <span className={s.quizVoiceStatLbl}>Q. No</span>
+                <span className={s.quizVoiceStatVal}>Q{currentIdx + 1}/{total}</span>
+              </div>
+            </>
+          )}
         </div>
       </div>
+
+      {/* Question Layout = All questions: every question listed; the
+          highlighted one is answered below, unanswered ones can be picked. */}
+      {qSettings.questionLayout === 'all' && (
+        <ol className={s.quizAllList}>
+          {questions.map((qq, i) => {
+            const done = answers[String(qq._id)]?.status === 'answered';
+            const isCurrent = i === currentIdx;
+            return (
+              <li key={String(qq._id)}>
+                <button type="button"
+                  className={`${s.quizAllItem} ${isCurrent ? s.quizAllItemCurrent : ''} ${done ? s.quizAllItemDone : ''}`}
+                  disabled={done || isCurrent || isRecording || isTranscribing}
+                  onClick={() => { stopRecording(); setCurrentIdx(i); }}>
+                  {!qSettings.hideQuestionNumber && <span className={s.quizAllNum}>Q{i + 1}</span>}
+                  <span className={s.quizAllText}>{qq.question}</span>
+                  <span className={s.quizAllStatus}>{done ? 'Answered' : isCurrent ? 'Answering' : 'Pending'}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      )}
 
       {/* Question */}
       <div className={s.quizVoiceBody}>
@@ -1300,6 +1390,23 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
               <span className={s.quizTranscriptPlaceholder}>Your answer will appear here as you speak…</span>
             )}
           </div>
+
+          {!isAnswered && (
+            <div className={s.quizClearRow}>
+              <button
+                type="button"
+                className={s.quizClearBtn}
+                onClick={clearVoiceInput}
+                disabled={!hasSpeech && !isRecording && !isTranscribing}
+                title="Clear your answer and record again"
+              >
+                <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13" aria-hidden="true">
+                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd"/>
+                </svg>
+                Clear
+              </button>
+            </div>
+          )}
 
           {isAnswered ? (
             <div className={s.quizAnsweredBadge}>
@@ -1477,6 +1584,7 @@ export default function CourseDetailPage({ params }) {
   const [quizAttemptCounts, setQuizAttemptCounts] = useState({}); // topicId -> number of attempts made
   const [assignDoneMap,   setAssignDoneMap]   = useState({}); // topicId -> true if marked done
   const [pendingAdvanceFrom, setPendingAdvanceFrom] = useState(null); // topicId just completed
+  const [completion, setCompletion] = useState(null); // permanent certificate record (server), or null
   const [returnToQuiz, setReturnToQuiz] = useState(null); // { chIdx, chId, topId } — quiz to reopen after "Watch Lesson"
   const [playCommand, setPlayCommand] = useState({ n: 0, topicId: null, toggle: false }); // sidebar play-icon requests
   const [quizInProgress, setQuizInProgress] = useState(false); // a quiz is being taken — course is read-only
@@ -1497,7 +1605,7 @@ export default function CourseDetailPage({ params }) {
 
     async function load() {
       try {
-        const [courseRes, chRes, topRes, statsRes, progRes, quizRes, assignRes] = await Promise.all([
+        const [courseRes, chRes, topRes, statsRes, progRes, quizRes, assignRes, completionRec] = await Promise.all([
           apiServiceHandler('GET', `course/${courseId}`).catch(() => null),
           apiServiceHandler('GET', `chapter/list?courseId=${courseId}`).catch(() => null),
           apiServiceHandler('GET', `topic/list?courseId=${courseId}`).catch(() => null),
@@ -1506,6 +1614,7 @@ export default function CourseDetailPage({ params }) {
           apiServiceHandler('GET', `quiz-attempt/course?courseId=${courseId}`).catch(() => null),
           // No orgId filter — counts learners assigned this course across every organization
           apiServiceHandler('GET', `course-assignment/list?courseId=${courseId}`).catch(() => null),
+          fetchCourseCompletion(courseId),
         ]);
         if (cancelled) return;
 
@@ -1540,6 +1649,7 @@ export default function CourseDetailPage({ params }) {
         const progData    = progRes?.data ?? progRes;
 
         setCourse(courseData);
+        setCompletion(completionRec);
         setChapters(chapterList);
         setTopics(topicList);
         if (stats?.total !== undefined) setReviewStats(stats);
@@ -1651,9 +1761,27 @@ export default function CourseDetailPage({ params }) {
 
   // Once every chapter is complete the certificate is earned and the course
   // becomes read-only — no chapter, topic or player interaction is allowed.
-  const courseFullyComplete = chapters.length > 0
+  // The certificate is permanent: once the server holds a completion record the
+  // course stays complete, even if the admin has since added chapters — those
+  // show as inactive for this learner.
+  const allChaptersDone = chapters.length > 0
     && chapters.some(ch => (topicsByChapter[String(ch._id)] || []).length > 0)
     && chapters.every((_, i) => isChapterComplete(i));
+  const courseFullyComplete = !!completion || allChaptersDone;
+  const completedChapterIds = completedChapterIdSet(completion);
+  // A chapter the admin added after this learner earned the certificate.
+  const isChapterAddedAfterCompletion = (ch) => !!completion && !completedChapterIds.has(String(ch._id));
+
+  // First time every chapter is done: record the certificate on the server.
+  const recordingCompletionRef = useRef(false);
+  useEffect(() => {
+    if (!allChaptersDone || completion || recordingCompletionRef.current || !courseId) return;
+    recordingCompletionRef.current = true;
+    recordCourseCompletion(courseId).then(rec => {
+      if (rec) setCompletion(rec);
+      else recordingCompletionRef.current = false; // retry on the next change
+    });
+  }, [allChaptersDone, completion, courseId]);
 
   // A finished chapter closes once the learner has moved on to the next one;
   // the last chapter stays open until the whole course is complete.
@@ -1921,6 +2049,7 @@ export default function CourseDetailPage({ params }) {
   useEffect(() => {
     if (loading || placedOnCurrentRef.current || chapters.length === 0) return;
     placedOnCurrentRef.current = true;
+    if (completion) return; // certificate earned — nothing left to resume
     const chIdx = chapters.findIndex((_, i) => !isChapterComplete(i));
     if (chIdx <= 0) return; // chapter 1 is already selected, or the course is complete
     const chId = String(chapters[chIdx]._id);
@@ -2038,6 +2167,7 @@ export default function CourseDetailPage({ params }) {
                 onQuizPass={handleQuizPass}
                 onQuizAttempt={handleQuizAttempt}
                 attemptCount={quizAttemptCounts[activeTopId] || 0}
+                isPassed={quizPassedMap[activeTopId] === true}
                 onContinue={() => advanceToNextTopic(activeTopId)}
                 onActiveChange={handleQuizActiveChange}
                 videoBlocked={remoteVideoActive}
@@ -2133,7 +2263,9 @@ export default function CourseDetailPage({ params }) {
               // Still listed, but nothing can be clicked while a quiz is running.
               const chReadOnly = !chLocked && (quizInProgress || remoteQuizActive);
               const isOpen    = !chLocked && !!expanded[chId];
-              const lockTitle = courseFullyComplete ? 'Course completed'
+              const addedLater = isChapterAddedAfterCompletion(ch);
+              const lockTitle = addedLater ? 'Added after you completed this course — not available'
+                              : courseFullyComplete ? 'Course completed'
                               : isChapterClosed(idx) ? 'Chapter completed'
                               : !unlocked ? 'Complete the previous chapter to unlock' : undefined;
 
@@ -2149,6 +2281,7 @@ export default function CourseDetailPage({ params }) {
                       <span className={s.chTitle}>
                         Ch {idx + 1} &ndash; {ch.title || `Chapter ${idx + 1}`}
                       </span>
+                      {addedLater && <span className={s.chAddedLaterTag}>Added after completion</span>}
                       {(topCount > 0 || dur) && (
                         <span className={s.chMeta}>
                           {topCount > 0 ? `${topCount} topics` : ''}
@@ -2158,7 +2291,9 @@ export default function CourseDetailPage({ params }) {
                       )}
                     </div>
                     {chLocked ? (
-                      <button className={s.chActiveBtn} disabled onClick={e => e.stopPropagation()}>Active</button>
+                      <button className={s.chActiveBtn} disabled onClick={e => e.stopPropagation()}>
+                        {addedLater ? 'Inactive' : 'Active'}
+                      </button>
                     ) : (
                       <span className={s.chevronBox}>
                         {chDone ? (

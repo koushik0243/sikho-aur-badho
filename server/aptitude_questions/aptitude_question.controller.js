@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import * as AptitudeQuestionHelper from './aptitude_question.service.js';
 
 const Router = express.Router();
@@ -80,10 +81,24 @@ const updateAptitudeQuestion = async (req, res, next) => {
     }
 };
 
+const permanentDeleteAptitudeQuestion = async (req, res, next) => {
+    try {
+        if (!mongoose.isValidObjectId(req.params.id)) {
+            return res.status(400).json({ status: 400, message: "Invalid question id." });
+        }
+        const data = await AptitudeQuestionHelper.permanentDeleteQuestion(req.params.id);
+        if (!data) return res.status(404).json({ status: 404, message: "Question not found." });
+        res.status(200).json({ status: 200, message: "Question permanently deleted.", data });
+    } catch (error) {
+        next(error);
+    }
+};
+
 Router.post('/generate',       generateQuestions);
 Router.post('/create',         createAptitudeQuestion);
 Router.get('/list',            listAptitudeQuestions);
 Router.put('/attach-course',   attachCourse);
 Router.put('/update/:id',      updateAptitudeQuestion);
+Router.delete('/permanent/:id', permanentDeleteAptitudeQuestion);
 
 export default Router;

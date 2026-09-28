@@ -774,6 +774,46 @@
 
 .quizExpandLink:hover { text-decoration: underline; }
 
+/* Icon-only Expand / Collapse toggle in the QA column headers */
+.quizExpandIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: #0b7b7b;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.quizExpandIconBtn:hover { background: #e6f5f4; color: #075e5e; }
+
+.quizExpandIconBtn:focus-visible { outline: 2px solid #0b7b7b; outline-offset: 1px; }
+
+/* Permanent-delete icon after the question text in Generated QA */
+.quizQADeleteBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: #dc2626;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.quizQADeleteBtn:hover { opacity: 1; background: #fef2f2; }
+
 
 
 .quizModalLeft {
@@ -1118,6 +1158,23 @@
   margin: 2px 0;
 }
 
+/* Aptitude modal: header title left, close button far right */
+.quizModalHeaderSpread { justify-content: space-between; }
+
+/* Aptitude modal: right column fills its height so the footer sits at the bottom */
+.quizRightFormFill {
+  flex: 1;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+.quizRightFooter {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 
 
 /* ── Save Quiz button ── */
@@ -1161,6 +1218,19 @@
   overflow-y: auto;
   background: #f9fafb;
 }
+
+/* Settings tab: Close / Save Quiz under the settings cards (same width) */
+.quizSettingsFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  max-width: 660px;
+  margin: 0 auto;
+  padding: 4px 20px 20px;
+}
+
+.quizSettingsFooter .btnSaveQA,
+.quizSettingsFooter .btnCloseAptitude { width: auto; min-width: 130px; }
 
 
 

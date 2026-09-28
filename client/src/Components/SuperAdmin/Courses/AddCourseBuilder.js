@@ -9,6 +9,31 @@ import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
 import s from "./AddCourseBuilder.module.css";
 
+// A quiz's Settings tab defaults. Saved on the quiz Topic (quizSettings) and
+// applied to the learner's quiz (see server/quiz_attempts/quiz_settings.js).
+const DEFAULT_QUIZ_SETTINGS = Object.freeze({
+  timeLimit: '60', timeUnit: 'Minutes', hideQuizTime: false,
+  feedbackMode: 'retry',
+  attemptsAllowed: '20', passingGrade: '20', maxQuestions: '20',
+  basicOpen: true,
+  quizAutoStart: false, questionLayout: 'single', questionOrder: 'sequential',
+  hideQuestionNumber: false, charLimitShort: '200', charLimitEssay: '500',
+  advancedOpen: true,
+});
+
+// Expand / Collapse toggle for the QA columns: a panel with a side bar and a
+// chevron pointing out (expand) or back in (collapse).
+function PanelToggleIcon({ expanded }) {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+      strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="3" width="18" height="18" rx="3.5" />
+      <path d="M15 3v18" />
+      <path d={expanded ? 'M10.5 9.5 8 12l2.5 2.5' : 'M8 9.5 10.5 12 8 14.5'} />
+    </svg>
+  );
+}
+
 /* ── Constants ─────────────────────────────────────────────────── */
 const CHAPTER_COLORS = ['#3b82f6', '#7c3aed', '#059669', '#dc2626', '#d97706', '#0b7b7b', '#db2777', '#6d28d9'];
 const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
@@ -283,28 +308,15 @@ export default function AddCourseBuilder({ editId } = {}) {
   const [savingManualQA, setSavingManualQA] = useState(false);
   // Selected question awaiting confirmation before it's moved back to Generated QA.
   const [qaToUnselect, setQaToUnselect] = useState(null);
-  const [quizSettings, setQuizSettings] = useState({
-    timeLimit: '0', timeUnit: 'Minutes', hideQuizTime: false,
-    feedbackMode: 'retry',
-    attemptsAllowed: '10', passingGrade: '80', maxQuestions: '10',
-    basicOpen: true,
-    quizAutoStart: false, questionLayout: 'single', questionOrder: 'random',
-    hideQuestionNumber: false, charLimitShort: '200', charLimitEssay: '500',
-    advancedOpen: true,
-  });
+  // Generated QA question awaiting confirmation before it's permanently deleted.
+  const [qaToDelete, setQaToDelete] = useState(null); // { q, kind: 'quiz' | 'aptitude' } | null
+  const [deletingQA, setDeletingQA] = useState(false);
+  const [quizSettings, setQuizSettings] = useState(DEFAULT_QUIZ_SETTINGS);
 
   function openQuizModal(chIdx) {
     setQuizForm({ title: '', summary: '' });
     setQuizTab('details');
-    setQuizSettings({
-      timeLimit: '0', timeUnit: 'Minutes', hideQuizTime: false,
-      feedbackMode: 'retry',
-      attemptsAllowed: '10', passingGrade: '80', maxQuestions: '10',
-      basicOpen: true,
-      quizAutoStart: false, questionLayout: 'single', questionOrder: 'random',
-      hideQuestionNumber: false, charLimitShort: '200', charLimitEssay: '500',
-      advancedOpen: true,
-    });
+    setQuizSettings(DEFAULT_QUIZ_SETTINGS);
     setQuizQAPool([]);
     setQuizQASelected([]);
     setQuizQAHasGenerated(false);
@@ -315,6 +327,24 @@ export default function AddCourseBuilder({ editId } = {}) {
     setQuizModal(null);
     resetQAPanelState();
   }
+  // Generated QA delete icon: removes the question from the database for good.
+  async function deletePoolQuestion({ q, kind }) {
+    const id = String(q._id);
+    const endpoint = kind === 'aptitude' ? `aptitude-questions/permanent/${id}` : `quiz-questions/permanent/${id}`;
+    setDeletingQA(true);
+    try {
+      await apiServiceHandler('DELETE', endpoint);
+      if (kind === 'aptitude') setAptitudeQAPool(prev => prev.filter(x => String(x._id) !== id));
+      else setQuizQAPool(prev => prev.filter(x => String(x._id) !== id));
+      toast.success('Question deleted.');
+      setQaToDelete(null);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Could not delete the question. Please try again.');
+    } finally {
+      setDeletingQA(false);
+    }
+  }
+
   function toggleQuizQAExpand(col) {
     setQuizQAExpandedCol(prev => (prev === col ? null : col));
   }
@@ -489,6 +519,12 @@ export default function AddCourseBuilder({ editId } = {}) {
     setManualQA(EMPTY_MANUAL_QA);
   }
   function saveQuiz() {
+    const grade = Number(quizSettings.passingGrade);
+    if (!Number.isFinite(grade) || grade < 0 || grade > 100) {
+      toast.error('Passing Grade must be between 0 and 100.');
+      setQuizTab('settings');
+      return;
+    }
     const chIdx = quizModal.chIdx;
     const autoTitle = quizForm.title.trim() || `${chapters[chIdx]?.title || 'Chapter'} Quiz`;
     const chServerId = chapters[chIdx]?.serverId;
@@ -1905,9 +1941,11 @@ export default function AddCourseBuilder({ editId } = {}) {
                       {manualQAOpen ? 'Cancel' : '+ Add Question'}
                     </button>
                     {(quizQAPool.length > 0 || quizQAExpandedCol === 'pool') && (
-                      <button type="button" className={s.quizExpandLink}
-                        onClick={() => toggleQuizQAExpand('pool')}>
-                        {quizQAExpandedCol === 'pool' ? 'Collapse' : 'Expand'}
+                      <button type="button" className={s.quizExpandIconBtn}
+                        onClick={() => toggleQuizQAExpand('pool')}
+                        title={quizQAExpandedCol === 'pool' ? 'Collapse' : 'Expand'}
+                        aria-label={quizQAExpandedCol === 'pool' ? 'Collapse' : 'Expand'}>
+                        <PanelToggleIcon expanded={quizQAExpandedCol === 'pool'} />
                       </button>
                     )}
                     <span className={s.quizColBadge}>{quizQAPool.length}</span>
@@ -1967,6 +2005,13 @@ export default function AddCourseBuilder({ editId } = {}) {
                             }}>
                             <span className={s.quizQANum}>{i + 1}</span>
                             <span className={s.quizQAText}>{q.question}</span>
+                            <button type="button" className={s.quizQADeleteBtn} title="Delete permanently"
+                              aria-label="Delete question permanently"
+                              onClick={e => { e.stopPropagation(); setQaToDelete({ q, kind: 'quiz' }); }}>
+                              <svg viewBox="0 0 20 20" fill="currentColor" width="12" height="12" aria-hidden="true">
+                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd"/>
+                              </svg>
+                            </button>
                             <span className={`${s.quizQADiff} ${s[`quizQADiff_${q.difficulty}`]}`}>
                               {DIFF_LABEL[q.difficulty] || 'B'}
                             </span>
@@ -2006,9 +2051,11 @@ export default function AddCourseBuilder({ editId } = {}) {
                   <span className={s.quizColTitle}>Selected Questions</span>
                   <div className={s.quizColHeaderRight}>
                     {(quizQASelected.length > 0 || quizQAExpandedCol === 'selected') && (
-                      <button type="button" className={s.quizExpandLink}
-                        onClick={() => toggleQuizQAExpand('selected')}>
-                        {quizQAExpandedCol === 'selected' ? 'Collapse' : 'Expand'}
+                      <button type="button" className={s.quizExpandIconBtn}
+                        onClick={() => toggleQuizQAExpand('selected')}
+                        title={quizQAExpandedCol === 'selected' ? 'Collapse' : 'Expand'}
+                        aria-label={quizQAExpandedCol === 'selected' ? 'Collapse' : 'Expand'}>
+                        <PanelToggleIcon expanded={quizQAExpandedCol === 'selected'} />
                       </button>
                     )}
                     <span className={s.quizColBadge}>{quizQASelected.length}</span>
@@ -2099,7 +2146,7 @@ export default function AddCourseBuilder({ editId } = {}) {
 
               {/* ── Right: Controls ── */}
               <div className={s.quizModalRight}>
-                <div className={s.quizRightForm}>
+                <div className={`${s.quizRightForm} ${s.quizRightFormFill}`}>
 
                   <div className={s.quizRightChapterRow}>
                     <span className={s.quizRightChapterLabel}>Chapter</span>
@@ -2134,11 +2181,16 @@ export default function AddCourseBuilder({ editId } = {}) {
                     </div>
                   )}
 
-                  <div className={s.quizRightDivider} />
-
-                  <button type="button" className={s.btnSaveQA} onClick={saveQuiz}>
-                    Save Quiz
-                  </button>
+                  {/* Pinned to the bottom of the column, same as the Aptitude modal */}
+                  <div className={s.quizRightFooter}>
+                    <div className={s.quizRightDivider} />
+                    <button type="button" className={s.btnSaveQA} onClick={saveQuiz}>
+                      Save Quiz
+                    </button>
+                    <button type="button" className={s.btnCloseAptitude} onClick={closeQuizModal}>
+                      Close
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -2146,6 +2198,14 @@ export default function AddCourseBuilder({ editId } = {}) {
           ) : (
             <div className={s.quizSettingsBody}>
               {SettingsPanel()}
+              <div className={s.quizSettingsFooter}>
+                <button type="button" className={s.btnCloseAptitude} onClick={closeQuizModal}>
+                  Close
+                </button>
+                <button type="button" className={s.btnSaveQA} onClick={saveQuiz}>
+                  Save Quiz
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -2160,8 +2220,9 @@ export default function AddCourseBuilder({ editId } = {}) {
     return (
       <div className={s.modalOverlay}>
         <div className={`${s.quizModalBox} ${s.quizModalBoxWide}`}>
-          {/* Header — no tabs: the Aptitude Test has no Settings panel */}
-          <div className={s.quizModalHeader}>
+          {/* Header — no tabs: the Aptitude Test has no Settings panel. Title
+              on the left, close (×) at the far right. */}
+          <div className={`${s.quizModalHeader} ${s.quizModalHeaderSpread}`}>
             <div className={s.modalHeaderLeft}>
               <span className={s.modalType}>Aptitude Test</span>
               <span className={s.modalTypeSep}>|</span>
@@ -2188,9 +2249,11 @@ export default function AddCourseBuilder({ editId } = {}) {
                     {manualQAOpen ? 'Cancel' : '+ Add Question'}
                   </button>
                   {(aptitudeQAPool.length > 0 || quizQAExpandedCol === 'pool') && (
-                    <button type="button" className={s.quizExpandLink}
-                      onClick={() => toggleQuizQAExpand('pool')}>
-                      {quizQAExpandedCol === 'pool' ? 'Collapse' : 'Expand'}
+                    <button type="button" className={s.quizExpandIconBtn}
+                      onClick={() => toggleQuizQAExpand('pool')}
+                      title={quizQAExpandedCol === 'pool' ? 'Collapse' : 'Expand'}
+                      aria-label={quizQAExpandedCol === 'pool' ? 'Collapse' : 'Expand'}>
+                      <PanelToggleIcon expanded={quizQAExpandedCol === 'pool'} />
                     </button>
                   )}
                   <span className={s.quizColBadge}>{aptitudeQAPool.length}</span>
@@ -2250,6 +2313,13 @@ export default function AddCourseBuilder({ editId } = {}) {
                           }}>
                           <span className={s.quizQANum}>{i + 1}</span>
                           <span className={s.quizQAText}>{q.question}</span>
+                          <button type="button" className={s.quizQADeleteBtn} title="Delete permanently"
+                            aria-label="Delete question permanently"
+                            onClick={e => { e.stopPropagation(); setQaToDelete({ q, kind: 'aptitude' }); }}>
+                            <svg viewBox="0 0 20 20" fill="currentColor" width="12" height="12" aria-hidden="true">
+                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd"/>
+                            </svg>
+                          </button>
                           <span className={`${s.quizQADiff} ${s[`quizQADiff_${q.difficulty}`]}`}>
                             {DIFF_LABEL[q.difficulty] || 'B'}
                           </span>
@@ -2289,9 +2359,11 @@ export default function AddCourseBuilder({ editId } = {}) {
                 <span className={s.quizColTitle}>Selected Questions</span>
                 <div className={s.quizColHeaderRight}>
                   {(aptitudeQASelected.length > 0 || quizQAExpandedCol === 'selected') && (
-                    <button type="button" className={s.quizExpandLink}
-                      onClick={() => toggleQuizQAExpand('selected')}>
-                      {quizQAExpandedCol === 'selected' ? 'Collapse' : 'Expand'}
+                    <button type="button" className={s.quizExpandIconBtn}
+                      onClick={() => toggleQuizQAExpand('selected')}
+                      title={quizQAExpandedCol === 'selected' ? 'Collapse' : 'Expand'}
+                      aria-label={quizQAExpandedCol === 'selected' ? 'Collapse' : 'Expand'}>
+                      <PanelToggleIcon expanded={quizQAExpandedCol === 'selected'} />
                     </button>
                   )}
                   <span className={s.quizColBadge}>{aptitudeQASelected.length}</span>
@@ -2382,7 +2454,7 @@ export default function AddCourseBuilder({ editId } = {}) {
 
             {/* ── Right: Controls ── */}
             <div className={s.quizModalRight}>
-              <div className={s.quizRightForm}>
+              <div className={`${s.quizRightForm} ${s.quizRightFormFill}`}>
 
                 <div className={s.formGroup}>
                   <label className={s.label}>Context</label>
@@ -2420,15 +2492,16 @@ export default function AddCourseBuilder({ editId } = {}) {
                   </div>
                 )}
 
-                <div className={s.quizRightDivider} />
-
-                <button type="button" className={s.btnSaveQA} disabled={aptitudeSaving} onClick={saveAptitudeTest}>
-                  {aptitudeSaving ? 'Saving…' : 'Save Aptitude Test'}
-                </button>
-
-                <button type="button" className={s.btnCloseAptitude} onClick={closeAptitudeModal}>
-                  Close
-                </button>
+                {/* Pinned to the bottom of the column */}
+                <div className={s.quizRightFooter}>
+                  <div className={s.quizRightDivider} />
+                  <button type="button" className={s.btnSaveQA} disabled={aptitudeSaving} onClick={saveAptitudeTest}>
+                    {aptitudeSaving ? 'Saving…' : 'Save Aptitude Test'}
+                  </button>
+                  <button type="button" className={s.btnCloseAptitude} onClick={closeAptitudeModal}>
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -3103,7 +3176,7 @@ export default function AddCourseBuilder({ editId } = {}) {
                                           setLessonModal({ chIdx, topicName: ch.title || '(Untitled)', editIdx: item._typeIdx });
                                         } else if (item._type === 'quiz') {
                                           setQuizForm({ title: item.title, summary: item.summary || '' });
-                                          setQuizSettings({ ...item.settings });
+                                          setQuizSettings({ ...DEFAULT_QUIZ_SETTINGS, ...item.settings });
                                           setQuizTab('details');
                                           setQuizQAPool([]);
                                           setQuizQASelected([]);
@@ -3408,6 +3481,18 @@ export default function AddCourseBuilder({ editId } = {}) {
           message="Are you sure you want to delete this zoom link?"
           onConfirm={() => { removeZoom(zoomToDelete.chIdx, zoomToDelete.zIdx); setZoomToDelete(null); }}
           onCancel={() => setZoomToDelete(null)}
+        />
+      )}
+
+      {/* Permanently delete a Generated QA question */}
+      {qaToDelete && (
+        <ConfirmModal
+          show={true}
+          title="Delete Question"
+          message={`Permanently delete "${qaToDelete.q.question}"? This can't be undone.`}
+          confirmLabel={deletingQA ? 'Deleting…' : 'Delete'}
+          onConfirm={() => { if (!deletingQA) deletePoolQuestion(qaToDelete); }}
+          onCancel={() => { if (!deletingQA) setQaToDelete(null); }}
         />
       )}
 

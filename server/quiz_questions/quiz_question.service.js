@@ -8,6 +8,7 @@ import QuizQuestion from './quiz_question.model.js';
 import Topic from '../topics/topic.model.js';
 import Course from '../courses/course.model.js';
 import AptitudeAttempt from '../aptitude_attempts/aptitude_attempt.model.js';
+import { normalizeQuizSettings } from '../quiz_attempts/quiz_settings.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -287,8 +288,9 @@ export const listQuestionsForLearner = async ({ quizId, userId }) => {
       pool = pool.filter(q => selectedSet.has(String(q._id)));
     }
 
+    const settings = normalizeQuizSettings(topic?.quizSettings);
     const level = await resolveAptitudeLevel({ userId, courseId: topic?.courseId });
-    if (!level) return pool;
+    if (!level) return applyOrderAndLimit(pool, settings);
 
     const byTier = { beginner: [], intermediate: [], advanced: [] };
     for (const q of pool) {
@@ -297,7 +299,7 @@ export const listQuestionsForLearner = async ({ quizId, userId }) => {
     }
 
     const pcts = LEVEL_DIFFICULTY_SPLIT[level];
-    return DIFFICULTY_TIERS.flatMap(tier => {
+    return applyOrderAndLimit(DIFFICULTY_TIERS.flatMap(tier => {
       const available = byTier[tier].length;
       if (available === 0) return [];
       // A small selected count can round all the way down to 0 (e.g. 4 Advanced x 10% =
@@ -307,11 +309,34 @@ export const listQuestionsForLearner = async ({ quizId, userId }) => {
         ? Math.max(1, Math.round(available * pcts[tier]))
         : Math.round(available * pcts[tier]);
       return byTier[tier].slice(0, take);
-    });
+    }), settings);
   } catch (error) {
     throw error;
   }
 };
+
+// Quiz settings → Question Order + Max Question Allowed to Answer.
+// Sequential keeps the builder's order (Basic → Intermediate → Advanced);
+// Random shuffles, so a max below the pool size also picks a random subset.
+function applyOrderAndLimit(questions, settings) {
+  const rank = q => {
+    const i = DIFFICULTY_TIERS.indexOf(String(q.difficulty || '').toLowerCase());
+    return i === -1 ? 1 : i;
+  };
+  let ordered;
+  if (settings.questionOrder === 'sequential') {
+    ordered = questions.map((q, i) => ({ q, i }))
+      .sort((a, b) => rank(a.q) - rank(b.q) || a.i - b.i)
+      .map(x => x.q);
+  } else {
+    ordered = [...questions];
+    for (let i = ordered.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ordered[i], ordered[j]] = [ordered[j], ordered[i]];
+    }
+  }
+  return settings.maxQuestions > 0 ? ordered.slice(0, settings.maxQuestions) : ordered;
+}
 
 async function resolveAptitudeLevel({ userId, courseId }) {
   if (!userId || !courseId) return null;
@@ -357,4 +382,17 @@ export const deleteQuestion = async (delId) => {
   } catch (error) {
     throw error;
   }
+};
+
+// Permanent delete (Generated QA "delete" icon): removes the question document
+// and drops its id from any quiz topic's saved selection.
+export const permanentDeleteQuestion = async (delId) => {
+  const oid = new mongoose.Types.ObjectId(delId);
+  const deleted = await QuizQuestion.findOneAndDelete({ _id: oid }).lean();
+  if (!deleted) return null;
+  await Topic.updateMany(
+    { 'quizSettings.selectedQuestionIds': { $in: [oid, String(oid)] } },
+    { $pull: { 'quizSettings.selectedQuestionIds': { $in: [oid, String(oid)] } } }
+  );
+  return deleted;
 };

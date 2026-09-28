@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import * as QuizQuestionHelper from './quiz_question.service.js';
 
 const Router = express.Router();
@@ -104,6 +105,19 @@ const deleteQuizQuestion = async (req, res, next) => {
     }
 };
 
+const permanentDeleteQuizQuestion = async (req, res, next) => {
+    try {
+        if (!mongoose.isValidObjectId(req.params.id)) {
+            return res.status(400).json({ status: 400, message: "Invalid question id." });
+        }
+        const data = await QuizQuestionHelper.permanentDeleteQuestion(req.params.id);
+        if (!data) return res.status(404).json({ status: 404, message: "Question not found." });
+        res.status(200).json({ status: 200, message: "Question permanently deleted.", data });
+    } catch (error) {
+        next(error);
+    }
+};
+
 Router.post('/generate',        generateQuestions);
 Router.post('/create',          createQuizQuestion);
 Router.get('/list',             listQuizQuestions);
@@ -111,6 +125,7 @@ Router.get('/list-pagination',  listQuizQuestionsPagination);
 Router.get('/edit/:id',         editQuizQuestion);
 Router.put('/update/:id',       updateQuizQuestion);
 Router.get('/delete/:id',       deleteQuizQuestion);
+Router.delete('/permanent/:id', permanentDeleteQuizQuestion);
 Router.get('/:id',              editQuizQuestion);
 
 export default Router;

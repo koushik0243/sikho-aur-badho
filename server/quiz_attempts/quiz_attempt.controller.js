@@ -24,6 +24,7 @@ const submit = async (req, res, next) => {
     }
     res.status(200).json({ status: 200, message: 'Quiz evaluated.', data: attempt });
   } catch (error) {
+    if (error.status === 403) return res.status(403).json({ status: 403, message: error.message });
     next(error);
   }
 };

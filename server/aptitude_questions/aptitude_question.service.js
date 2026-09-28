@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import OpenAI from 'openai';
 import AptitudeQuestion from './aptitude_question.model.js';
+import Course from '../courses/course.model.js';
 
 const { ObjectId } = mongoose.Types;
 
@@ -165,4 +166,17 @@ export const updateQuestion = async (updateId, data) => {
     { $set: { ...updateFields, updatedAt: new Date() } },
     { new: true, runValidators: true }
   ).lean();
+};
+
+// Permanent delete (Generated QA "delete" icon): removes the question document
+// and drops its id from any course's saved aptitude selection.
+export const permanentDeleteQuestion = async (delId) => {
+  const oid = new ObjectId(delId);
+  const deleted = await AptitudeQuestion.findOneAndDelete({ _id: oid }).lean();
+  if (!deleted) return null;
+  await Course.updateMany(
+    { aptitudeSelectedQuestionIds: oid },
+    { $pull: { aptitudeSelectedQuestionIds: oid } }
+  );
+  return deleted;
 };
