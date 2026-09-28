@@ -47,8 +47,43 @@ const attachCourse = async (req, res, next) => {
     }
 };
 
+const DIFFICULTIES = ['beginner', 'intermediate', 'advanced'];
+
+const createAptitudeQuestion = async (req, res, next) => {
+    try {
+        const { courseId, question, answer, difficulty } = req.body;
+        if (!question || !String(question).trim() || !difficulty) {
+            return res.status(400).json({ status: 400, message: "question and difficulty are required." });
+        }
+        if (!DIFFICULTIES.includes(difficulty)) {
+            return res.status(400).json({ status: 400, message: "Invalid difficulty." });
+        }
+        const data = await AptitudeQuestionHelper.createQuestion({
+            courseId: courseId || null,
+            question: String(question).trim(),
+            answer: answer ? String(answer).trim() : '',
+            difficulty,
+        });
+        res.status(200).json({ status: 200, message: "Successfully added.", data });
+    } catch (error) {
+        next(error);
+    }
+};
+
+const updateAptitudeQuestion = async (req, res, next) => {
+    try {
+        const data = await AptitudeQuestionHelper.updateQuestion(req.params.id, req.body);
+        if (!data) return res.status(404).json({ status: 404, message: "Question not found." });
+        res.status(200).json({ status: 200, message: "Successfully updated.", data });
+    } catch (error) {
+        next(error);
+    }
+};
+
 Router.post('/generate',       generateQuestions);
+Router.post('/create',         createAptitudeQuestion);
 Router.get('/list',            listAptitudeQuestions);
 Router.put('/attach-course',   attachCourse);
+Router.put('/update/:id',      updateAptitudeQuestion);
 
 export default Router;

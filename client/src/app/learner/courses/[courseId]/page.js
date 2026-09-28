@@ -6,6 +6,9 @@ import { selectUser } from '../../../../redux/slices/authSlice';
 import apiServiceHandler, { clearGetCache } from '../../../../service/apiService';
 import { API_URL } from '../../../../lib/constant';
 import useVoiceAnswer from '../../../../hooks/useVoiceAnswer';
+import {
+  unansweredIndexes, nextUnansweredAfter, prevUnansweredBefore, UnansweredAlert,
+} from '../../../../Components/Learner/QuestionFlow';
 import s from "./CourseView.module.css";
 
 const BackArrow = (
@@ -25,10 +28,8 @@ const Icon = {
   playFill: <svg viewBox="0 0 20 20" fill="currentColor"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/></svg>,
   rewind:   <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.99 5V1l-5 5 5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h-2c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>,
   forward:  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z"/></svg>,
-  caption:  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 4H5a2 2 0 00-2 2v12a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1a2 2 0 01-2 2H7a2 2 0 01-2-2v-4a2 2 0 012-2h2a2 2 0 012 2v1zm7 0h-1.5v-.5h-2v3h2V13H18v1a2 2 0 01-2 2h-2a2 2 0 01-2-2v-4a2 2 0 012-2h2a2 2 0 012 2v1z"/></svg>,
   thumbUp:  <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z"/></svg>,
   thumbDn:  <svg viewBox="0 0 20 20" fill="currentColor"><path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.105-1.79l-.05-.025A4 4 0 0011.055 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z"/></svg>,
-  settings: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd"/></svg>,
   lock:     <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd"/></svg>,
   check:    <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>,
   chevDown: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd"/></svg>,
@@ -65,6 +66,42 @@ function fmtSecs(secs) {
   if (m > 0) return `${m}:${String(s).padStart(2, '0')} min`;
   return `${s}s`;
 }
+// ── Quiz / video activity locks ───────────────────────────────────────────────
+// Quizzes and lesson videos are mutually exclusive for a learner's course in
+// every tab and device, and the latest activity wins: starting a quiz rewinds
+// a lesson video left part-watched elsewhere, and playing a lesson video
+// cancels a quiz in progress elsewhere. A quiz can't be started while a lesson
+// video is actually playing. The active tab holds a server-side lock with a
+// heartbeat; other tabs poll it, and tabs in the same browser are also told
+// instantly over a BroadcastChannel.
+const QUIZ_LOCK_HEARTBEAT_MS = 15000;
+const QUIZ_LOCK_POLL_MS      = 10000;
+const QUIZ_LOCK_CHANNEL      = 'lms-quiz-lock';
+
+// Identifies this tab, so it can tell its own locks from another tab's.
+const TAB_ID = (() => {
+  try { if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID(); } catch { /* fall through */ }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+})();
+
+// kind: 'quiz' | 'video'
+function broadcastLock(kind, courseId, active) {
+  try {
+    const ch = new BroadcastChannel(QUIZ_LOCK_CHANNEL);
+    ch.postMessage({ kind, courseId: String(courseId), active, ownerId: TAB_ID });
+    ch.close();
+  } catch { /* BroadcastChannel unsupported — the server poll still covers it */ }
+}
+
+// Whether a quiz / a lesson video is active for this course in some OTHER tab.
+async function fetchCourseLocks(courseId) {
+  // Timestamp defeats apiServiceHandler's 60s GET cache — this must be live.
+  const res  = await apiServiceHandler('GET', `quiz-attempt/lock?courseId=${courseId}&t=${Date.now()}`);
+  const data = res?.data ?? res ?? {};
+  const isOthers = (lock) => !!lock?.active && lock.ownerId !== TAB_ID;
+  return { quiz: isOthers(data.quiz ?? data), video: isOthers(data.video) };
+}
+
 function ordinal(n) {
   const mod100 = n % 100;
   if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
@@ -81,7 +118,7 @@ function timeAgo(d) {
 }
 
 // ── VideoPlayer ───────────────────────────────────────────────────────────────
-function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange, topicId, courseId, savedPosition, onProgress, onDurationLoad, isCompleted, serverPct, onVideoEnded, playCommand, courseCompleted }) {
+function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange, topicId, courseId, savedPosition, onProgress, onDurationLoad, isCompleted, serverPct, onVideoEnded, playCommand, courseCompleted, resetSignal = 0 }) {
   const videoRef      = useRef(null);
   const containerRef  = useRef(null);
   const lastSavedRef  = useRef(0);
@@ -90,8 +127,6 @@ function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange,
   const [timeNow,  setTimeNow]  = useState(0);
   const [dur,      setDur]      = useState(0);
   const [speed,    setSpeed]    = useState(1);
-  const [captionsOn, setCaptionsOn] = useState(false);
-  const [feedback, setFeedback] = useState(null); // 'up' | 'down' | null
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
@@ -111,6 +146,10 @@ function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange,
       el.requestFullscreen?.();
     }
   }
+
+  // Unmounting (e.g. moving on to a quiz) stops playback — tell the page so it
+  // releases the video lock.
+  useEffect(() => () => onPlayStateChange?.(false), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // When topic changes: restore saved position and reset session tracking
   useEffect(() => {
@@ -175,8 +214,25 @@ function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange,
     setDur(d);
     if (d > 0) onDurationLoad?.(topicId, d);
   }
-  function handlePlay()  { setPaused(false); onPlayStateChange?.(true); }
+  function handlePlay() { setPaused(false); onPlayStateChange?.(true); }
   function handlePause() { setPaused(true); onPlayStateChange?.(false); }
+
+  // A quiz was started in another tab/device — the latest activity wins, so
+  // this viewing is abandoned: stop and go back to the start (watch % → 0).
+  // Lesson completion and best-watched progress are kept.
+  useEffect(() => {
+    if (!resetSignal) return;
+    const v = videoRef.current;
+    if (!v) return;
+    v.pause();
+    v.currentTime = 0;
+    setTimeNow(0);
+    if (topicId && courseId && v.duration) {
+      onProgress?.({ topicId, courseId, watchedSeconds: 0, durationSeconds: Math.floor(v.duration), lastPosition: 0 });
+      lastSavedRef.current = Date.now();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetSignal]);
 
   function togglePlay() {
     const v = videoRef.current;
@@ -240,6 +296,8 @@ function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange,
     : serverPct > 0 ? serverPct : Math.min(100, dur > 0 ? Math.round((maxReachedRef.current / dur) * 100) : 0);
   // Show Re-watch when video is server-completed and currently paused at start
   const showRewatch = !courseCompleted && isCompleted && paused && timeNow < 1;
+  // Re-watching a completed lesson: show how far through this viewing is.
+  const isRewatching = !courseCompleted && isCompleted && timeNow >= 1;
 
   if (videoSrc) {
     return (
@@ -263,6 +321,8 @@ function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange,
           <div className={s.watchPctBadge}>
             {courseCompleted
               ? <span className={s.watchPctCompleted}>{Icon.check} 100% watched</span>
+              : isRewatching
+              ? <span>{localPct}% re-watched</span>
               : isCompleted
               ? <span className={s.watchPctCompleted}>{Icon.check} Completed</span>
               : displayPct > 0
@@ -270,6 +330,7 @@ function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange,
                 : null
             }
           </div>
+
         </div>
 
         {/* Progress bar — below the video. Seeking is limited to the
@@ -311,27 +372,6 @@ function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange,
             <span className={s.videoTimeTxt}>{fmtT(courseCompleted ? dur : timeNow)} / {fmtT(dur)}</span>
           </div>
           <div className={s.videoControlRight}>
-            <button
-              className={`${s.videoCtrlIconBtn} ${captionsOn ? s.videoCtrlIconBtnActive : ''}`}
-              onClick={() => setCaptionsOn(v => !v)}
-              title="Captions">
-              {Icon.caption}
-            </button>
-            <button
-              className={`${s.videoCtrlIconBtn} ${feedback === 'up' ? s.videoCtrlIconBtnActive : ''}`}
-              onClick={() => setFeedback(f => f === 'up' ? null : 'up')}
-              title="Helpful">
-              {Icon.thumbUp}
-            </button>
-            <button
-              className={`${s.videoCtrlIconBtn} ${feedback === 'down' ? s.videoCtrlIconBtnActive : ''}`}
-              onClick={() => setFeedback(f => f === 'down' ? null : 'down')}
-              title="Not helpful">
-              {Icon.thumbDn}
-            </button>
-            <button className={s.videoCtrlIconBtn} title="Settings">
-              {Icon.settings}
-            </button>
             <button
               className={s.videoCtrlIconBtn}
               onClick={toggleFullscreen}
@@ -701,6 +741,18 @@ function getTopicType(topic) {
   return 'lesson';
 }
 
+// Same order the admin course builder shows: by `order`, and when two topics
+// share an order value (older courses were saved with a chapter's lesson and
+// quiz both at order 1) lessons come before quizzes, then zoom links, then
+// assignments — the builder's tie-break — instead of the server's
+// alphabetical-by-title fallback. Array.sort is stable, so remaining ties keep
+// the server's order, as the builder does.
+const TOPIC_TYPE_RANK = { lesson: 0, quiz: 1, zoom: 2, assignment: 3 };
+function compareTopics(a, b) {
+  return ((a.order ?? 9999) - (b.order ?? 9999))
+    || ((TOPIC_TYPE_RANK[getTopicType(a)] ?? 0) - (TOPIC_TYPE_RANK[getTopicType(b)] ?? 0));
+}
+
 function getTopicIcon(topic, isActive) {
   const type = getTopicType(topic);
   if (type === 'zoom')       return Icon.camera;
@@ -803,13 +855,75 @@ const QRowXIcon = (
   </svg>
 );
 
-function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCount = 0, onContinue }) {
+function QuizVideoBlockedNote() {
+  return (
+    <p className={s.quizBlockedNote}>
+      A lesson video from this course is playing in another tab or device.
+      Pause it to start the quiz.
+    </p>
+  );
+}
+
+function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCount = 0, onContinue, onActiveChange, videoBlocked = false, onVideoConflict, onWatchLesson }) {
   const [phase,       setPhase]       = useState('start');
+  const [checkingLock, setCheckingLock] = useState(false);
+  const [cancelNotice, setCancelNotice] = useState(false); // quiz was cancelled by a lesson video playing elsewhere
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
   const [questions,   setQuestions]   = useState([]);
   const [currentIdx,  setCurrentIdx]  = useState(0);
   const [answers,     setAnswers]     = useState({});   // qId -> { transcript, status }
   const [quizTimeLeft, setQuizTimeLeft] = useState(3600); // 60-minute total timer
   const [evalResult,   setEvalResult]   = useState(null);
+  const [unansweredAlert, setUnansweredAlert] = useState(null); // [{ n, question }] | null
+
+  // While a quiz is being taken the rest of the course is read-only — tell the
+  // page so it can lock lesson playback and navigation.
+  const quizActive = phase === 'loading' || phase === 'question' || phase === 'evaluating';
+  useEffect(() => {
+    onActiveChange?.(quizActive);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quizActive]);
+  useEffect(() => () => onActiveChange?.(false), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A lesson video of this course started playing in another tab/device while
+  // the quiz was running — the latest activity wins, so the quiz is abandoned.
+  function cancelForVideo() {
+    setPhase(p => (p === 'question' || p === 'loading' ? 'start' : p));
+    setAnswers({}); setCurrentIdx(0); setQuizTimeLeft(3600); setEvalResult(null); setUnansweredAlert(null);
+    resetVoiceInput?.('');
+    setCancelNotice(true);
+  }
+
+  // Same browser: the page hears the video start instantly over BroadcastChannel.
+  // (Not while evaluating — the answers are already submitted.)
+  useEffect(() => {
+    if (videoBlocked && (phase === 'question' || phase === 'loading')) cancelForVideo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoBlocked]);
+
+  // Hold the account-wide lock (other tabs/devices) for as long as the quiz runs.
+  // The server answers { cancelled: true } once a video has started elsewhere.
+  useEffect(() => {
+    const cid = String(topic.courseId?._id || topic.courseId || '');
+    if (!quizActive || !cid) return;
+    const beat = () => apiServiceHandler('POST', 'quiz-attempt/lock', { courseId: cid, topicId: topic._id, ownerId: TAB_ID })
+      .then(res => {
+        const data = res?.data ?? res;
+        if (data?.cancelled && phaseRef.current !== 'evaluating') cancelForVideo();
+      })
+      .catch(() => { /* next heartbeat retries */ });
+    beat();
+    broadcastLock('quiz', cid, true);
+    const iv = setInterval(beat, QUIZ_LOCK_HEARTBEAT_MS);
+    return () => {
+      clearInterval(iv);
+      apiServiceHandler('POST', 'quiz-attempt/unlock', { courseId: cid, ownerId: TAB_ID })
+        .catch(() => { /* the lock lapses on its own without heartbeats */ });
+      broadcastLock('quiz', cid, false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quizActive]);
   const {
     transcript, setTranscript,
     isRecording, recordTime, micError, isTranscribing,
@@ -818,7 +932,32 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
   const answersRef     = useRef({});
   answersRef.current   = answers;
 
+  // A lesson video of this course playing in another tab/device blocks the
+  // quiz. The page's poll can be up to ~10s stale, so check live before the
+  // quiz starts (and takes its own lock).
+  async function isVideoPlayingElsewhere() {
+    const cid = String(topic.courseId?._id || topic.courseId || '');
+    if (!cid) return false;
+    setCheckingLock(true);
+    try {
+      const { video } = await fetchCourseLocks(cid);
+      if (video) onVideoConflict?.();
+      return video;
+    } catch {
+      return false; // don't strand the learner on a network hiccup
+    } finally {
+      setCheckingLock(false);
+    }
+  }
+
+  async function beginRetake() {
+    if (videoBlocked || await isVideoPlayingElsewhere()) return;
+    setAnswers({}); setCurrentIdx(0); setQuizTimeLeft(3600); setEvalResult(null); setPhase('question');
+  }
+
   async function startQuiz() {
+    if (videoBlocked || await isVideoPlayingElsewhere()) return;
+    setCancelNotice(false);
     setPhase('loading');
     try {
       // forLearner=true opts into the server's aptitude-level-weighted question selection
@@ -837,6 +976,7 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
       setAnswers({});
       setEvalResult(null);
       setQuizTimeLeft(3600);
+      if (phaseRef.current !== 'loading') return; // cancelled while loading
       setPhase('question');
     } catch { setPhase('empty'); }
   }
@@ -881,26 +1021,31 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
     const saved = { status, transcript: status === 'answered' ? transcript : '' };
     const newAnswers = { ...answers, [qId]: saved };
     setAnswers(newAnswers);
-
-    if (currentIdx + 1 >= questions.length) {
-      submitQuiz(questions, newAnswers);
-    } else {
-      setCurrentIdx(i => i + 1);
-    }
+    moveOnOrSubmit(newAnswers);
   }
 
+  // Goes to the next unanswered question. With none left after this one, the
+  // quiz submits only if every question is answered; otherwise the learner is
+  // shown which ones are missing and taken to the first of them.
+  function moveOnOrSubmit(answersMap) {
+    const next = nextUnansweredAfter(questions, answersMap, currentIdx);
+    if (next !== -1) { setCurrentIdx(next); return; }
+    const missing = unansweredIndexes(questions, answersMap);
+    if (missing.length === 0) { submitQuiz(questions, answersMap); return; }
+    setUnansweredAlert(missing.map(i => ({ n: i + 1, question: questions[i].question })));
+    setCurrentIdx(missing[0]);
+  }
+
+  // Back only steps through questions that still need an answer.
   function goBack() {
     stopRecording();
-    setCurrentIdx(i => i - 1);
+    const prev = prevUnansweredBefore(questions, answers, currentIdx);
+    if (prev !== -1) setCurrentIdx(prev);
   }
 
   function goForward() {
     stopRecording();
-    if (currentIdx + 1 >= questions.length) {
-      submitQuiz(questions, answers);
-    } else {
-      setCurrentIdx(i => i + 1);
-    }
+    moveOnOrSubmit(answers);
   }
 
   async function submitQuiz(qs, allAnswers) {
@@ -935,9 +1080,23 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
         <div className={s.panelIcon} style={{ background: '#fef9e7', color: '#d97706' }}>{QuizIcon}</div>
         <h3 className={s.panelTitle}>{topic.title}</h3>
         <p className={s.panelSub}>Complete this quiz to test your understanding of the chapter</p>
-        <button className={s.panelBtn} onClick={startQuiz} disabled={phase === 'loading'}>
-          {phase === 'loading' ? 'Loading…' : attemptCount > 0 ? 'Re-Take Quiz' : 'Start Quiz'}
-        </button>
+        <div className={s.startBtns}>
+          <button className={s.panelBtn} onClick={startQuiz} disabled={phase === 'loading' || checkingLock || videoBlocked}>
+            {phase === 'loading' ? 'Loading…' : checkingLock ? 'Checking…' : attemptCount > 0 ? 'Re-Take Quiz' : 'Start Quiz'}
+          </button>
+          {onWatchLesson && (
+            <button className={s.panelBtnOutline} onClick={onWatchLesson} disabled={phase === 'loading' || checkingLock}>
+              Watch Lesson
+            </button>
+          )}
+        </div>
+        {videoBlocked && <QuizVideoBlockedNote />}
+        {cancelNotice && !videoBlocked && (
+          <p className={s.quizBlockedNote}>
+            Your quiz was cancelled because a lesson video of this course was played.
+            Start the quiz again when you&apos;re ready.
+          </p>
+        )}
         {attemptCount > 0 && (
           <p className={s.attemptNote}>
             This will be your {ordinal(attemptCount + 1)} attempt at this quiz
@@ -1054,9 +1213,8 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
         )}
 
         <div className={s.resultBtns}>
-          <button className={s.panelBtn}
-            onClick={() => { setAnswers({}); setCurrentIdx(0); setQuizTimeLeft(3600); setEvalResult(null); setPhase('question'); }}>
-            Re-Take Quiz
+          <button className={s.panelBtn} onClick={beginRetake} disabled={checkingLock || videoBlocked}>
+            {checkingLock ? 'Checking…' : 'Re-Take Quiz'}
           </button>
           {passed && onContinue && (
             <button className={s.panelBtn} onClick={onContinue}>
@@ -1064,6 +1222,7 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
             </button>
           )}
         </div>
+        {videoBlocked && <QuizVideoBlockedNote />}
         {!passed && (
           <p className={s.attemptNote}>
             Re-taking will be your {ordinal(attemptCount + 1)} attempt at this quiz
@@ -1079,10 +1238,13 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
   const qId        = String(q._id);
   const savedAns   = answers[qId];
   const isAnswered = savedAns?.status === 'answered';
-  const hasBack    = currentIdx > 0;
+  const hasBack    = prevUnansweredBefore(questions, answers, currentIdx) !== -1;
+  const allAnswered = unansweredIndexes(questions, answers).length === 0;
+  const hasSpeech  = !!String(transcript || '').trim();
 
   return (
     <div className={s.quizVoiceWrap}>
+      <UnansweredAlert items={unansweredAlert} onClose={() => setUnansweredAlert(null)} />
       {/* Header bar */}
       <div className={s.quizVoiceHeader}>
         <div className={s.quizVoiceHeaderLeft}>
@@ -1192,14 +1354,15 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
         )}
         {isAnswered ? (
           <button className={s.quizSubmitAnswerBtn} onClick={goForward}>
-            {currentIdx + 1 < total ? 'Next →' : 'Submit Quiz'}
+            {allAnswered ? 'Submit Quiz' : 'Next →'}
           </button>
         ) : (
           <>
             <button
               className={s.quizSubmitAnswerBtn}
               onClick={() => advance('answered')}
-              disabled={isRecording || isTranscribing}
+              disabled={isRecording || isTranscribing || !hasSpeech}
+              title={!hasSpeech ? 'Record your answer first' : undefined}
             >
               Submit Answer
             </button>
@@ -1314,7 +1477,13 @@ export default function CourseDetailPage({ params }) {
   const [quizAttemptCounts, setQuizAttemptCounts] = useState({}); // topicId -> number of attempts made
   const [assignDoneMap,   setAssignDoneMap]   = useState({}); // topicId -> true if marked done
   const [pendingAdvanceFrom, setPendingAdvanceFrom] = useState(null); // topicId just completed
+  const [returnToQuiz, setReturnToQuiz] = useState(null); // { chIdx, chId, topId } — quiz to reopen after "Watch Lesson"
   const [playCommand, setPlayCommand] = useState({ n: 0, topicId: null, toggle: false }); // sidebar play-icon requests
+  const [quizInProgress, setQuizInProgress] = useState(false); // a quiz is being taken — course is read-only
+  const [remoteQuizActive, setRemoteQuizActive] = useState(false); // ...in another tab or device
+  const [videoResetSignal, setVideoResetSignal] = useState(0); // bumped when a quiz starts elsewhere — rewinds the lesson
+  const [remoteVideoActive, setRemoteVideoActive] = useState(false); // a lesson video plays in another tab/device — quizzes blocked
+  const ownQuizActiveRef = useRef(false);
   const [videoDurMap,     setVideoDurMap]     = useState({}); // topicId -> actual duration seconds
   const [enrolledCount,   setEnrolledCount]   = useState(0); // distinct learners assigned this course, across all orgs
 
@@ -1407,7 +1576,9 @@ export default function CourseDetailPage({ params }) {
           const firstId     = String(chapterList[0]._id || '');
           setActiveChId(firstId);
           setExpanded({ [firstId]: true });
-          const firstTopics = topicList.filter(t => String(t.chapterId?._id || t.chapterId || '') === firstId);
+          const firstTopics = topicList
+            .filter(t => String(t.chapterId?._id || t.chapterId || '') === firstId)
+            .sort(compareTopics);
           if (firstTopics.length > 0) setActiveTopId(String(firstTopics[0]._id || ''));
         }
       } finally {
@@ -1447,13 +1618,14 @@ export default function CourseDetailPage({ params }) {
     return () => { cancelled = true; };
   }, [courseId, activeChId, activeTopId]);
 
-  // Group topics by chapterId
+  // Group topics by chapterId, in the order the admin course builder shows them
   const topicsByChapter = {};
   for (const t of topics) {
     const cid = String(t.chapterId?._id || t.chapterId || '');
     if (!topicsByChapter[cid]) topicsByChapter[cid] = [];
     topicsByChapter[cid].push(t);
   }
+  for (const cid of Object.keys(topicsByChapter)) topicsByChapter[cid].sort(compareTopics);
 
   const activeTopic   = topics.find(t => String(t._id) === activeTopId);
   const activeChapter = chapters.find(c => String(c._id) === activeChId);
@@ -1482,6 +1654,18 @@ export default function CourseDetailPage({ params }) {
   const courseFullyComplete = chapters.length > 0
     && chapters.some(ch => (topicsByChapter[String(ch._id)] || []).length > 0)
     && chapters.every((_, i) => isChapterComplete(i));
+
+  // A finished chapter closes once the learner has moved on to the next one;
+  // the last chapter stays open until the whole course is complete.
+  function isChapterClosed(chIdx) {
+    return chIdx < chapters.length - 1 && isChapterComplete(chIdx);
+  }
+  // Whether the learner can open this chapter and use its topics right now.
+  // Nothing is usable while a quiz is in progress or after the certificate is earned.
+  function isChapterInteractive(chIdx) {
+    return !courseFullyComplete && !quizInProgress && !remoteQuizActive
+      && isChapterUnlocked(chIdx) && !isChapterClosed(chIdx);
+  }
 
   function handleDurationLoad(topicId, secs) {
     if (topicId && secs > 0) setVideoDurMap(prev => ({ ...prev, [topicId]: secs }));
@@ -1540,25 +1724,49 @@ export default function CourseDetailPage({ params }) {
     setPendingAdvanceFrom(topicId);
   }
 
-  function toggleChapter(chId) {
-    if (courseFullyComplete) return;
+  function toggleChapter(chIdx, chId) {
+    if (!isChapterInteractive(chIdx)) return;
     setExpanded(prev => ({ ...prev, [chId]: !prev[chId] }));
   }
 
   // Sidebar play icon: plays the lesson (toggles if it's already the current one).
+  // Quizzes and lesson videos are mutually exclusive in the sidebar: with a
+  // quiz open (here or in another tab) the lesson links are disabled, and with
+  // a lesson video open (or playing elsewhere) the quiz links are. Moving on
+  // via Continue / auto-advance goes through selectTopic and isn't affected.
+  function sidebarBlockReason(topic) {
+    if (String(topic._id) === activeTopId) return null;
+    const tType      = getTopicType(topic);
+    const activeType = getTopicType(activeTopic);
+    if (tType === 'lesson' && (activeType === 'quiz' || remoteQuizActive)) {
+      return 'A quiz is open — lesson videos are disabled';
+    }
+    if (tType === 'quiz' && (activeType === 'lesson' || remoteVideoActive)) {
+      return 'A lesson video is open — quizzes are disabled';
+    }
+    return null;
+  }
+
+  function handleSidebarTopicClick(chIdx, chId, topic) {
+    if (sidebarBlockReason(topic)) return;
+    if (String(topic._id) !== activeTopId) setReturnToQuiz(null);
+    selectTopic(chIdx, chId, String(topic._id));
+  }
+
   function handleTopicPlayClick(e, chIdx, chId, topic) {
     e.stopPropagation();
     const topId = String(topic._id);
-    if (courseFullyComplete || !isTopicUnlocked(chIdx, topId)) return;
+    if (sidebarBlockReason(topic)) return;
+    if (!isChapterInteractive(chIdx) || !isTopicUnlocked(chIdx, topId)) return;
     const isCurrent = topId === activeTopId;
-    if (!isCurrent) selectTopic(chIdx, chId, topId);
+    if (!isCurrent) { setReturnToQuiz(null); selectTopic(chIdx, chId, topId); }
     if (getTopicType(topic) === 'lesson') {
       setPlayCommand(c => ({ n: c.n + 1, topicId: topId, toggle: isCurrent, at: Date.now() }));
     }
   }
 
   function selectTopic(chIdx, chId, topId) {
-    if (courseFullyComplete) return;
+    if (!isChapterInteractive(chIdx)) return;
     if (!isTopicUnlocked(chIdx, topId)) return;
     setActiveChId(chId);
     setActiveTopId(topId);
@@ -1570,6 +1778,29 @@ export default function CourseDetailPage({ params }) {
   // Moves to the next topic in the current chapter, or to the first topic of
   // the next chapter once this one runs out (selectTopic still enforces the
   // chapter lock, so a not-yet-passed quiz blocks crossing into it).
+  // The lesson a quiz tests: the nearest lesson before it in its chapter,
+  // else the chapter's first lesson. null when the chapter has no lesson.
+  function lessonForQuiz(quizTopId) {
+    const chIdx = chapters.findIndex(c => (topicsByChapter[String(c._id)] || []).some(t => String(t._id) === quizTopId));
+    if (chIdx === -1) return null;
+    const chId     = String(chapters[chIdx]._id);
+    const chTopics = topicsByChapter[chId] || [];
+    const qIdx     = chTopics.findIndex(t => String(t._id) === quizTopId);
+    const before   = chTopics.slice(0, qIdx).reverse().find(t => getTopicType(t) === 'lesson');
+    const lesson   = before || chTopics.find(t => getTopicType(t) === 'lesson');
+    return lesson ? { chIdx, chId, lessonId: String(lesson._id) } : null;
+  }
+
+  // "Watch Lesson" on a quiz: open and play its lesson; when the video ends
+  // the pending-advance effect brings the learner back to the quiz.
+  function watchLessonForQuiz(quizTopId) {
+    const target = lessonForQuiz(quizTopId);
+    if (!target) return;
+    setReturnToQuiz({ chIdx: target.chIdx, chId: target.chId, topId: quizTopId });
+    selectTopic(target.chIdx, target.chId, target.lessonId);
+    setPlayCommand(c => ({ n: c.n + 1, topicId: target.lessonId, toggle: false, at: Date.now() }));
+  }
+
   function advanceToNextTopic(fromTopicId) {
     const chIdx = chapters.findIndex(c => String(c._id) === activeChId);
     if (chIdx === -1) return;
@@ -1596,10 +1827,110 @@ export default function CourseDetailPage({ params }) {
   // locked, so the move happens here, after the update has rendered.
   useEffect(() => {
     if (!pendingAdvanceFrom) return;
-    advanceToNextTopic(pendingAdvanceFrom);
+    if (returnToQuiz) {
+      // The lesson was opened from a quiz's "Watch Lesson" — go back to that quiz.
+      selectTopic(returnToQuiz.chIdx, returnToQuiz.chId, returnToQuiz.topId);
+      setReturnToQuiz(null);
+    } else {
+      advanceToNextTopic(pendingAdvanceFrom);
+    }
     setPendingAdvanceFrom(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingAdvanceFrom]);
+
+  // A quiz running in this tab: the lock reported by the server/other tabs is
+  // our own, so ignore it while the quiz runs and clear it the moment it ends
+  // (otherwise "Continue" would stay blocked until the next poll).
+  // A quiz starting in another tab/device rewinds this tab's lesson video.
+  const prevRemoteQuizRef = useRef(false);
+  useEffect(() => {
+    if (remoteQuizActive && !prevRemoteQuizRef.current) setVideoResetSignal(n => n + 1);
+    prevRemoteQuizRef.current = remoteQuizActive;
+  }, [remoteQuizActive]);
+
+  function handleQuizActiveChange(active) {
+    ownQuizActiveRef.current = active;
+    setQuizInProgress(active);
+    if (!active) setRemoteQuizActive(false);
+  }
+
+  // While a lesson video plays here, hold the video lock so this course's
+  // quizzes can't be started in another tab or on another device.
+  const lessonPlaying = videoPlaying && !!activeTopId && getTopicType(activeTopic) === 'lesson';
+  useEffect(() => {
+    if (!lessonPlaying || !courseId) return;
+    const beat = () => apiServiceHandler('POST', 'quiz-attempt/video-lock', { courseId, topicId: activeTopId, ownerId: TAB_ID })
+      .catch(() => { /* next heartbeat retries */ });
+    beat();
+    broadcastLock('video', courseId, true);
+    const iv = setInterval(beat, QUIZ_LOCK_HEARTBEAT_MS);
+    return () => {
+      clearInterval(iv);
+      apiServiceHandler('POST', 'quiz-attempt/video-unlock', { courseId, ownerId: TAB_ID })
+        .catch(() => { /* the lock lapses on its own without heartbeats */ });
+      broadcastLock('video', courseId, false);
+    };
+  }, [lessonPlaying, courseId, activeTopId]);
+
+  // Watch for a quiz / a lesson video running in another tab or on another device.
+  useEffect(() => {
+    if (!courseId) return;
+    let cancelled = false;
+    async function check() {
+      if (ownQuizActiveRef.current) return;
+      try {
+        const { quiz, video } = await fetchCourseLocks(courseId);
+        if (cancelled || ownQuizActiveRef.current) return;
+        setRemoteQuizActive(quiz);
+        setRemoteVideoActive(video);
+      } catch { /* keep the last known state */ }
+    }
+    check();
+    const iv = setInterval(check, QUIZ_LOCK_POLL_MS);
+    const onFocus = () => check();
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+
+    let ch = null;
+    try {
+      ch = new BroadcastChannel(QUIZ_LOCK_CHANNEL);
+      ch.onmessage = e => {
+        const msg = e.data || {};
+        if (String(msg.courseId) !== String(courseId) || msg.ownerId === TAB_ID) return;
+        if (msg.kind === 'video') {
+          setRemoteVideoActive(!!msg.active);
+        } else if (!ownQuizActiveRef.current) {
+          setRemoteQuizActive(!!msg.active);
+        }
+      };
+    } catch { /* unsupported — polling covers it */ }
+
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+      ch?.close();
+    };
+  }, [courseId]);
+
+  // On first load, open the learner's current chapter (the first unfinished
+  // one) at its first unfinished topic — finished chapters are closed, so
+  // landing on chapter 1 would leave a returning learner on a locked chapter.
+  const placedOnCurrentRef = useRef(false);
+  useEffect(() => {
+    if (loading || placedOnCurrentRef.current || chapters.length === 0) return;
+    placedOnCurrentRef.current = true;
+    const chIdx = chapters.findIndex((_, i) => !isChapterComplete(i));
+    if (chIdx <= 0) return; // chapter 1 is already selected, or the course is complete
+    const chId = String(chapters[chIdx]._id);
+    const chTopics = topicsByChapter[chId] || [];
+    const target = chTopics.find(t => !isTopicDone(t)) || chTopics[0];
+    setActiveChId(chId);
+    setExpanded({ [chId]: true });
+    if (target) setActiveTopId(String(target._id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, chapters]);
 
   if (loading) {
     return <div className={s.loadingWrap}><div className={s.spinner}/></div>;
@@ -1708,6 +2039,10 @@ export default function CourseDetailPage({ params }) {
                 onQuizAttempt={handleQuizAttempt}
                 attemptCount={quizAttemptCounts[activeTopId] || 0}
                 onContinue={() => advanceToNextTopic(activeTopId)}
+                onActiveChange={handleQuizActiveChange}
+                videoBlocked={remoteVideoActive}
+                onWatchLesson={lessonForQuiz(activeTopId) ? () => watchLessonForQuiz(activeTopId) : undefined}
+                onVideoConflict={() => setRemoteVideoActive(true)}
               />
             )}
             {topicType === 'assignment' && activeTopic && (
@@ -1738,6 +2073,7 @@ export default function CourseDetailPage({ params }) {
                   onVideoEnded={() => handleVideoEnded(activeTopId)}
                   playCommand={playCommand}
                   courseCompleted={courseFullyComplete}
+                  resetSignal={videoResetSignal}
                 />
               );
             })()}
@@ -1786,18 +2122,27 @@ export default function CourseDetailPage({ params }) {
             {chapters.length > 0 ? chapters.map((ch, idx) => {
               const chId      = String(ch._id || '');
               const isActive  = chId === activeChId;
-              // Completed course: show everything the learner covered, but read-only.
-              const isOpen    = courseFullyComplete || !!expanded[chId];
               const chTopics  = topicsByChapter[chId] || [];
               const topCount  = chTopics.length || Number(ch.totalTopics || 0);
               const dur       = ch.duration || (topCount > 0 ? `${topCount * 4}:00 min` : null);
               const unlocked  = isChapterUnlocked(idx);
               const chDone    = isChapterComplete(idx);
+              // Shown locked and collapsed: not reached yet, finished and left
+              // behind, or the whole course is complete (certificate earned).
+              const chLocked  = !unlocked || isChapterClosed(idx) || courseFullyComplete;
+              // Still listed, but nothing can be clicked while a quiz is running.
+              const chReadOnly = !chLocked && (quizInProgress || remoteQuizActive);
+              const isOpen    = !chLocked && !!expanded[chId];
+              const lockTitle = courseFullyComplete ? 'Course completed'
+                              : isChapterClosed(idx) ? 'Chapter completed'
+                              : !unlocked ? 'Complete the previous chapter to unlock' : undefined;
 
               return (
-                <div key={chId || idx} className={`${s.chapterCard} ${isActive ? s.chapterActive : ''} ${!unlocked ? s.chapterLocked : ''} ${courseFullyComplete ? s.readOnly : ''}`}>
-                  <div className={s.chapterHeader} onClick={() => unlocked ? toggleChapter(chId) : undefined}>
-                    {!unlocked && (
+                <div key={chId || idx}
+                  className={`${s.chapterCard} ${isActive && !chLocked ? s.chapterActive : ''} ${chLocked ? s.chapterLocked : ''} ${chReadOnly ? s.readOnly : ''}`}
+                  title={lockTitle}>
+                  <div className={s.chapterHeader} onClick={() => toggleChapter(idx, chId)}>
+                    {chLocked && (
                       <span className={s.chLeadLockIcon}>{Icon.lock}</span>
                     )}
                     <div className={s.chInfo}>
@@ -1812,7 +2157,7 @@ export default function CourseDetailPage({ params }) {
                         </span>
                       )}
                     </div>
-                    {!unlocked ? (
+                    {chLocked ? (
                       <button className={s.chActiveBtn} disabled onClick={e => e.stopPropagation()}>Active</button>
                     ) : (
                       <span className={s.chevronBox}>
@@ -1827,7 +2172,7 @@ export default function CourseDetailPage({ params }) {
                     )}
                   </div>
 
-                  {unlocked && isOpen && (
+                  {isOpen && (
                     <div className={s.topicList}>
                       {chTopics.length === 0 && (
                         <p className={s.noTopicsNote}>No topics in this chapter yet.</p>
@@ -1841,17 +2186,20 @@ export default function CourseDetailPage({ params }) {
                         const pct    = prog?.percentage ?? 0;
                         const topicDone   = isTopicDone(topic);
                         const topicLocked = !isTopicUnlocked(idx, topId);
+                        const blockReason = topicLocked ? null : sidebarBlockReason(topic);
+                        const playable    = tType === 'lesson' && !topicLocked && !blockReason && !courseFullyComplete;
                         return (
                           <div key={topId}
-                            className={`${s.topicRow} ${isCurr ? s.topicActive : ''} ${topicLocked ? s.topicLocked : ''}`}
+                            className={`${s.topicRow} ${isCurr ? s.topicActive : ''} ${topicLocked ? s.topicLocked : ''} ${blockReason ? s.topicBlocked : ''}`}
                             title={courseFullyComplete ? 'Course completed — read only'
-                                 : topicLocked ? 'Complete the previous topic to unlock' : undefined}
-                            onClick={() => selectTopic(idx, chId, topId)}>
+                                 : topicLocked ? 'Complete the previous topic to unlock'
+                                 : blockReason || undefined}
+                            aria-disabled={topicLocked || !!blockReason || undefined}
+                            onClick={() => handleSidebarTopicClick(idx, chId, topic)}>
                             <span
-                              className={`${s.topicPlayIcon} ${s['topicIcon__' + tType] || ''} ${tType === 'lesson' && !topicLocked && !courseFullyComplete ? s.topicPlayClickable : ''}`}
+                              className={`${s.topicPlayIcon} ${s['topicIcon__' + tType] || ''} ${playable ? s.topicPlayClickable : ''}`}
                               onClick={e => handleTopicPlayClick(e, idx, chId, topic)}
-                              title={tType === 'lesson' && !topicLocked && !courseFullyComplete
-                                ? (isCurr && videoPlaying ? 'Pause' : 'Play') : undefined}>
+                              title={playable ? (isCurr && videoPlaying ? 'Pause' : 'Play') : undefined}>
                               {topicLocked
                                 ? <span className={s.topicLockIcon}>{Icon.lock}</span>
                                 : topicDone && tType !== 'lesson'

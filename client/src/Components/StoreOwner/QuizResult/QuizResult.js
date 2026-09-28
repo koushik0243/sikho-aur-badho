@@ -31,6 +31,24 @@ function fmtTimeOfDay(d) {
   return new Date(d).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
+function fmtDateTime(d) {
+  if (!d) return '—';
+  return `${fmtDate(d)}, ${fmtTimeOfDay(d)}`;
+}
+
+// Number each quiz's attempts oldest-first (1st, 2nd, …) and return them
+// newest-first for the dropdown.
+function numberAttempts(list) {
+  const byTime = [...list].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  const counters = {};
+  const numbered = byTime.map(a => {
+    const tid = String(a.topicId?._id || a.topicId || '');
+    counters[tid] = (counters[tid] || 0) + 1;
+    return { ...a, attemptNo: counters[tid] };
+  });
+  return numbered.reverse();
+}
+
 const DIFF_LABEL = { beginner: 'Basic', intermediate: 'Intermediate', advanced: 'Advanced' };
 
 const ChevronIcon = (
@@ -56,8 +74,8 @@ export default function QuizResult() {
   const [loadingChapters, setLoadingChapters] = useState(false);
   const [loadingResult, setLoadingResult] = useState(false);
 
-  const [attempt, setAttempt] = useState(null);
-  const [attemptCount, setAttemptCount] = useState(0);
+  const [attempts, setAttempts] = useState([]); // this learner's attempts for the chapter, newest first
+  const [selectedAttemptId, setSelectedAttemptId] = useState('');
   const [questionBank, setQuestionBank] = useState([]);
   const [searched, setSearched] = useState(false);
 
@@ -123,8 +141,8 @@ export default function QuizResult() {
   // ── Attempt + question bank for learner / course / chapter ──
   useEffect(() => {
     if (!selectedLearner || !selectedCourse || !selectedChapter) {
-      setAttempt(null);
-      setAttemptCount(0);
+      setAttempts([]);
+      setSelectedAttemptId('');
       setQuestionBank([]);
       setSearched(false);
       return;
@@ -134,7 +152,8 @@ export default function QuizResult() {
     setSearched(true);
     async function loadResult() {
       try {
-        const res = await apiServiceHandler('GET', `quiz-attempt/course-all?courseId=${selectedCourse}`).catch(() => null);
+        // Timestamp defeats apiServiceHandler's 60s GET cache so new attempts show up.
+        const res = await apiServiceHandler('GET', `quiz-attempt/course-all?courseId=${selectedCourse}&t=${Date.now()}`).catch(() => null);
         if (cancelled) return;
         const all = toArr(res);
         const matches = all.filter(a => {
@@ -144,21 +163,9 @@ export default function QuizResult() {
           if (cid !== selectedChapter) return false;
           return true;
         });
-        setAttemptCount(matches.length);
-        const latest = matches[0] || null;
-        setAttempt(latest);
-
-        if (latest) {
-          const topicId = String(latest.topicId?._id || latest.topicId || '');
-          if (topicId) {
-            const qRes = await apiServiceHandler('GET', `quiz-questions/list?quizId=${topicId}`).catch(() => null);
-            if (!cancelled) setQuestionBank(toArr(qRes));
-          } else if (!cancelled) {
-            setQuestionBank([]);
-          }
-        } else if (!cancelled) {
-          setQuestionBank([]);
-        }
+        const numbered = numberAttempts(matches);
+        setAttempts(numbered);
+        setSelectedAttemptId(numbered[0] ? String(numbered[0]._id) : '');
       } finally {
         if (!cancelled) setLoadingResult(false);
       }
@@ -166,6 +173,24 @@ export default function QuizResult() {
     loadResult();
     return () => { cancelled = true; };
   }, [selectedLearner, selectedCourse, selectedChapter]);
+
+  const attempt = attempts.find(a => String(a._id) === selectedAttemptId) || null;
+  const attemptTopicId = attempt ? String(attempt.topicId?._id || attempt.topicId || '') : '';
+  const attemptsForTopic = attempt
+    ? attempts.filter(a => String(a.topicId?._id || a.topicId || '') === attemptTopicId).length
+    : 0;
+  // The chapter may hold more than one quiz — then the dropdown names the quiz too.
+  const multipleQuizzes = new Set(attempts.map(a => String(a.topicId?._id || a.topicId || ''))).size > 1;
+
+  // ── Question bank (reference answers) for the selected attempt's quiz ──
+  useEffect(() => {
+    if (!attemptTopicId) { setQuestionBank([]); return; }
+    let cancelled = false;
+    apiServiceHandler('GET', `quiz-questions/list?quizId=${attemptTopicId}`)
+      .then(res => { if (!cancelled) setQuestionBank(toArr(res)); })
+      .catch(() => { if (!cancelled) setQuestionBank([]); });
+    return () => { cancelled = true; };
+  }, [attemptTopicId]);
 
   const activeCourse = coursesForDrop.find(c => c._id === selectedCourse);
   const activeLearner = learners.find(l => String(l._id) === selectedLearner);
@@ -258,6 +283,32 @@ export default function QuizResult() {
               <span className={s.selectArrow}>{ChevronIcon}</span>
             </div>
           </div>
+
+          <div className={s.filterGroup}>
+            <label className={s.filterLabel}>Attempt</label>
+            <div className={s.selectWrap}>
+              <select
+                className={s.select}
+                value={selectedAttemptId}
+                onChange={e => setSelectedAttemptId(e.target.value)}
+                disabled={!selectedChapter || !selectedLearner || loadingResult || attempts.length === 0}
+              >
+                {attempts.length === 0 && (
+                  <option value="">
+                    {loadingResult ? 'Loading attempts…' : selectedChapter && selectedLearner ? 'No attempts' : '— Select an attempt —'}
+                  </option>
+                )}
+                {attempts.map(a => (
+                  <option key={String(a._id)} value={String(a._id)}>
+                    Attempt {a.attemptNo} – {fmtDateTime(a.createdAt)}
+                    {multipleQuizzes && a.topicId?.title ? ` (${a.topicId.title})` : ''}
+                    {a.passed ? ' · Passed' : ' · Failed'}
+                  </option>
+                ))}
+              </select>
+              <span className={s.selectArrow}>{ChevronIcon}</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -295,13 +346,14 @@ export default function QuizResult() {
       {/* ── Result ── */}
       {selectedLearner && selectedCourse && selectedChapter && !loadingResult && attempt && (
         <>
-          {attemptCount > 1 && (
+          {attemptsForTopic > 1 && (
             <div className={s.attemptsBanner}>
               <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
               </svg>
-              Showing latest of {attemptCount} attempt{attemptCount > 1 ? 's' : ''} by {learnerName}
-              {' '}for this chapter
+              Showing attempt {attempt.attemptNo} of {attemptsForTopic} by {learnerName}
+              {' '}for this quiz{attempt.attemptNo === attemptsForTopic ? ' (latest)' : ''}
+              {' '}— pick another attempt from the Attempt dropdown
             </div>
           )}
 

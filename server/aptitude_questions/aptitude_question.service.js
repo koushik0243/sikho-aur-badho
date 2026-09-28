@@ -137,3 +137,32 @@ export const attachCourseId = async (ids, courseId) => {
     throw error;
   }
 };
+
+// A hand-written question added by an admin in the course builder. courseId is
+// optional: like generated questions, it's attached on "Save Aptitude Test".
+export const createQuestion = async (data) => {
+  return await new AptitudeQuestion({
+    courseId: data.courseId && ObjectId.isValid(data.courseId) ? data.courseId : null,
+    question: data.question,
+    answer: data.answer || '',
+    difficulty: data.difficulty,
+    explanation: data.explanation || '',
+    status: 'active',
+  }).save();
+};
+
+export const updateQuestion = async (updateId, data) => {
+  const fields = ['question', 'answer', 'difficulty', 'explanation', 'status'];
+  const updateFields = {};
+  for (const field of fields) {
+    if (data[field] !== undefined) updateFields[field] = data[field];
+  }
+  if (Object.keys(updateFields).length === 0) {
+    return await AptitudeQuestion.findOne({ _id: updateId, deletedAt: null }).lean();
+  }
+  return await AptitudeQuestion.findOneAndUpdate(
+    { _id: updateId, deletedAt: null },
+    { $set: { ...updateFields, updatedAt: new Date() } },
+    { new: true, runValidators: true }
+  ).lean();
+};

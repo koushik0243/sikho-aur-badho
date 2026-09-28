@@ -10,6 +10,8 @@
 
 
 
+
+
 /* Wraps video + progress bar + controls so full screen keeps the custom
    controls (and their seek restrictions) instead of the native ones. */
 .videoPlayerRoot { width: 100%; }
@@ -844,6 +846,20 @@
   text-align: center;
 }
 
+/* Quiz start blocked because a lesson video plays in another tab/device */
+.quizBlockedNote {
+  max-width: 360px;
+  margin: 12px auto 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  text-align: center;
+}
+
 
 
 /* ─── Inner centered layout for Quiz start/empty and Assignment panels ── */
@@ -895,6 +911,30 @@
 
 
 .panelBtn:hover { opacity: 0.88; }
+
+/* Quiz start screen: Start Quiz + Watch Lesson side by side */
+.startBtns {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.panelBtnOutline {
+  display: inline-block;
+  padding: 11px 30px;
+  background: #fff;
+  color: #047279;
+  border: 1.5px solid #047279;
+  border-radius: 9px;
+  font-size: 15px; font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.panelBtnOutline:hover:not(:disabled) { background: #e6f4f3; }
+
+.panelBtnOutline:disabled { opacity: 0.5; cursor: not-allowed; }
 
 
 
@@ -2018,6 +2058,10 @@
 .topicLocked { cursor: not-allowed; opacity: 0.55; }
 
 .topicLocked:hover { background: transparent; }
+
+/* Quiz ↔ lesson video exclusivity: shown read-only, not clickable */
+.topicBlocked { cursor: not-allowed; opacity: 0.45; }
+.topicBlocked:hover { background: transparent; }
 
 .topicLockIcon {
   display: flex; align-items: center; justify-content: center;

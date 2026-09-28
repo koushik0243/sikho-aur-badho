@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import QuizAttempt from './quiz_attempt.model.js';
+import QuizLock, { VideoLock } from './quiz_lock.model.js';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -97,3 +98,52 @@ export const getAttemptsByCourseAdmin = async ({ courseId }) => {
     .sort({ createdAt: -1 })
     .lean();
 };
+
+// ── Quiz / video activity locks ──────────────────────────────────────────────
+// The holding tab heartbeats every ~15s; a lock that misses a few beats lapses.
+export const QUIZ_LOCK_TTL_MS = 45 * 1000;
+
+const acquireLock = (Model, { userId, courseId, topicId, ownerId }) => Model.findOneAndUpdate(
+  { userId, courseId },
+  { userId, courseId, topicId, ownerId: ownerId || null, expiresAt: new Date(Date.now() + QUIZ_LOCK_TTL_MS) },
+  { upsert: true, new: true, setDefaultsOnInsert: true }
+).lean();
+
+// With ownerId, only that tab's lock is released — another tab may have taken
+// it over since.
+const releaseLock = (Model, { userId, courseId, ownerId }) =>
+  Model.deleteOne(ownerId ? { userId, courseId, ownerId } : { userId, courseId });
+
+// Active lock for this learner + course, or null. The TTL index only sweeps
+// about once a minute, so expiry is also checked here.
+const getLock = (Model, { userId, courseId }) =>
+  Model.findOne({ userId, courseId, expiresAt: { $gt: new Date() } })
+    .select('topicId ownerId expiresAt createdAt')
+    .lean();
+
+export const acquireQuizLock  = (args) => acquireLock(QuizLock, args);
+export const releaseQuizLock  = (args) => releaseLock(QuizLock, args);
+export const getQuizLock      = (args) => getLock(QuizLock, args);
+
+// Quiz heartbeat. The most recent activity wins: if a lesson video of this
+// course started playing in another tab/device after the quiz began, the quiz
+// is cancelled — its lock is dropped and { cancelled: true } is returned so
+// the quiz tab resets.
+export const heartbeatQuizLock = async ({ userId, courseId, topicId, ownerId }) => {
+  const [quizLock, videoLock] = await Promise.all([
+    getLock(QuizLock, { userId, courseId }),
+    getLock(VideoLock, { userId, courseId }),
+  ]);
+  const videoElsewhere = videoLock && (!ownerId || videoLock.ownerId !== ownerId);
+  const quizStartedAt  = quizLock?.createdAt ? new Date(quizLock.createdAt).getTime() : Date.now();
+  if (videoElsewhere && new Date(videoLock.createdAt).getTime() >= quizStartedAt - 1000) {
+    await releaseLock(QuizLock, { userId, courseId, ownerId });
+    return { cancelled: true };
+  }
+  const lock = await acquireLock(QuizLock, { userId, courseId, topicId, ownerId });
+  return { cancelled: false, lock };
+};
+
+export const acquireVideoLock = (args) => acquireLock(VideoLock, args);
+export const releaseVideoLock = (args) => releaseLock(VideoLock, args);
+export const getVideoLock     = (args) => getLock(VideoLock, args);

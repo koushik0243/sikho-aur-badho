@@ -269,6 +269,20 @@ export default function AddCourseBuilder({ editId } = {}) {
   const [quizQAHasGenerated, setQuizQAHasGenerated] = useState(false);
   const [quizQALoading, setQuizQALoading] = useState(false);
   const [expandedQIds, setExpandedQIds] = useState(new Set());
+  // Which quiz-modal QA column is expanded to full width ('pool' | 'selected' | null).
+  // The expanded column shows every answer and the other column is hidden.
+  const [quizQAExpandedCol, setQuizQAExpandedCol] = useState(null);
+  // Inline answer editing in "Selected Questions" (answer only — the question stays fixed).
+  const [editingAnswerId, setEditingAnswerId] = useState(null);
+  const [editingAnswerText, setEditingAnswerText] = useState('');
+  const [savingAnswer, setSavingAnswer] = useState(false);
+  // Hand-written question form in "Generated QA".
+  const EMPTY_MANUAL_QA = { question: '', answer: '', difficulty: 'beginner' };
+  const [manualQAOpen, setManualQAOpen] = useState(false);
+  const [manualQA, setManualQA] = useState(EMPTY_MANUAL_QA);
+  const [savingManualQA, setSavingManualQA] = useState(false);
+  // Selected question awaiting confirmation before it's moved back to Generated QA.
+  const [qaToUnselect, setQaToUnselect] = useState(null);
   const [quizSettings, setQuizSettings] = useState({
     timeLimit: '0', timeUnit: 'Minutes', hideQuizTime: false,
     feedbackMode: 'retry',
@@ -297,7 +311,13 @@ export default function AddCourseBuilder({ editId } = {}) {
     setExpandedQIds(new Set());
     setQuizModal({ chIdx, topicName: chapters[chIdx]?.title || 'demo' });
   }
-  function closeQuizModal() { setQuizModal(null); }
+  function closeQuizModal() {
+    setQuizModal(null);
+    resetQAPanelState();
+  }
+  function toggleQuizQAExpand(col) {
+    setQuizQAExpandedCol(prev => (prev === col ? null : col));
+  }
   function setQuizField(key, val) { setQuizForm(prev => ({ ...prev, [key]: val })); }
   function setQS(key, val) { setQuizSettings(prev => ({ ...prev, [key]: val })); }
 
@@ -318,6 +338,43 @@ export default function AddCourseBuilder({ editId } = {}) {
     }
   }
 
+  // Questions belong to a quiz topic, so the topic must exist before any question
+  // can be generated or added by hand — create it on first use.
+  async function ensureQuizServerId(chIdx, chServerId) {
+    const existing = quizModal.editIdx != null
+      ? chapters[chIdx].quizzes?.[quizModal.editIdx]?.serverId
+      : null;
+    if (existing) return existing;
+
+    const autoTitle = quizForm.title.trim() || `${chapters[chIdx]?.title || 'Chapter'} Quiz`;
+    const order = nextChapterTopicOrder(chIdx);
+    const saveRes = await apiServiceHandler('POST', 'topic/create', {
+      courseId, chapterId: chServerId,
+      title: autoTitle,
+      desc: quizForm.summary || '',
+      video_type: 'quiz',
+      quizSettings: { ...quizSettings },
+      order, isPreview: false, status: 'active',
+    });
+    const quizServerId = saveRes?.data?._id;
+    if (!quizServerId) throw new Error('Failed to create quiz topic.');
+    const newEditIdx = chapters[chIdx].quizzes?.length || 0;
+    const newQuiz = {
+      _id: Date.now(),
+      serverId: quizServerId,
+      title: autoTitle,
+      summary: quizForm.summary || '',
+      settings: { ...quizSettings },
+    };
+    setChapters(prev => {
+      const c = [...prev];
+      c[chIdx] = { ...c[chIdx], quizzes: [...(c[chIdx].quizzes || []), newQuiz] };
+      return c;
+    });
+    setQuizModal(prev => ({ ...prev, editIdx: newEditIdx }));
+    return quizServerId;
+  }
+
   async function generateQuizQA() {
     const chIdx = quizModal.chIdx;
     const chServerId = chapters[chIdx]?.serverId;
@@ -325,39 +382,7 @@ export default function AddCourseBuilder({ editId } = {}) {
 
     setQuizQAGenerating(true);
     try {
-      let quizServerId = quizModal.editIdx != null
-        ? chapters[chIdx].quizzes?.[quizModal.editIdx]?.serverId
-        : null;
-
-      const autoTitle = quizForm.title.trim() || `${chapters[chIdx]?.title || 'Chapter'} Quiz`;
-
-      if (!quizServerId) {
-        const order = nextChapterTopicOrder(chIdx);
-        const saveRes = await apiServiceHandler('POST', 'topic/create', {
-          courseId, chapterId: chServerId,
-          title: autoTitle,
-          desc: quizForm.summary || '',
-          video_type: 'quiz',
-          quizSettings: { ...quizSettings },
-          order, isPreview: false, status: 'active',
-        });
-        quizServerId = saveRes?.data?._id;
-        if (!quizServerId) throw new Error('Failed to create quiz topic.');
-        const newEditIdx = chapters[chIdx].quizzes?.length || 0;
-        const newQuiz = {
-          _id: Date.now(),
-          serverId: quizServerId,
-          title: autoTitle,
-          summary: quizForm.summary || '',
-          settings: { ...quizSettings },
-        };
-        setChapters(prev => {
-          const c = [...prev];
-          c[chIdx] = { ...c[chIdx], quizzes: [...(c[chIdx].quizzes || []), newQuiz] };
-          return c;
-        });
-        setQuizModal(prev => ({ ...prev, editIdx: newEditIdx }));
-      }
+      const quizServerId = await ensureQuizServerId(chIdx, chServerId);
 
       const res = await apiServiceHandler('POST', 'quiz-questions/generate', {
         courseId,
@@ -382,6 +407,86 @@ export default function AddCourseBuilder({ editId } = {}) {
     } finally {
       setQuizQAGenerating(false);
     }
+  }
+
+  // The Quiz and Aptitude Test modals share one QA layout; `kind` picks which
+  // question API and which pool/selected lists these handlers act on.
+  // (Only one of the two modals can be open, so the UI state is shared.)
+  async function saveManualQA(kind) {
+    const question = manualQA.question.trim();
+    const answer = manualQA.answer.trim();
+    if (!question) { toast.error('Question is required.'); return; }
+    if (!answer) { toast.error('Answer is required.'); return; }
+
+    setSavingManualQA(true);
+    try {
+      let created;
+      if (kind === 'aptitude') {
+        // courseId may still be null for a new course — questions are attached
+        // to it on "Save Aptitude Test", same as generated ones.
+        const res = await apiServiceHandler('POST', 'aptitude-questions/create', {
+          courseId: courseId || null, question, answer, difficulty: manualQA.difficulty,
+        });
+        created = res?.data;
+        if (!created?._id) throw new Error('Failed to add question.');
+        setAptitudeQAPool(prev => sortByDifficulty([...prev, created]));
+        setAptitudeQAHasGenerated(true);
+      } else {
+        const chIdx = quizModal.chIdx;
+        const chServerId = chapters[chIdx]?.serverId;
+        if (!chServerId) { toast.error('Please save the chapter first.'); return; }
+        const quizServerId = await ensureQuizServerId(chIdx, chServerId);
+        const res = await apiServiceHandler('POST', 'quiz-questions/create', {
+          courseId, chapterId: chServerId, quizId: quizServerId,
+          question, answer, difficulty: manualQA.difficulty,
+        });
+        created = res?.data;
+        if (!created?._id) throw new Error('Failed to add question.');
+        setQuizQAPool(prev => sortByDifficulty([...prev, created]));
+        setQuizQAHasGenerated(true);
+      }
+      setManualQA(EMPTY_MANUAL_QA);
+      setManualQAOpen(false);
+      toast.success('Question added.');
+    } catch (err) {
+      toast.error(err?.message || 'Failed to add question.');
+    } finally {
+      setSavingManualQA(false);
+    }
+  }
+
+  function startEditAnswer(q) {
+    setEditingAnswerId(String(q._id));
+    setEditingAnswerText(q.answer || '');
+  }
+
+  async function saveEditedAnswer(kind) {
+    const id = editingAnswerId;
+    const answer = editingAnswerText.trim();
+    if (!id) return;
+    if (!answer) { toast.error('Answer cannot be empty.'); return; }
+    setSavingAnswer(true);
+    try {
+      const endpoint = kind === 'aptitude' ? 'aptitude-questions' : 'quiz-questions';
+      await apiServiceHandler('PUT', `${endpoint}/update/${id}`, { answer });
+      const patch = list => list.map(q => (String(q._id) === id ? { ...q, answer } : q));
+      if (kind === 'aptitude') setAptitudeQASelected(patch);
+      else setQuizQASelected(patch);
+      setEditingAnswerId(null);
+      toast.success('Answer updated.');
+    } catch (err) {
+      toast.error(err?.message || 'Failed to update answer.');
+    } finally {
+      setSavingAnswer(false);
+    }
+  }
+
+  // Clears the shared QA-panel UI state when either modal opens or closes.
+  function resetQAPanelState() {
+    setQuizQAExpandedCol(null);
+    setEditingAnswerId(null);
+    setManualQAOpen(false);
+    setManualQA(EMPTY_MANUAL_QA);
   }
   function saveQuiz() {
     const chIdx = quizModal.chIdx;
@@ -445,12 +550,13 @@ export default function AddCourseBuilder({ editId } = {}) {
   const [aptitudeLoadedOnce, setAptitudeLoadedOnce] = useState(false);
 
   function openAptitudeModal() {
+    resetQAPanelState();
     setAptitudeModalOpen(true);
     if (courseId && !aptitudeLoadedOnce) {
       loadAptitudeQA();
     }
   }
-  function closeAptitudeModal() { setAptitudeModalOpen(false); }
+  function closeAptitudeModal() { setAptitudeModalOpen(false); resetQAPanelState(); }
 
   async function loadAptitudeQA(overrideCourseId, overrideSelectedIds) {
     const cId = overrideCourseId || courseId;
@@ -1757,7 +1863,7 @@ export default function AddCourseBuilder({ editId } = {}) {
 
     return (
       <div className={s.modalOverlay}>
-        <div className={s.quizModalBox}>
+        <div className={`${s.quizModalBox} ${s.quizModalBoxWide}`}>
           {/* Header */}
           <div className={s.quizModalHeader}>
             <div className={s.modalHeaderLeft}>
@@ -1786,15 +1892,60 @@ export default function AddCourseBuilder({ editId } = {}) {
 
           {/* Body */}
           {quizTab === 'details' ? (
-            <div className={s.quizDetailsBody}>
+            <div className={`${s.quizDetailsBody} ${quizQAExpandedCol ? s.quizDetailsBodyExpanded : ''}`}>
 
               {/* ── Left: Generated QA pool ── */}
+              {quizQAExpandedCol !== 'selected' && (
               <div className={s.quizModalLeft}>
                 <div className={s.quizColHeader}>
                   <span className={s.quizColTitle}>Generated QA</span>
-                  <span className={s.quizColBadge}>{quizQAPool.length}</span>
+                  <div className={s.quizColHeaderRight}>
+                    <button type="button" className={s.quizExpandLink}
+                      onClick={() => setManualQAOpen(o => !o)}>
+                      {manualQAOpen ? 'Cancel' : '+ Add Question'}
+                    </button>
+                    {(quizQAPool.length > 0 || quizQAExpandedCol === 'pool') && (
+                      <button type="button" className={s.quizExpandLink}
+                        onClick={() => toggleQuizQAExpand('pool')}>
+                        {quizQAExpandedCol === 'pool' ? 'Collapse' : 'Expand'}
+                      </button>
+                    )}
+                    <span className={s.quizColBadge}>{quizQAPool.length}</span>
+                  </div>
                 </div>
                 <div className={s.quizQAList}>
+                  {manualQAOpen && (
+                    <div className={s.manualQAForm}>
+                      <label className={s.manualQALabel}>Question</label>
+                      <textarea className={s.manualQAInput} rows={2}
+                        placeholder="Type your question"
+                        value={manualQA.question}
+                        onChange={e => setManualQA(p => ({ ...p, question: e.target.value }))} />
+                      <label className={s.manualQALabel}>Answer</label>
+                      <textarea className={s.manualQAInput} rows={3}
+                        placeholder="Type the expected answer"
+                        value={manualQA.answer}
+                        onChange={e => setManualQA(p => ({ ...p, answer: e.target.value }))} />
+                      <label className={s.manualQALabel}>Difficulty</label>
+                      <select className={s.manualQAInput}
+                        value={manualQA.difficulty}
+                        onChange={e => setManualQA(p => ({ ...p, difficulty: e.target.value }))}>
+                        {Object.entries(DIFF_LABEL).map(([val, label]) => (
+                          <option key={val} value={val}>{label}</option>
+                        ))}
+                      </select>
+                      <div className={s.manualQAActions}>
+                        <button type="button" className={s.manualQACancel}
+                          onClick={() => { setManualQAOpen(false); setManualQA(EMPTY_MANUAL_QA); }}>
+                          Cancel
+                        </button>
+                        <button type="button" className={s.manualQASave}
+                          disabled={savingManualQA} onClick={() => saveManualQA('quiz')}>
+                          {savingManualQA ? 'Adding…' : 'Add Question'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   {quizQALoading ? (
                     <div className={s.quizQAEmpty}>Loading questions…</div>
                   ) : quizQAPool.length === 0 ? (
@@ -1806,7 +1957,7 @@ export default function AddCourseBuilder({ editId } = {}) {
                   ) : (
                     quizQAPool.map((q, i) => {
                       const id = String(q._id);
-                      const open = expandedQIds.has(id);
+                      const open = quizQAExpandedCol === 'pool' || expandedQIds.has(id);
                       return (
                         <div key={id} className={s.quizQAAccordion}>
                           <div className={s.quizQAAccordionHead}
@@ -1846,12 +1997,22 @@ export default function AddCourseBuilder({ editId } = {}) {
                   )}
                 </div>
               </div>
+              )}
 
               {/* ── Middle: Selected QA ── */}
+              {quizQAExpandedCol !== 'pool' && (
               <div className={s.quizModalMiddle}>
                 <div className={s.quizColHeader}>
                   <span className={s.quizColTitle}>Selected Questions</span>
-                  <span className={s.quizColBadge}>{quizQASelected.length}</span>
+                  <div className={s.quizColHeaderRight}>
+                    {(quizQASelected.length > 0 || quizQAExpandedCol === 'selected') && (
+                      <button type="button" className={s.quizExpandLink}
+                        onClick={() => toggleQuizQAExpand('selected')}>
+                        {quizQAExpandedCol === 'selected' ? 'Collapse' : 'Expand'}
+                      </button>
+                    )}
+                    <span className={s.quizColBadge}>{quizQASelected.length}</span>
+                  </div>
                 </div>
                 <div className={s.quizQAList}>
                   {quizQASelected.length === 0 ? (
@@ -1869,16 +2030,24 @@ export default function AddCourseBuilder({ editId } = {}) {
                   ) : (
                     quizQASelected.map((q, i) => {
                       const id = String(q._id);
-                      const open = expandedQIds.has(id);
+                      const open = quizQAExpandedCol === 'selected' || expandedQIds.has(id);
                       return (
                         <div key={id} className={`${s.quizQAAccordion} ${s.quizQAAccordionSel}`}>
                           <div className={s.quizQAAccordionHead}
                             onClick={() => {
-                              setQuizQASelected(prev => prev.filter(x => String(x._id) !== id));
-                              setQuizQAPool(prev => sortByDifficulty([...prev, q]));
+                              if (editingAnswerId === id) return; // don't drop a question mid-edit
+                              setQaToUnselect({ q, kind: 'quiz' }); // moved back only after the admin confirms
                             }}>
                             <span className={s.quizQANum}>{i + 1}</span>
-                            <span className={s.quizQAText}>{q.question}</span>
+                            <span className={s.quizQAText}>
+                              {q.question}
+                              <button type="button" className={s.quizQAEditBtn} title="Edit answer"
+                                onClick={e => { e.stopPropagation(); startEditAnswer(q); }}>
+                                <svg viewBox="0 0 20 20" fill="currentColor" width="12" height="12">
+                                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                                </svg>
+                              </button>
+                            </span>
                             <span className={`${s.quizQADiff} ${s[`quizQADiff_${q.difficulty}`]}`}>
                               {DIFF_LABEL[q.difficulty] || 'B'}
                             </span>
@@ -1897,7 +2066,24 @@ export default function AddCourseBuilder({ editId } = {}) {
                               </svg>
                             </button>
                           </div>
-                          {open && q.answer && (
+                          {editingAnswerId === id ? (
+                            <div className={s.quizQAAccordionBody}>
+                              <span className={s.quizQAAnswerLabel}>Answer</span>
+                              <textarea className={s.manualQAInput} rows={4} autoFocus
+                                value={editingAnswerText}
+                                onChange={e => setEditingAnswerText(e.target.value)} />
+                              <div className={s.manualQAActions}>
+                                <button type="button" className={s.manualQACancel}
+                                  disabled={savingAnswer} onClick={() => setEditingAnswerId(null)}>
+                                  Cancel
+                                </button>
+                                <button type="button" className={s.manualQASave}
+                                  disabled={savingAnswer} onClick={() => saveEditedAnswer('quiz')}>
+                                  {savingAnswer ? 'Updating…' : 'Update Answer'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : open && q.answer && (
                             <div className={s.quizQAAccordionBody}>
                               <span className={s.quizQAAnswerLabel}>Answer</span>
                               <p className={s.quizQAAnswer}>{q.answer}</p>
@@ -1909,6 +2095,7 @@ export default function AddCourseBuilder({ editId } = {}) {
                   )}
                 </div>
               </div>
+              )}
 
               {/* ── Right: Controls ── */}
               <div className={s.quizModalRight}>
@@ -1972,7 +2159,7 @@ export default function AddCourseBuilder({ editId } = {}) {
 
     return (
       <div className={s.modalOverlay}>
-        <div className={s.quizModalBox}>
+        <div className={`${s.quizModalBox} ${s.quizModalBoxWide}`}>
           {/* Header — no tabs: the Aptitude Test has no Settings panel */}
           <div className={s.quizModalHeader}>
             <div className={s.modalHeaderLeft}>
@@ -1988,15 +2175,60 @@ export default function AddCourseBuilder({ editId } = {}) {
           </div>
 
           {/* Body */}
-          <div className={s.quizDetailsBody}>
+          <div className={`${s.quizDetailsBody} ${quizQAExpandedCol ? s.quizDetailsBodyExpanded : ''}`}>
 
             {/* ── Left: Generated QA pool ── */}
+            {quizQAExpandedCol !== 'selected' && (
             <div className={s.quizModalLeft}>
               <div className={s.quizColHeader}>
                 <span className={s.quizColTitle}>Generated QA</span>
-                <span className={s.quizColBadge}>{aptitudeQAPool.length}</span>
+                <div className={s.quizColHeaderRight}>
+                  <button type="button" className={s.quizExpandLink}
+                    onClick={() => setManualQAOpen(o => !o)}>
+                    {manualQAOpen ? 'Cancel' : '+ Add Question'}
+                  </button>
+                  {(aptitudeQAPool.length > 0 || quizQAExpandedCol === 'pool') && (
+                    <button type="button" className={s.quizExpandLink}
+                      onClick={() => toggleQuizQAExpand('pool')}>
+                      {quizQAExpandedCol === 'pool' ? 'Collapse' : 'Expand'}
+                    </button>
+                  )}
+                  <span className={s.quizColBadge}>{aptitudeQAPool.length}</span>
+                </div>
               </div>
               <div className={s.quizQAList}>
+                {manualQAOpen && (
+                  <div className={s.manualQAForm}>
+                    <label className={s.manualQALabel}>Question</label>
+                    <textarea className={s.manualQAInput} rows={2}
+                      placeholder="Type your question"
+                      value={manualQA.question}
+                      onChange={e => setManualQA(p => ({ ...p, question: e.target.value }))} />
+                    <label className={s.manualQALabel}>Answer</label>
+                    <textarea className={s.manualQAInput} rows={3}
+                      placeholder="Type the expected answer"
+                      value={manualQA.answer}
+                      onChange={e => setManualQA(p => ({ ...p, answer: e.target.value }))} />
+                    <label className={s.manualQALabel}>Difficulty</label>
+                    <select className={s.manualQAInput}
+                      value={manualQA.difficulty}
+                      onChange={e => setManualQA(p => ({ ...p, difficulty: e.target.value }))}>
+                      {Object.entries(DIFF_LABEL).map(([val, label]) => (
+                        <option key={val} value={val}>{label}</option>
+                      ))}
+                    </select>
+                    <div className={s.manualQAActions}>
+                      <button type="button" className={s.manualQACancel}
+                        onClick={() => { setManualQAOpen(false); setManualQA(EMPTY_MANUAL_QA); }}>
+                        Cancel
+                      </button>
+                      <button type="button" className={s.manualQASave}
+                        disabled={savingManualQA} onClick={() => saveManualQA('aptitude')}>
+                        {savingManualQA ? 'Adding…' : 'Add Question'}
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {aptitudeQALoading ? (
                   <div className={s.quizQAEmpty}>Loading questions…</div>
                 ) : aptitudeQAPool.length === 0 ? (
@@ -2008,7 +2240,7 @@ export default function AddCourseBuilder({ editId } = {}) {
                 ) : (
                   aptitudeQAPool.map((q, i) => {
                     const id = String(q._id);
-                    const open = expandedAptitudeQIds.has(id);
+                    const open = quizQAExpandedCol === 'pool' || expandedAptitudeQIds.has(id);
                     return (
                       <div key={id} className={s.quizQAAccordion}>
                         <div className={s.quizQAAccordionHead}
@@ -2048,12 +2280,22 @@ export default function AddCourseBuilder({ editId } = {}) {
                 )}
               </div>
             </div>
+            )}
 
             {/* ── Middle: Selected QA ── */}
+            {quizQAExpandedCol !== 'pool' && (
             <div className={s.quizModalMiddle}>
               <div className={s.quizColHeader}>
                 <span className={s.quizColTitle}>Selected Questions</span>
-                <span className={s.quizColBadge}>{aptitudeQASelected.length}</span>
+                <div className={s.quizColHeaderRight}>
+                  {(aptitudeQASelected.length > 0 || quizQAExpandedCol === 'selected') && (
+                    <button type="button" className={s.quizExpandLink}
+                      onClick={() => toggleQuizQAExpand('selected')}>
+                      {quizQAExpandedCol === 'selected' ? 'Collapse' : 'Expand'}
+                    </button>
+                  )}
+                  <span className={s.quizColBadge}>{aptitudeQASelected.length}</span>
+                </div>
               </div>
               <div className={s.quizQAList}>
                 {aptitudeQASelected.length === 0 ? (
@@ -2071,16 +2313,24 @@ export default function AddCourseBuilder({ editId } = {}) {
                 ) : (
                   aptitudeQASelected.map((q, i) => {
                     const id = String(q._id);
-                    const open = expandedAptitudeQIds.has(id);
+                    const open = quizQAExpandedCol === 'selected' || expandedAptitudeQIds.has(id);
                     return (
                       <div key={id} className={`${s.quizQAAccordion} ${s.quizQAAccordionSel}`}>
                         <div className={s.quizQAAccordionHead}
                           onClick={() => {
-                            setAptitudeQASelected(prev => prev.filter(x => String(x._id) !== id));
-                            setAptitudeQAPool(prev => sortByDifficulty([...prev, q]));
+                            if (editingAnswerId === id) return; // don't drop a question mid-edit
+                            setQaToUnselect({ q, kind: 'aptitude' }); // moved back only after the admin confirms
                           }}>
                           <span className={s.quizQANum}>{i + 1}</span>
-                          <span className={s.quizQAText}>{q.question}</span>
+                          <span className={s.quizQAText}>
+                            {q.question}
+                            <button type="button" className={s.quizQAEditBtn} title="Edit answer"
+                              onClick={e => { e.stopPropagation(); startEditAnswer(q); }}>
+                              <svg viewBox="0 0 20 20" fill="currentColor" width="12" height="12">
+                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                              </svg>
+                            </button>
+                          </span>
                           <span className={`${s.quizQADiff} ${s[`quizQADiff_${q.difficulty}`]}`}>
                             {DIFF_LABEL[q.difficulty] || 'B'}
                           </span>
@@ -2099,7 +2349,24 @@ export default function AddCourseBuilder({ editId } = {}) {
                             </svg>
                           </button>
                         </div>
-                        {open && q.answer && (
+                        {editingAnswerId === id ? (
+                          <div className={s.quizQAAccordionBody}>
+                            <span className={s.quizQAAnswerLabel}>Answer</span>
+                            <textarea className={s.manualQAInput} rows={4} autoFocus
+                              value={editingAnswerText}
+                              onChange={e => setEditingAnswerText(e.target.value)} />
+                            <div className={s.manualQAActions}>
+                              <button type="button" className={s.manualQACancel}
+                                disabled={savingAnswer} onClick={() => setEditingAnswerId(null)}>
+                                Cancel
+                              </button>
+                              <button type="button" className={s.manualQASave}
+                                disabled={savingAnswer} onClick={() => saveEditedAnswer('aptitude')}>
+                                {savingAnswer ? 'Updating…' : 'Update Answer'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : open && q.answer && (
                           <div className={s.quizQAAccordionBody}>
                             <span className={s.quizQAAnswerLabel}>Answer</span>
                             <p className={s.quizQAAnswer}>{q.answer}</p>
@@ -2111,6 +2378,7 @@ export default function AddCourseBuilder({ editId } = {}) {
                 )}
               </div>
             </div>
+            )}
 
             {/* ── Right: Controls ── */}
             <div className={s.quizModalRight}>
@@ -3140,6 +3408,29 @@ export default function AddCourseBuilder({ editId } = {}) {
           message="Are you sure you want to delete this zoom link?"
           onConfirm={() => { removeZoom(zoomToDelete.chIdx, zoomToDelete.zIdx); setZoomToDelete(null); }}
           onCancel={() => setZoomToDelete(null)}
+        />
+      )}
+
+      {/* Remove a question from the quiz's Selected Questions */}
+      {qaToUnselect && (
+        <ConfirmModal
+          show={true}
+          title="Remove Question"
+          message={`Remove "${qaToUnselect.q.question}" from Selected Questions? It will be moved back to Generated QA.`}
+          confirmLabel="Remove"
+          onConfirm={() => {
+            const { q, kind } = qaToUnselect;
+            const id = String(q._id);
+            if (kind === 'aptitude') {
+              setAptitudeQASelected(prev => prev.filter(x => String(x._id) !== id));
+              setAptitudeQAPool(prev => sortByDifficulty([...prev, q]));
+            } else {
+              setQuizQASelected(prev => prev.filter(x => String(x._id) !== id));
+              setQuizQAPool(prev => sortByDifficulty([...prev, q]));
+            }
+            setQaToUnselect(null);
+          }}
+          onCancel={() => setQaToUnselect(null)}
         />
       )}
 

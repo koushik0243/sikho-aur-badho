@@ -3,6 +3,9 @@ import { useState, useEffect, useRef, use } from 'react';
 import { useRouter } from 'next/navigation';
 import apiServiceHandler, { clearGetCache } from '../../../../../service/apiService';
 import useVoiceAnswer from '../../../../../hooks/useVoiceAnswer';
+import {
+  unansweredIndexes, nextUnansweredAfter, prevUnansweredBefore, UnansweredAlert,
+} from '../../../../../Components/Learner/QuestionFlow';
 import s from './AptitudeTest.module.css';
 
 /* ── Helpers ─────────────────────────────────────────────────── */
@@ -94,6 +97,7 @@ export default function AptitudeTestPage({ params }) {
   const [questions, setQuestions] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState({}); // qId -> { transcript, status }
+  const [unansweredAlert, setUnansweredAlert] = useState(null); // [{ n, question }] | null
   const [testTimeLeft, setTestTimeLeft] = useState(3600); // 60-minute total timer
   const [evalResult, setEvalResult] = useState(null);
   const {
@@ -205,26 +209,31 @@ export default function AptitudeTestPage({ params }) {
     const saved = { status, transcript: status === 'answered' ? transcript : '' };
     const newAnswers = { ...answers, [qId]: saved };
     setAnswers(newAnswers);
-
-    if (currentIdx + 1 >= questions.length) {
-      submitTest(questions, newAnswers);
-    } else {
-      setCurrentIdx(i => i + 1);
-    }
+    moveOnOrSubmit(newAnswers);
   }
 
+  // Goes to the next unanswered question. With none left after this one, the
+  // test submits only if every question is answered; otherwise the learner is
+  // shown which ones are missing and taken to the first of them.
+  function moveOnOrSubmit(answersMap) {
+    const next = nextUnansweredAfter(questions, answersMap, currentIdx);
+    if (next !== -1) { setCurrentIdx(next); return; }
+    const missing = unansweredIndexes(questions, answersMap);
+    if (missing.length === 0) { submitTest(questions, answersMap); return; }
+    setUnansweredAlert(missing.map(i => ({ n: i + 1, question: questions[i].question })));
+    setCurrentIdx(missing[0]);
+  }
+
+  // Back only steps through questions that still need an answer.
   function goBack() {
     stopRecording();
-    setCurrentIdx(i => i - 1);
+    const prev = prevUnansweredBefore(questions, answers, currentIdx);
+    if (prev !== -1) setCurrentIdx(prev);
   }
 
   function goForward() {
     stopRecording();
-    if (currentIdx + 1 >= questions.length) {
-      submitTest(questions, answers);
-    } else {
-      setCurrentIdx(i => i + 1);
-    }
+    moveOnOrSubmit(answers);
   }
 
   async function submitTest(qs, allAnswers) {
@@ -412,10 +421,13 @@ export default function AptitudeTestPage({ params }) {
   const qId = String(q._id);
   const savedAns = answers[qId];
   const isAnswered = savedAns?.status === 'answered';
-  const hasBack = currentIdx > 0;
+  const hasBack = prevUnansweredBefore(questions, answers, currentIdx) !== -1;
+  const allAnswered = unansweredIndexes(questions, answers).length === 0;
+  const hasSpeech = !!String(transcript || '').trim();
 
   return (
     <div className={s.page}>
+      <UnansweredAlert items={unansweredAlert} onClose={() => setUnansweredAlert(null)} />
       <div className={s.testWrap}>
         {/* Header bar */}
         <div className={s.testHeader}>
@@ -504,14 +516,15 @@ export default function AptitudeTestPage({ params }) {
           )}
           {isAnswered ? (
             <button className={s.submitBtn} onClick={goForward}>
-              {currentIdx + 1 < total ? 'Next →' : 'Submit Test'}
+              {allAnswered ? 'Submit Test' : 'Next →'}
             </button>
           ) : (
             <>
               <button
                 className={s.submitBtn}
                 onClick={() => advance('answered')}
-                disabled={isRecording || isTranscribing}
+                disabled={isRecording || isTranscribing || !hasSpeech}
+                title={!hasSpeech ? 'Record your answer first' : undefined}
               >
                 Submit Answer
               </button>
