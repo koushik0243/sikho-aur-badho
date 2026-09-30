@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import apiServiceHandler, { clearGetCache } from '../../../../../service/apiService';
 import useVoiceAnswer from '../../../../../hooks/useVoiceAnswer';
 import {
-  unansweredIndexes, nextUnansweredAfter, prevUnansweredBefore, UnansweredAlert,
+  unansweredIndexes, nextUnansweredCycling, prevUnansweredCycling, answersForTimeUp,
 } from '../../../../../Components/Learner/QuestionFlow';
 import s from './AptitudeTest.module.css';
 
@@ -97,13 +97,12 @@ export default function AptitudeTestPage({ params }) {
   const [questions, setQuestions] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState({}); // qId -> { transcript, status }
-  const [unansweredAlert, setUnansweredAlert] = useState(null); // [{ n, question }] | null
   const [testTimeLeft, setTestTimeLeft] = useState(3600); // 60-minute total timer
   const [evalResult, setEvalResult] = useState(null);
   const {
     transcript, setTranscript,
     isRecording, recordTime, micError, isTranscribing,
-    startRecording, stopRecording, reset: resetVoiceInput, usesFallback,
+    startRecording, stopRecording, reset: resetVoiceInput, clear: clearVoiceInput, usesFallback,
   } = useVoiceAnswer();
   const answersRef = useRef({});
   answersRef.current = answers;
@@ -181,15 +180,10 @@ export default function AptitudeTestPage({ params }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, testTimeLeft]);
 
+  // Time's up → submit now; every pending question is marked "Skipped".
   function handleTimeExpired() {
     stopRecording();
-    const allAnswers = { ...answersRef.current };
-    const q = questions[currentIdx];
-    if (q) allAnswers[String(q._id)] = { status: transcript ? 'answered' : 'skipped', transcript };
-    for (let i = currentIdx + 1; i < questions.length; i++) {
-      allAnswers[String(questions[i]._id)] = { status: 'skipped', transcript: '' };
-    }
-    submitTest(questions, allAnswers);
+    submitTest(questions, answersForTimeUp(questions, answersRef.current));
   }
 
   // Reset mic + restore saved transcript on question change
@@ -212,22 +206,21 @@ export default function AptitudeTestPage({ params }) {
     moveOnOrSubmit(newAnswers);
   }
 
-  // Goes to the next unanswered question. With none left after this one, the
-  // test submits only if every question is answered; otherwise the learner is
-  // shown which ones are missing and taken to the first of them.
+  // Same flow as the lesson quiz: after each answer go straight to the next
+  // unanswered question, wrapping round to skipped ones after the last
+  // question. The test submits by itself once every question is answered —
+  // never while any is still pending.
   function moveOnOrSubmit(answersMap) {
-    const next = nextUnansweredAfter(questions, answersMap, currentIdx);
-    if (next !== -1) { setCurrentIdx(next); return; }
-    const missing = unansweredIndexes(questions, answersMap);
-    if (missing.length === 0) { submitTest(questions, answersMap); return; }
-    setUnansweredAlert(missing.map(i => ({ n: i + 1, question: questions[i].question })));
-    setCurrentIdx(missing[0]);
+    if (unansweredIndexes(questions, answersMap).length === 0) { submitTest(questions, answersMap); return; }
+    const next = nextUnansweredCycling(questions, answersMap, currentIdx);
+    if (next !== -1) setCurrentIdx(next);
+    // else: the current question is the only one left — stay on it
   }
 
-  // Back only steps through questions that still need an answer.
+  // Back only steps through questions that still need an answer (wrapping).
   function goBack() {
     stopRecording();
-    const prev = prevUnansweredBefore(questions, answers, currentIdx);
+    const prev = prevUnansweredCycling(questions, answers, currentIdx);
     if (prev !== -1) setCurrentIdx(prev);
   }
 
@@ -421,13 +414,12 @@ export default function AptitudeTestPage({ params }) {
   const qId = String(q._id);
   const savedAns = answers[qId];
   const isAnswered = savedAns?.status === 'answered';
-  const hasBack = prevUnansweredBefore(questions, answers, currentIdx) !== -1;
+  const hasBack = prevUnansweredCycling(questions, answers, currentIdx) !== -1;
   const allAnswered = unansweredIndexes(questions, answers).length === 0;
   const hasSpeech = !!String(transcript || '').trim();
 
   return (
     <div className={s.page}>
-      <UnansweredAlert items={unansweredAlert} onClose={() => setUnansweredAlert(null)} />
       <div className={s.testWrap}>
         {/* Header bar */}
         <div className={s.testHeader}>
@@ -471,6 +463,23 @@ export default function AptitudeTestPage({ params }) {
                 <span className={s.transcriptPlaceholder}>Your answer will appear here as you speak…</span>
               )}
             </div>
+
+            {!isAnswered && (
+              <div className={s.clearRow}>
+                <button
+                  type="button"
+                  className={s.clearBtn}
+                  onClick={clearVoiceInput}
+                  disabled={!hasSpeech && !isRecording && !isTranscribing}
+                  title="Clear your answer and record again"
+                >
+                  <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13" aria-hidden="true">
+                    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd"/>
+                  </svg>
+                  Clear
+                </button>
+              </div>
+            )}
 
             {isAnswered ? (
               <div className={s.answeredBadge}>{CheckIcon} Answer submitted — read only</div>

@@ -240,6 +240,32 @@
   word-break: break-word;
 }
 
+/* Clear button — just below the answer text, above the mic row */
+.clearRow {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 18px 10px;
+}
+
+.clearBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: #fff;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.clearBtn:hover:not(:disabled) { background: #fef2f2; border-color: #f87171; }
+
+.clearBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+
 .transcriptPlaceholder {
   color: #b8caca;
   font-style: italic;

@@ -9,7 +9,7 @@ import useVoiceAnswer from '../../../../hooks/useVoiceAnswer';
 import { normalizeQuizSettings } from '../../../../Components/Learner/quizSettings';
 import { fetchCourseCompletion, recordCourseCompletion, completedChapterIdSet } from '../../../../Components/Learner/courseCompletion';
 import {
-  unansweredIndexes, nextUnansweredCycling, prevUnansweredCycling,
+  unansweredIndexes, nextUnansweredCycling, prevUnansweredCycling, answersForTimeUp,
 } from '../../../../Components/Learner/QuestionFlow';
 import s from "./CourseView.module.css";
 
@@ -1056,15 +1056,10 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
     return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
   }
 
+  // Time's up → submit now; every pending question is marked "Skipped".
   function handleTimeExpired() {
     stopRecording();
-    const allAnswers = { ...answers };
-    const q = questions[currentIdx];
-    if (q) allAnswers[String(q._id)] = { status: transcript ? 'answered' : 'skipped', transcript };
-    for (let i = currentIdx + 1; i < questions.length; i++) {
-      allAnswers[String(questions[i]._id)] = { status: 'skipped', transcript: '' };
-    }
-    submitQuiz(questions, allAnswers);
+    submitQuiz(questions, answersForTimeUp(questions, answersRef.current));
   }
 
   function advance(status) {

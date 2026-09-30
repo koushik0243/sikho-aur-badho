@@ -2305,3 +2305,44 @@
 
 
 @keyframes quizSpin { to { transform: rotate(360deg); } }
+
+
+/* ── Quiz on phones ─────────────────────────────────────────────────────
+   On desktop the quiz matches the video box's height and scrolls inside it.
+   On a phone that box is tiny, so the quiz grows to its full height instead
+   (the page scrolls, not the card) and uses the full width. */
+@media (max-width: 640px) {
+  .quizVoiceWrap,
+  .panelInner {
+    height: auto;
+    overflow: visible;
+  }
+
+  .panelInner {
+    min-height: 320px;
+    padding: 24px 16px;
+  }
+
+  .quizVoiceHeader { padding: 10px 14px; }
+
+  .quizVoiceTitle {
+    max-width: none;
+    white-space: normal;
+  }
+
+  .quizVoiceBody { padding: 18px 14px 14px; gap: 12px; }
+
+  .quizVoiceAnswerBox { min-height: 120px; }
+
+  .quizTranscriptArea { overflow: visible; padding: 14px 14px 8px; }
+
+  .quizClearRow { padding: 0 14px 8px; }
+
+  .quizMicRow { padding: 12px 14px; gap: 10px; flex-wrap: wrap; }
+
+  .quizAllList { padding: 12px 14px 0; max-height: none; overflow: visible; }
+
+  .quizVoiceFooter { padding: 12px 14px 16px; gap: 10px; flex-wrap: wrap; }
+
+  .quizVoiceFooter > button { flex: 1 1 auto; }
+}
