@@ -399,7 +399,10 @@ const listUserPagination = async (req, res, next) => {
                 { email: { $regex: filters.search, $options: 'i' } },
             ];
         }
-        if (filters.orgId) countQuery.orgId = filters.orgId;
+        // Same org filter as the list itself (an invalid id used to reach the
+        // count query raw and fail the whole request with a 500).
+        const orgFilter = UserHelper.orgIdFilter(filters.orgId);
+        if (orgFilter !== undefined) countQuery.orgId = orgFilter;
         if (filters.orgRole) countQuery.orgRole = filters.orgRole;
 
         const [users, totalUsers] = await Promise.all([

@@ -915,3 +915,12 @@
   padding: 20px !important;
   border-top: 1px solid #e3e3e3 !important;
 }
+
+/* Page header buttons: "+ Add Learner & Assign Course" then "+ Add Organization" */
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}

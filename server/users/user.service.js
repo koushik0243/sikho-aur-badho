@@ -170,11 +170,21 @@ export const checkUserExists = async ({ email, whatsapp_no, excludeUserId }) => 
 };
 
 /* List users with pagination */
+// ?orgId= filter for user lists: "null" = not assigned to any organization
+// (orgId null or missing), a valid id = that organization, anything else is
+// ignored. Returns undefined when there's no org filter to apply.
+export const orgIdFilter = (orgId) => {
+    if (orgId === 'null' || orgId === null) return null;
+    if (orgId && ObjectId.isValid(orgId)) return new ObjectId(orgId);
+    return undefined;
+};
+
 export const listUserPagination = async (page, limit, filters = {}) => {
     try {
         const query = { deletedAt: null };
         if (filters.user_type) query.user_type = filters.user_type;
-        if (filters.orgId && ObjectId.isValid(filters.orgId)) query.orgId = new ObjectId(filters.orgId);
+        const orgFilter = orgIdFilter(filters.orgId);
+        if (orgFilter !== undefined) query.orgId = orgFilter;
         if (filters.orgRole) query.orgRole = filters.orgRole;
         if (filters.search) {
             query.$or = [

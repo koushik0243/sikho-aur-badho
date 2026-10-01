@@ -184,9 +184,14 @@ export default function OrganizationsList() {
           <h1 className={s.pageTitle}>Organizations</h1>
           <p className={s.pageSubtitle}>Manage organizations</p>
         </div>
-        <button className={s.btnAdd} onClick={() => router.push('/superadmin/organizations/add')}>
-          + Add Organization
-        </button>
+        <div className={s.headerActions}>
+          {/* <button className={s.btnAdd} onClick={() => router.push('/superadmin/organizations/add-learner')}>
+            + Add Learner &amp; Assign Course
+          </button> */}
+          <button className={s.btnAdd} onClick={() => router.push('/superadmin/organizations/add')}>
+            + Add Organization
+          </button>
+        </div>
       </div>
 
       <div className={s.card}>
