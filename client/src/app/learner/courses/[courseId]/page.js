@@ -1023,6 +1023,7 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
     transcript, setTranscript,
     isRecording, recordTime, micError, isTranscribing,
     startRecording, stopRecording, reset: resetVoiceInput, clear: clearVoiceInput, usesFallback,
+    liveText, maxRecordingSeconds,
   } = useVoiceAnswer();
   const answersRef     = useRef({});
   answersRef.current   = answers;
@@ -1435,8 +1436,11 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
           <div className={s.quizTranscriptArea}>
             {isAnswered ? (
               <span>{savedAns.transcript || <em>No speech recorded.</em>}</span>
-            ) : transcript ? (
-              <span>{transcript}</span>
+            ) : (transcript || liveText) ? (
+              <span>
+                {transcript}
+                {liveText && <span className={s.quizLivePreview}>{transcript ? ' ' : ''}{liveText}</span>}
+              </span>
             ) : (
               <span className={s.quizTranscriptPlaceholder}>Your answer will appear here as you speak…</span>
             )}
@@ -1495,7 +1499,7 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
                   ? (usesFallback ? 'Recording · Tap Mic To Stop And Transcribe…' : 'Tap Mic To Stop · Speak Clearly In Hindi Or English…')
                   : 'Tap Mic To Start · Speak Your Answer…'}
               </span>
-              <span className={s.quizMicTimer}>{fmtSecs(recordTime)}</span>
+              <span className={s.quizMicTimer}>{fmtSecs(recordTime)} / {fmtSecs(maxRecordingSeconds)}</span>
             </div>
           )}
 

@@ -9,11 +9,20 @@ import { API_URL } from './constant';
 // it before it expires, and adds it to file URLs.
 
 const REFRESH_EARLY_MS = 5 * 60 * 1000; // refresh 5 min before expiry
+const RETRY_MIN_MS = 2 * 1000;          // a failed token request is retried, backing off…
+const RETRY_MAX_MS = 30 * 1000;         // …up to this interval
+// The API server predates media tokens (no /media/token route) — it serves
+// /uploads publicly, so files are used without a token rather than not at all.
+export const NO_MEDIA_TOKEN = 'none';
 
 let cached = null;    // { token, expiresAt }
 let inflight = null;  // Promise<string|null>
 
-/** @returns {Promise<string|null>} a valid media token, or null if not logged in. */
+/**
+ * @returns {Promise<string|null>} a valid media token, NO_MEDIA_TOKEN when the
+ *   server doesn't use them, or null if it couldn't be fetched (not logged in,
+ *   network/server error) — callers retry.
+ */
 export async function getMediaToken() {
   if (cached && cached.expiresAt - Date.now() > REFRESH_EARLY_MS) return cached.token;
   if (!inflight) {
@@ -25,7 +34,12 @@ export async function getMediaToken() {
         cached = { token: data.token, expiresAt: Date.now() + (Number(data.expiresIn) || 0) * 1000 };
         return data.token;
       })
-      .catch(() => null)
+      .catch(err => {
+        // GET errors arrive as the raw axios error (status on err.response).
+        if ((err?.statusCode ?? err?.response?.status) !== 404) return null;
+        cached = { token: NO_MEDIA_TOKEN, expiresAt: Date.now() + 60 * 60 * 1000 };
+        return NO_MEDIA_TOKEN;
+      })
       .finally(() => { inflight = null; });
   }
   return inflight;
@@ -47,6 +61,7 @@ export function secureMediaUrl(filePath, token) {
   const full = filePath.startsWith('http') ? filePath : `${API_URL}${filePath}`;
   if (!full.includes('/uploads/')) return full;
   if (!token) return null;
+  if (token === NO_MEDIA_TOKEN) return full;
   return `${full}${full.includes('?') ? '&' : '?'}mt=${encodeURIComponent(token)}`;
 }
 
@@ -60,11 +75,20 @@ export function useMediaToken() {
   useEffect(() => {
     let cancelled = false;
     let timer = null;
+    let retryMs = RETRY_MIN_MS;
     const load = async () => {
       const t = await getMediaToken();
       if (cancelled) return;
+      if (!t) {
+        // Keep the last good token (if any) and try again — one failed request
+        // must not leave videos blank until the page is reloaded.
+        timer = setTimeout(load, retryMs);
+        retryMs = Math.min(retryMs * 2, RETRY_MAX_MS);
+        return;
+      }
+      retryMs = RETRY_MIN_MS;
       setToken(t);
-      if (t && cached) {
+      if (cached) {
         const wait = Math.max(30 * 1000, cached.expiresAt - Date.now() - REFRESH_EARLY_MS);
         timer = setTimeout(load, wait);
       }
@@ -81,4 +105,22 @@ export function useMediaToken() {
   };
 
   return [token, refresh];
+}
+
+/**
+ * Opens an uploaded file (e.g. a lesson video) in a new tab with a fresh media
+ * token. The tab is opened straight away — inside the click — so popup
+ * blockers allow it, then pointed at the file once the token is ready.
+ * @param {string} filePath e.g. "/uploads/lesson-videos/123.mp4"
+ * @returns {Promise<boolean>} false if the file couldn't be opened
+ */
+export async function openMediaInNewTab(filePath) {
+  const tab = window.open('', '_blank');
+  if (!tab) return false;
+  tab.opener = null;
+  try { tab.document.title = 'Loading…'; } catch { /* cross-origin already */ }
+  const url = secureMediaUrl(filePath, await getMediaToken());
+  if (!url) { tab.close(); return false; }
+  tab.location.replace(url);
+  return true;
 }

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import { API_URL } from '../../../lib/constant';
-import { useMediaToken, secureMediaUrl } from '../../../lib/mediaToken';
+import { useMediaToken, secureMediaUrl, openMediaInNewTab } from '../../../lib/mediaToken';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
 import s from "./AddCourseBuilder.module.css";
@@ -782,6 +782,7 @@ export default function AddCourseBuilder({ editId } = {}) {
     imageUrl: '',
     video: null,
     videoUrl: '',
+    localVideo: null, // video file uploaded in this session — previewed from the computer
     playbackHour: '0',
     playbackMin: '0',
     playbackSec: '0',
@@ -791,7 +792,7 @@ export default function AddCourseBuilder({ editId } = {}) {
 
   function openLessonModal(chIdx) {
     setLessonForm({
-      name: '', content: '', featuredImage: null, imageUrl: '', video: null, videoUrl: '',
+      name: '', content: '', featuredImage: null, imageUrl: '', video: null, videoUrl: '', localVideo: null,
       playbackHour: '0', playbackMin: '0', playbackSec: '0',
       exerciseFile: null, lessonPreview: false,
     });
@@ -822,6 +823,9 @@ export default function AddCourseBuilder({ editId } = {}) {
       playbackMin: lessonForm.playbackMin,
       playbackSec: lessonForm.playbackSec,
     };
+    // A video uploaded earlier whose server path isn't known here must not be
+    // cleared by re-saving the lesson — leave videoUrl out so the server keeps it.
+    const keepServerVideo = !lessonBase.video && !lessonBase.videoUrl && !!lessonForm.localVideo;
     let payload;
     if (lessonBase.featuredImage || lessonBase.video) {
       payload = new FormData();
@@ -830,7 +834,7 @@ export default function AddCourseBuilder({ editId } = {}) {
       payload.append('title', lessonBase.name);
       payload.append('desc', lessonBase.content || '');
       payload.append('video_type', 'lesson');
-      payload.append('videoUrl', lessonBase.videoUrl || '');
+      if (!keepServerVideo) payload.append('videoUrl', lessonBase.videoUrl || '');
       payload.append('duration_hr', lessonBase.playbackHour || '0');
       payload.append('duration_min', lessonBase.playbackMin || '0');
       payload.append('duration_sec', lessonBase.playbackSec || '0');
@@ -844,7 +848,7 @@ export default function AddCourseBuilder({ editId } = {}) {
         courseId, chapterId: chServerId,
         title: lessonBase.name, desc: lessonBase.content || '',
         video_type: 'lesson',
-        videoUrl: lessonBase.videoUrl || null,
+        videoUrl: keepServerVideo ? undefined : (lessonBase.videoUrl || null),
         duration_hr: lessonBase.playbackHour || '0',
         duration_min: lessonBase.playbackMin || '0',
         duration_sec: lessonBase.playbackSec || '0',
@@ -857,7 +861,24 @@ export default function AddCourseBuilder({ editId } = {}) {
     apiCall
       .then(res => {
         const serverId = lessonBase.serverId || res?.data?._id || null;
-        const lesson = { ...lessonBase, serverId };
+        // Keep where the uploaded video/image now lives on the server, so it
+        // can be played again from the lesson before the course is submitted.
+        // (An older server returns the lesson as it was before the update —
+        // a path equal to the previous one isn't the new upload.)
+        const saved = res?.data || {};
+        const isNewPath = (path, previous) => !!path && path !== previous;
+        const uploadedVideo = lessonBase.video || lessonForm.localVideo;
+        const lesson = {
+          ...lessonBase,
+          serverId,
+          video: uploadedVideo,
+          videoUrl: lessonBase.video
+            ? (isNewPath(saved.videoUrl, existingLesson?.videoUrl) ? saved.videoUrl : '')
+            : lessonBase.videoUrl,
+          imageUrl: lessonBase.featuredImage
+            ? (isNewPath(saved.imageUrl, existingLesson?.imageUrl) ? saved.imageUrl : existingLesson?.imageUrl || '')
+            : lessonForm.imageUrl,
+        };
         setChapters(prev => {
           const c = [...prev];
           const lessons = [...(c[chIdx].lessons || [])];
@@ -1794,7 +1815,7 @@ export default function AddCourseBuilder({ editId } = {}) {
                     <>
                       <span className={s.modalFileName}>{lessonForm.imageUrl.split('/').pop()}</span>
                       <button type="button" className={s.modalAddFromUrl}
-                        onClick={() => window.open(secureMediaUrl(lessonForm.imageUrl, mediaToken), '_blank', 'noopener')}>
+                        onClick={() => openMediaInNewTab(lessonForm.imageUrl)}>
                         🖼 View in new tab
                       </button>
                     </>
@@ -1811,23 +1832,24 @@ export default function AddCourseBuilder({ editId } = {}) {
                     <path d="M16 9l6-3v12l-6-3V9z"/>
                   </svg>
                   <label className={s.modalUploadBtn}>
-                    {lessonForm.video || lessonForm.videoUrl ? 'Change Video' : 'Upload Video'}
+                    {lessonForm.video || lessonForm.localVideo || lessonForm.videoUrl ? 'Change Video' : 'Upload Video'}
                     <input type="file" accept="video/*" hidden
                       onChange={e => {
                         const file = pickLessonVideoFile(e.target.files[0]);
                         if (!file) { e.target.value = ''; return; }
                         setLessonField('video', file);
                         setLessonField('videoUrl', '');
+                        setLessonField('localVideo', null);
                       }} />
                   </label>
                   <span className={s.modalUploadNote}>MP4, and WebM formats, up to {MAX_LESSON_VIDEO_MB} MB</span>
-                  {lessonForm.video ? (
+                  {(lessonForm.video || lessonForm.localVideo) ? (
                     <>
-                      <span className={s.modalFileName}>{lessonForm.video.name}</span>
+                      <span className={s.modalFileName}>{(lessonForm.video || lessonForm.localVideo).name}</span>
                       <button
                         type="button"
                         className={s.modalAddFromUrl}
-                        onClick={() => window.open(URL.createObjectURL(lessonForm.video), '_blank')}
+                        onClick={() => window.open(URL.createObjectURL(lessonForm.video || lessonForm.localVideo), '_blank')}
                       >
                         ▶ Play in new tab
                       </button>
@@ -1838,7 +1860,9 @@ export default function AddCourseBuilder({ editId } = {}) {
                       <button
                         type="button"
                         className={s.modalAddFromUrl}
-                        onClick={() => window.open(secureMediaUrl(lessonForm.videoUrl, mediaToken), '_blank', 'noopener')}
+                        onClick={async () => {
+                          if (!(await openMediaInNewTab(lessonForm.videoUrl))) toast.error('Could not open the video. Please try again.');
+                        }}
                       >
                         ▶ Play in new tab
                       </button>
@@ -2826,7 +2850,7 @@ export default function AddCourseBuilder({ editId } = {}) {
                 <>
                   <span className={s.uploadAreaNote} style={{ wordBreak: 'break-all' }}>{existingIntroVideo.split('/').pop()}</span>
                   <button type="button" className={s.modalAddFromUrl}
-                    onClick={() => window.open(secureMediaUrl(existingIntroVideo, mediaToken), '_blank', 'noopener')}>
+                    onClick={() => openMediaInNewTab(existingIntroVideo)}>
                     ▶ Play in new tab
                   </button>
                 </>
@@ -3305,7 +3329,7 @@ export default function AddCourseBuilder({ editId } = {}) {
                                     <button type="button" className={s.btnChIcon} title="Edit"
                                       onClick={() => {
                                         if (item._type === 'lesson') {
-                                          setLessonForm({ name: item.name, content: item.content, featuredImage: null, imageUrl: item.imageUrl || '', video: null, videoUrl: item.videoUrl || '', playbackHour: item.playbackHour, playbackMin: item.playbackMin, playbackSec: item.playbackSec, exerciseFile: null, lessonPreview: false });
+                                          setLessonForm({ name: item.name, content: item.content, featuredImage: null, imageUrl: item.imageUrl || '', video: null, videoUrl: item.videoUrl || '', localVideo: item.video || null, playbackHour: item.playbackHour, playbackMin: item.playbackMin, playbackSec: item.playbackSec, exerciseFile: null, lessonPreview: false });
                                           setLessonModal({ chIdx, topicName: ch.title || '(Untitled)', editIdx: item._typeIdx });
                                         } else if (item._type === 'quiz') {
                                           setQuizForm({ title: item.title, summary: item.summary || '' });

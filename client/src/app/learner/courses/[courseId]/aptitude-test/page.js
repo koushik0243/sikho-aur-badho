@@ -119,6 +119,7 @@ export default function AptitudeTestPage({ params }) {
     transcript, setTranscript,
     isRecording, recordTime, micError, isTranscribing,
     startRecording, stopRecording, reset: resetVoiceInput, clear: clearVoiceInput, usesFallback,
+    liveText, maxRecordingSeconds,
   } = useVoiceAnswer();
   const answersRef = useRef({});
   answersRef.current = answers;
@@ -295,7 +296,7 @@ export default function AptitudeTestPage({ params }) {
             text automatically. Your score and level will be shown at the end.
           </p>
           <p className={s.startMeta}>
-            {questions.length} question{questions.length !== 1 ? 's' : ''} · Speech-to-text · English
+            {questions.length} question{questions.length !== 1 ? 's' : ''} · Speech-to-text · Hindi or English
             {timeLimit > 0 && ` · Time limit: ${timeLimit < 60 ? `${timeLimit}s` : `${Math.round(timeLimit / 60)} min`}`}
           </p>
           <button className={s.primaryBtn} onClick={startTest}>Start Aptitude Test</button>
@@ -513,8 +514,11 @@ export default function AptitudeTestPage({ params }) {
             <div className={s.transcriptArea}>
               {isAnswered ? (
                 <span>{savedAns.transcript || <em>No speech recorded.</em>}</span>
-              ) : transcript ? (
-                <span>{transcript}</span>
+              ) : (transcript || liveText) ? (
+                <span>
+                  {transcript}
+                  {liveText && <span className={s.livePreview}>{transcript ? ' ' : ''}{liveText}</span>}
+                </span>
               ) : (
                 <span className={s.transcriptPlaceholder}>Your answer will appear here as you speak…</span>
               )}
@@ -563,10 +567,10 @@ export default function AptitudeTestPage({ params }) {
                   {isTranscribing
                     ? 'Transcribing your answer…'
                     : isRecording
-                    ? (usesFallback ? 'Recording · Tap Mic To Stop And Transcribe…' : 'Tap Mic To Stop · Speak Clearly In English…')
+                    ? (usesFallback ? 'Recording · Tap Mic To Stop And Transcribe…' : 'Tap Mic To Stop · Speak Clearly In Hindi Or English…')
                     : 'Tap Mic To Start · Speak Your Answer…'}
                 </span>
-                <span className={s.micTimer}>{fmtSecs(recordTime)}</span>
+                <span className={s.micTimer}>{fmtSecs(recordTime)} / {fmtSecs(maxRecordingSeconds)}</span>
               </div>
             )}
 

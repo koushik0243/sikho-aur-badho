@@ -68,7 +68,8 @@ export const updateTopic = async (updateId, data) => {
         return await Topic.findOneAndUpdate(
             { _id: updateId, deletedAt: null },
             { $set: updateFields },
-            { returnDocument: 'before', runValidators: true }
+            // the saved lesson — the builder reads the new video/image path from it
+            { returnDocument: 'after', runValidators: true }
         ).lean();
     } catch (error) {
         throw error;

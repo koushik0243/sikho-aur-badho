@@ -20,8 +20,10 @@ const transcribeAudio = async (req, res, next) => {
     if (!req.file) {
       return res.status(400).json({ status: 400, message: 'An audio file is required.' });
     }
-    const text = await SpeechService.transcribeAudioBuffer(req.file.buffer, req.file.mimetype);
-    res.status(200).json({ status: 200, message: 'Transcribed.', data: { text } });
+    // languageHint: the language detected for the previous phrase of this answer
+    const languageHint = typeof req.body?.languageHint === 'string' ? req.body.languageHint.toLowerCase() : undefined;
+    const { text, language } = await SpeechService.transcribeAudioBuffer(req.file.buffer, req.file.mimetype, { languageHint });
+    res.status(200).json({ status: 200, message: 'Transcribed.', data: { text, language } });
   } catch (error) {
     next(error);
   }

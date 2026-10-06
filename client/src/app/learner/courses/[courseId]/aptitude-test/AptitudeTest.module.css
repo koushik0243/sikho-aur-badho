@@ -837,3 +837,7 @@
 @media (max-width: 640px) {
   .allList { padding: 12px 14px 0; max-height: none; overflow: visible; }
 }
+
+
+/* Voice answer: live preview of the phrase being spoken (confirmed text follows after each pause) */
+.livePreview { color: #8a9a9a; font-style: italic; }
