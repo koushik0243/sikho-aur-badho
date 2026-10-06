@@ -4,6 +4,27 @@ import Course from './course.model.js';
 import Chapter from '../chapters/chapter.model.js';
 import Topic from '../topics/topic.model.js';
 
+// Aptitude test settings (course builder → Aptitude Test → Settings). Only
+// these keys are kept; values are normalised to the builder's form types.
+// (Attempts / pass mark / max questions don't apply to the aptitude test.)
+const APTITUDE_SETTING_RULES = {
+    timeLimit:          v => String(Math.max(0, parseInt(v, 10) || 0)),
+    timeUnit:           v => (['Seconds', 'Minutes', 'Hours'].includes(v) ? v : 'Minutes'),
+    hideQuizTime:       v => v === true || v === 'true',
+    quizAutoStart:      v => v === true || v === 'true',
+    questionLayout:     v => (v === 'all' ? 'all' : 'single'),
+    questionOrder:      v => (v === 'random' ? 'random' : 'sequential'),
+    hideQuestionNumber: v => v === true || v === 'true',
+};
+export const sanitizeAptitudeSettings = (raw) => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const out = {};
+    for (const [key, rule] of Object.entries(APTITUDE_SETTING_RULES)) {
+        if (raw[key] !== undefined) out[key] = rule(raw[key]);
+    }
+    return Object.keys(out).length ? out : null;
+};
+
 const { ObjectId } = mongoose.Types;
 
 const generateSlug = (title) => slugify(title, { lower: true, strict: true, trim: true });
@@ -49,6 +70,7 @@ export const createCourse = async (data, userId) => {
             aptitudeEnabled: data.aptitudeEnabled !== undefined ? data.aptitudeEnabled : false,
             aptitudeContext: data.aptitudeContext || '',
             aptitudeSelectedQuestionIds: Array.isArray(data.aptitudeSelectedQuestionIds) ? data.aptitudeSelectedQuestionIds : [],
+            aptitudeSettings: sanitizeAptitudeSettings(data.aptitudeSettings),
             certificate_template_id: data.certificate_template_id || null,
             createdBy: userId,
             status: data.status || 'draft'
@@ -82,6 +104,7 @@ export const updateCourse = async (updateId, data) => {
             'certificate_template_id'
         ];
         const updateFields = {};
+        if (data.aptitudeSettings !== undefined) updateFields.aptitudeSettings = sanitizeAptitudeSettings(data.aptitudeSettings);
 
         if (data.course_price !== undefined) {
             updateFields.course_price = mongoose.Types.Decimal128.fromString(String(data.course_price));

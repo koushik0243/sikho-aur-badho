@@ -6,6 +6,7 @@ import { useSelector } from 'react-redux';
 import { selectUser } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
 import { API_URL } from '../../../lib/constant';
+import { useMediaToken, secureMediaUrl } from '../../../lib/mediaToken';
 import vp from "./CourseDetail.module.css";
 import s from "./CourseDetail.module.css";
 
@@ -67,6 +68,8 @@ const STATUS_CLS = {
 
 export default function CourseDetail() {
   const router = useRouter();
+  // Only used to read lesson durations from the (hidden) videos — the files themselves aren't shown.
+  const [mediaToken] = useMediaToken();
   const { id }  = useParams();
   const user    = useSelector(selectUser);
 
@@ -444,14 +447,15 @@ export default function CourseDetail() {
                                   )}
                                   <div className={s.contentRow}>
                                     <span className={s.contentLabel}>Video</span>
+                                    {/* The course files aren't exposed to the store owner — only whether one exists. */}
                                     {tp.videoUrl
-                                      ? <a href={tp.videoUrl.startsWith('http') ? tp.videoUrl : `${API_URL}${tp.videoUrl}`} target="_blank" rel="noreferrer" className={s.contentLink}>{tp.videoUrl}</a>
+                                      ? <span className={s.contentEmpty}>Hidden</span>
                                       : <span className={s.contentEmpty}>No video uploaded</span>}
                                   </div>
                                   <div className={s.contentRow}>
                                     <span className={s.contentLabel}>Image</span>
                                     {tp.imageUrl
-                                      ? <a href={`${API_URL}${tp.imageUrl}`} target="_blank" rel="noreferrer" className={s.contentLink}>{tp.imageUrl.split('/').pop()}</a>
+                                      ? <span className={s.contentEmpty}>Hidden</span>
                                       : <span className={s.contentEmpty}>No image</span>}
                                   </div>
                                   <div className={s.contentRow}>
@@ -469,10 +473,10 @@ export default function CourseDetail() {
                                       })()}
                                     </span>
                                   </div>
-                                  {tp.videoUrl && (
+                                  {tp.videoUrl && secureMediaUrl(tp.videoUrl, mediaToken) && (
                                     <video
                                       key={String(tp._id)}
-                                      src={tp.videoUrl.startsWith('http') ? tp.videoUrl : `${API_URL}${tp.videoUrl}`}
+                                      src={secureMediaUrl(tp.videoUrl, mediaToken)}
                                       preload="metadata"
                                       style={{ display: 'none' }}
                                       onLoadedMetadata={e => {
@@ -514,13 +518,13 @@ export default function CourseDetail() {
                                   <div className={s.contentRow}>
                                     <span className={s.contentLabel}>File</span>
                                     {fileUrl
-                                      ? <a href={`${API_URL}${fileUrl}`} target="_blank" rel="noreferrer" className={s.contentLink}>{fileUrl.split('/').pop()}</a>
+                                      ? <span className={s.contentEmpty}>Hidden</span>
                                       : <span className={s.contentEmpty}>No file attached</span>}
                                   </div>
                                   {tp.attachments?.length > 1 && tp.attachments.slice(1).map((att, ai) => (
                                     <div key={ai} className={s.contentRow}>
                                       <span className={s.contentLabel}>{ai === 0 ? 'Also' : ''}</span>
-                                      <a href={`${API_URL}${att.url}`} target="_blank" rel="noreferrer" className={s.contentLink}>{att.url.split('/').pop()}</a>
+                                      <span className={s.contentEmpty}>Hidden</span>
                                     </div>
                                   ))}
                                 </div>

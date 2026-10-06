@@ -6,6 +6,7 @@ import useVoiceAnswer from '../../../../../hooks/useVoiceAnswer';
 import {
   unansweredIndexes, nextUnansweredCycling, prevUnansweredCycling, answersForTimeUp,
 } from '../../../../../Components/Learner/QuestionFlow';
+import { normalizeQuizSettings } from '../../../../../Components/Learner/quizSettings';
 import s from './AptitudeTest.module.css';
 
 /* ── Helpers ─────────────────────────────────────────────────── */
@@ -16,7 +17,19 @@ function toArr(res) {
 }
 
 function fmtSecs(n) {
-  return `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
+  const h = Math.floor(n / 3600);
+  const mm = String(Math.floor((n % 3600) / 60)).padStart(2, '0');
+  const ss = String(n % 60).padStart(2, '0');
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+function shuffle(list) {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
 }
 
 function fmtDate(d) {
@@ -97,7 +110,10 @@ export default function AptitudeTestPage({ params }) {
   const [questions, setQuestions] = useState([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState({}); // qId -> { transcript, status }
-  const [testTimeLeft, setTestTimeLeft] = useState(3600); // 60-minute total timer
+  // The course's Aptitude Test → Settings (course builder). Same rules as a
+  // quiz's settings; attempts / pass mark / max questions don't apply here.
+  const [settings, setSettings] = useState(() => normalizeQuizSettings(null));
+  const [testElapsed, setTestElapsed] = useState(0); // seconds spent on the test
   const [evalResult, setEvalResult] = useState(null);
   const {
     transcript, setTranscript,
@@ -134,6 +150,8 @@ export default function AptitudeTestPage({ params }) {
         }
 
         setCourseTitle(course.title || 'this course');
+        const testSettings = normalizeQuizSettings(course.aptitudeSettings);
+        setSettings(testSettings);
 
         const qRes = await apiServiceHandler('GET', `aptitude-questions/list?courseId=${courseId}`).catch(() => null);
         const allQuestions = toArr(qRes);
@@ -153,8 +171,9 @@ export default function AptitudeTestPage({ params }) {
           return da - db;
         });
 
-        setQuestions(sorted);
-        setPhase('start');
+        setQuestions(testSettings.questionOrder === 'random' ? shuffle(sorted) : sorted);
+        // Auto Start: skip the start screen and go straight into the questions.
+        setPhase(testSettings.quizAutoStart ? 'question' : 'start');
       } catch {
         if (!cancelled) router.replace(`/learner/courses/${courseId}`);
       }
@@ -167,18 +186,20 @@ export default function AptitudeTestPage({ params }) {
     setCurrentIdx(0);
     setAnswers({});
     setEvalResult(null);
-    setTestTimeLeft(3600);
+    setTestElapsed(0);
     setPhase('question');
   }
 
-  // 60-minute total test countdown
+  // Test clock: counts up; with a Time Limit set, the test auto-submits when it runs out.
+  const timeLimit = settings.timeLimitSeconds; // 0 = no limit
+  const testTimeLeft = timeLimit > 0 ? Math.max(0, timeLimit - testElapsed) : null;
   useEffect(() => {
     if (phase !== 'question') return;
-    if (testTimeLeft <= 0) { handleTimeExpired(); return; }
-    const t = setTimeout(() => setTestTimeLeft(n => n - 1), 1000);
+    if (timeLimit > 0 && testElapsed >= timeLimit) { handleTimeExpired(); return; }
+    const t = setTimeout(() => setTestElapsed(n => n + 1), 1000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, testTimeLeft]);
+  }, [phase, testElapsed, timeLimit]);
 
   // Time's up → submit now; every pending question is marked "Skipped".
   function handleTimeExpired() {
@@ -273,7 +294,10 @@ export default function AptitudeTestPage({ params }) {
             test. Answer each question by speaking — your response is transcribed to
             text automatically. Your score and level will be shown at the end.
           </p>
-          <p className={s.startMeta}>{questions.length} question{questions.length !== 1 ? 's' : ''} · Speech-to-text · English</p>
+          <p className={s.startMeta}>
+            {questions.length} question{questions.length !== 1 ? 's' : ''} · Speech-to-text · English
+            {timeLimit > 0 && ` · Time limit: ${timeLimit < 60 ? `${timeLimit}s` : `${Math.round(timeLimit / 60)} min`}`}
+          </p>
           <button className={s.primaryBtn} onClick={startTest}>Start Aptitude Test</button>
         </div>
       </div>
@@ -298,7 +322,7 @@ export default function AptitudeTestPage({ params }) {
     const score = evalResult?.totalScore ?? 0;
     const level = evalResult?.level || 'beginner';
     const evaluated = evalResult?.answers ?? [];
-    const timeTaken = Math.max(0, 3600 - testTimeLeft);
+    const timeTaken = testElapsed;
     const timeTakenStr = `${Math.floor(timeTaken / 60)}m ${timeTaken % 60}s`;
     const correctCount = evaluated.filter(a => a.status !== 'skipped' && a.maxScore > 0 && (a.aiScore / a.maxScore) * 100 >= 60).length;
     const skippedCount = evaluated.filter(a => a.status === 'skipped').length;
@@ -433,20 +457,52 @@ export default function AptitudeTestPage({ params }) {
               <span className={s.testHeaderStatLbl}>Watch</span>
               <span className={s.testHeaderStatIcon}>{EyeIcon}</span>
             </div>
-            <div className={s.testHeaderStatDivider} />
-            <div className={s.testHeaderStat}>
-              <span className={s.testHeaderStatLbl}>Time</span>
-              <span className={s.testHeaderStatVal} style={{ color: testTimeLeft <= 300 ? '#dc2626' : undefined }}>
-                {fmtSecs(testTimeLeft)}
-              </span>
-            </div>
-            <div className={s.testHeaderStatDivider} />
-            <div className={s.testHeaderStat}>
-              <span className={s.testHeaderStatLbl}>Q. No</span>
-              <span className={s.testHeaderStatVal}>Q{currentIdx + 1}/{total}</span>
-            </div>
+            {!settings.hideQuizTime && (
+              <>
+                <div className={s.testHeaderStatDivider} />
+                <div className={s.testHeaderStat}>
+                  <span className={s.testHeaderStatLbl}>{testTimeLeft === null ? 'Time' : 'Time Left'}</span>
+                  <span className={s.testHeaderStatVal}
+                    style={{ color: testTimeLeft !== null && testTimeLeft <= 60 ? '#dc2626' : undefined }}>
+                    {fmtSecs(testTimeLeft === null ? testElapsed : testTimeLeft)}
+                  </span>
+                </div>
+              </>
+            )}
+            {!settings.hideQuestionNumber && (
+              <>
+                <div className={s.testHeaderStatDivider} />
+                <div className={s.testHeaderStat}>
+                  <span className={s.testHeaderStatLbl}>Q. No</span>
+                  <span className={s.testHeaderStatVal}>Q{currentIdx + 1}/{total}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
+
+        {/* Question Layout = All questions: every question listed; the
+            highlighted one is answered below, unanswered ones can be picked. */}
+        {settings.questionLayout === 'all' && (
+          <ol className={s.allList}>
+            {questions.map((qq, i) => {
+              const done = answers[String(qq._id)]?.status === 'answered';
+              const isCurrent = i === currentIdx;
+              return (
+                <li key={String(qq._id)}>
+                  <button type="button"
+                    className={`${s.allItem} ${isCurrent ? s.allItemCurrent : ''} ${done ? s.allItemDone : ''}`}
+                    disabled={done || isCurrent || isRecording || isTranscribing}
+                    onClick={() => { stopRecording(); setCurrentIdx(i); }}>
+                    {!settings.hideQuestionNumber && <span className={s.allNum}>Q{i + 1}</span>}
+                    <span className={s.allText}>{qq.question}</span>
+                    <span className={s.allStatus}>{done ? 'Answered' : isCurrent ? 'Answering' : 'Pending'}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        )}
 
         {/* Question */}
         <div className={s.testBody}>

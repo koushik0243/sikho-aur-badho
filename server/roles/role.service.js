@@ -34,7 +34,7 @@ export const createRole = async (newRole) => {
             return await Role.findOneAndUpdate(
                 { _id: deleted._id },
                 { $set: { display_name: newRole.display_name, desc: newRole.desc || '', status: newRole.status || 'active', user_type: userType, organizationId: orgId, deletedAt: null, updatedAt: new Date() } },
-                { new: true }
+                { returnDocument: 'after' }
             );
         }
         return await new Role({
@@ -107,7 +107,7 @@ export const updateRole = async (updateId, updateRoleData) => {
         return await Role.findOneAndUpdate(
             { _id: updateId, deletedAt: null },
             { $set: updateFields },
-            { new: true }
+            { returnDocument: 'after' }
         ).lean();
     } catch (error) {
         if (error.code === 11000) {

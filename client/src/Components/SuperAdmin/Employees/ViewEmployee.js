@@ -24,12 +24,21 @@ function fmtDate(val) {
   return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
 }
 
+// Date + time, so an update made the same day still shows a different Updated At.
+function fmtDateTime(val) {
+  if (!val) return '—';
+  const d = new Date(val);
+  if (isNaN(d)) return '—';
+  const time = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  return `${fmtDate(d)}, ${time}`;
+}
+
 function Row({ label, value }) {
   return (
-    <div className={s.viewRow}>
-      <div className={s.viewLabel}>{label}</div>
-      {value ? <div className={s.viewValue}>{value}</div> : <div className={s.viewValueMuted}>—</div>}
-    </div>
+    <tr>
+      <th scope="row" className={s.detailTh}>{label}</th>
+      <td className={value ? s.detailTd : `${s.detailTd} ${s.detailTdMuted}`}>{value || '—'}</td>
+    </tr>
   );
 }
 
@@ -41,7 +50,7 @@ export default function ViewEmployee() {
 
   useEffect(() => {
     if (!id) return;
-    apiServiceHandler('GET', `user/admin/edit/${id}`)
+    apiServiceHandler('GET', `user/admin/edit/${id}?t=${Date.now()}`)
       .then(res => setUser(res?.data ?? res))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -66,15 +75,23 @@ export default function ViewEmployee() {
         </button>
       </div>
 
-      <div className={s.viewCard}>
-        <div className={s.viewGrid}>
+      <div className={s.detailTableWrap}>
+        <table className={s.detailTable}>
+          <tbody>
           <Row label="Name"       value={user.name} />
           <Row label="Email"      value={user.email} />
+          <Row label="WhatsApp No" value={user.whatsapp_no} />
+          <Row label="Employee ID" value={user.emp_id} />
+          <Row label="Department" value={user.department} />
+          <Row label="Designation" value={user.designation} />
+          <Row label="Language Preference" value={user.course_language} />
+          <Row label="Access Start Date" value={user.access_start ? fmtDate(user.access_start) : null} />
           <Row label="Status"     value={user.status ? user.status.charAt(0).toUpperCase() + user.status.slice(1) : null} />
           <Row label="User Type"  value={user.user_type} />
-          <Row label="Created At" value={fmtDate(user.createdAt)} />
-          <Row label="Updated At" value={fmtDate(user.updatedAt)} />
-        </div>
+          <Row label="Created At" value={fmtDateTime(user.createdAt)} />
+          <Row label="Updated At" value={fmtDateTime(user.updatedAt)} />
+          </tbody>
+        </table>
       </div>
     </SuperAdminShell>
   );

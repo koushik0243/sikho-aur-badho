@@ -73,6 +73,8 @@ export default function WelcomeScreen() {
         {displayError && <div className={styles.errorBanner}>{displayError}</div>}
 
         <form onSubmit={handleActivate} style={{ width: '100%' }}>
+          {/* New + Confirm Password — side by side */}
+          <div className={styles.passwordPair}>
           <div className={styles.fieldGroup}>
             <label className={styles.label} htmlFor="welcome-new-pwd">New Password</label>
             <div className={styles.inputWrap}>
@@ -107,6 +109,7 @@ export default function WelcomeScreen() {
                 {showConfirm ? '🙈' : '👁️'}
               </button>
             </div>
+          </div>
           </div>
 
           <button

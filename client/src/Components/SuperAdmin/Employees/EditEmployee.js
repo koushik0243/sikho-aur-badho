@@ -5,6 +5,9 @@ import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
+import LearnerFields, {
+  EMPTY_LEARNER, learnerFromUser, learnerPayload, validateLearner, findDuplicateLearnerFields,
+} from './LearnerFields';
 import s from "./EditEmployee.module.css";
 
 const BackArrow = () => (
@@ -17,26 +20,18 @@ export default function EditEmployee() {
   const router = useRouter();
   const { id } = useParams();
 
-  const [form, setForm]         = useState({ name: '', email: '', password: '', confirmPassword: '', status: 'active' });
+  const [form, setForm]         = useState(EMPTY_LEARNER);
   const [loading, setLoading]   = useState(true);
   const [errors, setErrors]     = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [pwReadOnly, setPwReadOnly] = useState(true);
-  const [confirmPwReadOnly, setConfirmPwReadOnly] = useState(true);
 
   useEffect(() => {
     if (!id) return;
-    apiServiceHandler('GET', `user/admin/edit/${id}`)
+    apiServiceHandler('GET', `user/admin/edit/${id}?t=${Date.now()}`)
       .then(res => {
         const u = res?.data ?? res;
-        if (!u) return;
-        setForm({
-          name:            u.name ?? '',
-          email:           u.email ?? '',
-          password:        '',
-          confirmPassword: '',
-          status:          u.status ?? 'active',
-        });
+        if (u) setForm(learnerFromUser(u));
       })
       .catch(() => toast.error('Failed to load user.'))
       .finally(() => setLoading(false));
@@ -44,37 +39,22 @@ export default function EditEmployee() {
 
   function setField(key, val) { setForm(prev => ({ ...prev, [key]: val })); }
 
-  function validate() {
-    const e = {};
-    if (!form.name.trim()) e.name = 'Name is required.';
-    if (!form.email.trim()) e.email = 'Email is required.';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) e.email = 'Enter a valid email address.';
-    if (form.password) {
-      if (form.password.length < 6) e.password = 'Password must be at least 6 characters.';
-      if (!form.confirmPassword) e.confirmPassword = 'Please confirm the new password.';
-      else if (form.password !== form.confirmPassword) e.confirmPassword = 'Passwords do not match.';
-    }
-    return e;
-  }
-
   async function handleSubmit(e) {
     e.preventDefault();
-    const errs = validate();
+    if (submitting) return;
+    const errs = validateLearner(form, { passwordRequired: false });
     if (Object.keys(errs).length) { setErrors(errs); return; }
     setErrors({});
     setSubmitting(true);
     try {
-      const payload = {
-        name:   form.name.trim(),
-        email:  form.email.trim(),
-        status: form.status,
-      };
-      if (form.password) payload.password = form.password;
-      await apiServiceHandler('PUT', `user/admin/update/${id}`, payload);
+      const dupErrors = await findDuplicateLearnerFields(form, id);
+      if (Object.keys(dupErrors).length) { setErrors(dupErrors); return; }
+
+      await apiServiceHandler('PUT', `user/admin/update/${id}`, learnerPayload(form));
       toast.success('User updated successfully.');
       router.push('/superadmin/employees');
-    } catch {
-      toast.error('Failed to update user. Please try again.');
+    } catch (err) {
+      toast.error(err?.message || 'Failed to update user. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -94,77 +74,8 @@ export default function EditEmployee() {
           <p style={{ fontSize: 13, color: '#6b7280' }}>Loading…</p>
         ) : (
           <form onSubmit={handleSubmit} autoComplete="off">
-            <div className={s.formGrid}>
-
-              <div className={s.formGroup}>
-                <label>Name <span className={s.required}>*</span></label>
-                <input
-                  className={s.input}
-                  type="text"
-                  placeholder="Full name"
-                  value={form.name}
-                  onChange={e => setField('name', e.target.value)}
-                  autoComplete="off"
-                />
-                {errors.name && <p className={s.errorMsg}>{errors.name}</p>}
-              </div>
-
-              <div className={s.formGroup}>
-                <label>Email <span className={s.required}>*</span></label>
-                <input
-                  className={s.input}
-                  type="email"
-                  placeholder="user@example.com"
-                  value={form.email}
-                  onChange={e => setField('email', e.target.value)}
-                  autoComplete="off"
-                />
-                {errors.email && <p className={s.errorMsg}>{errors.email}</p>}
-              </div>
-
-              <div className={s.formGroup}>
-                <label>New Password <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span></label>
-                <input
-                  className={s.input}
-                  type="password"
-                  placeholder="Leave blank to keep current"
-                  value={form.password}
-                  onChange={e => setField('password', e.target.value)}
-                  autoComplete="new-password"
-                  readOnly={pwReadOnly}
-                  onFocus={() => setPwReadOnly(false)}
-                />
-                {errors.password && <p className={s.errorMsg}>{errors.password}</p>}
-              </div>
-
-              <div className={s.formGroup}>
-                <label>Confirm Password</label>
-                <input
-                  className={s.input}
-                  type="password"
-                  placeholder="Re-enter new password"
-                  value={form.confirmPassword}
-                  onChange={e => setField('confirmPassword', e.target.value)}
-                  autoComplete="new-password"
-                  readOnly={confirmPwReadOnly}
-                  onFocus={() => setConfirmPwReadOnly(false)}
-                />
-                {errors.confirmPassword && <p className={s.errorMsg}>{errors.confirmPassword}</p>}
-              </div>
-
-              <div className={s.formGroup}>
-                <label>Status</label>
-                <select
-                  className={s.select}
-                  value={form.status}
-                  onChange={e => setField('status', e.target.value)}
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-
-            </div>
+            <LearnerFields form={form} setField={setField} errors={errors} s={s} isEdit
+              pwReadOnly={pwReadOnly} onPasswordFocus={() => setPwReadOnly(false)} />
 
             <div className={s.formActions}>
               <button type="submit" className={s.btnSave} disabled={submitting}>

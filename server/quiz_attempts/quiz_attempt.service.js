@@ -121,7 +121,7 @@ export const QUIZ_LOCK_TTL_MS = 45 * 1000;
 const acquireLock = (Model, { userId, courseId, topicId, ownerId }) => Model.findOneAndUpdate(
   { userId, courseId },
   { userId, courseId, topicId, ownerId: ownerId || null, expiresAt: new Date(Date.now() + QUIZ_LOCK_TTL_MS) },
-  { upsert: true, new: true, setDefaultsOnInsert: true }
+  { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
 ).lean();
 
 // With ownerId, only that tab's lock is released — another tab may have taken

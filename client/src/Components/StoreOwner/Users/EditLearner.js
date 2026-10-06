@@ -4,13 +4,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
+import useDepartments from '../../../hooks/useDepartments';
 import s from "./EditLearner.module.css";
 
 const Icon = {
   chevronDown: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>,
 };
 
-const DEPARTMENTS = ['Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations', 'Design'];
 const LANGUAGES   = ['English', 'Hindi'];
 
 const EMPTY_FORM = {
@@ -32,6 +32,9 @@ export default function EditLearnerPage() {
   const router = useRouter();
 
   const [form, setForm]           = useState(EMPTY_FORM);
+  // Department options come from SuperAdmin → Manage Department; the learner's
+  // saved department stays selectable even if it's since been removed.
+  const { departments, loading: departmentsLoading } = useDepartments(form.department);
   const [notifyPrefs, setNotifyPrefs] = useState({ email: false, alert: false, digest: false });
   const [loading, setLoading]     = useState(true);
   const [notFound, setNotFound]   = useState(false);
@@ -157,9 +160,9 @@ export default function EditLearnerPage() {
                   <div className={s.fieldGroup}>
                     <label className={s.label}>Department</label>
                     <div className={s.selectWrapper}>
-                      <select className={s.select} value={form.department} onChange={set('department')}>
-                        <option value="">Select Department</option>
-                        {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                      <select className={s.select} value={form.department} onChange={set('department')} disabled={departmentsLoading}>
+                        <option value="">{departmentsLoading ? 'Loading departments…' : 'Select Department'}</option>
+                        {departments.map(d => <option key={d} value={d}>{d}</option>)}
                       </select>
                       <span className={s.selectChevron}>{Icon.chevronDown}</span>
                     </div>

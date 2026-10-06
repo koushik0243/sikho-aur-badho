@@ -64,7 +64,7 @@ export const updateCourseCategory = async (updateId, data) => {
         return await CourseCategory.findOneAndUpdate(
             { _id: updateId, deletedAt: null },
             { $set: updateFields },
-            { new: true, runValidators: true }
+            { returnDocument: 'after', runValidators: true }
         ).lean();
     } catch (error) {
         throw error;

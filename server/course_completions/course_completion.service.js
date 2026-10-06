@@ -72,7 +72,53 @@ export const markCourseComplete = async ({ userId, courseId }) => {
         topicIds: topics.map(t => t._id),
       },
     },
-    { upsert: true, new: true }
+    { upsert: true, returnDocument: 'after' }
   ).lean();
   return { record };
+};
+
+/**
+ * A learner's certificate status for one course, for the store owner / super
+ * admin certificate page. Read-only — it never records a completion (only the
+ * learner's own course/certificate page does that).
+ * Completed = the learner's saved certificate record, or else every lesson
+ * watched AND every quiz passed in a course that has at least one quiz (so a
+ * course with nothing to pass can't count as completed by someone who never
+ * opened it, and a completed course always has a score).
+ * @returns {Promise<{ completed: boolean, completedAt: Date|null, score: number|null,
+ *   attempted: boolean, quizzesPassed: number, quizzesTotal: number }>}
+ */
+export const getLearnerCourseStatus = async ({ userId, courseId }) => {
+  const uid = new ObjectId(userId);
+  const cid = new ObjectId(courseId);
+  const record = await getCompletion({ userId: uid, courseId: cid });
+  const { topics, chapterIds } = await loadCourseContent(courseId);
+  const quizIds = topics.filter(t => topicKind(t) === 'quiz').map(t => t._id);
+
+  const attempts = await QuizAttempt.find({ userId: uid, courseId: cid })
+    .select('topicId totalScore passed evaluatedAt createdAt').lean();
+  const quizSet = new Set(quizIds.map(String));
+  const bestPassed = new Map(); // quiz topicId → best passing score
+  let latestPassAt = null;
+  for (const a of attempts) {
+    const tid = String(a.topicId);
+    if (!a.passed || !quizSet.has(tid)) continue;
+    bestPassed.set(tid, Math.max(bestPassed.get(tid) ?? 0, Number(a.totalScore) || 0));
+    const at = new Date(a.evaluatedAt || a.createdAt);
+    if (!latestPassAt || at > latestPassAt) latestPassAt = at;
+  }
+
+  const verified = !record && quizIds.length > 0
+    && await verifyCourseDone({ userId: uid, courseId: cid, topics, chapterIds });
+  const completed = !!record || verified;
+  const scores = [...bestPassed.values()];
+  return {
+    completed,
+    completedAt: record?.completedAt || (verified ? latestPassAt : null),
+    score: completed && scores.length ? Math.round(scores.reduce((s, v) => s + v, 0) / scores.length) : null,
+    attempted: attempts.length > 0,
+    quizzesPassed: bestPassed.size,
+    quizzesTotal: quizIds.length,
+    lastPassedAt: latestPassAt,
+  };
 };

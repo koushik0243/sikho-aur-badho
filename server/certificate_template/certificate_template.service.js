@@ -105,7 +105,7 @@ export const updateCertificateTemplate = async (id, data) => {
         return await CertificateTemplate.findOneAndUpdate(
             { _id: id, deletedAt: null },
             { $set: updateFields },
-            { new: true, runValidators: true }
+            { returnDocument: 'after', runValidators: true }
         ).lean();
     } catch (error) {
         throw error;
@@ -158,7 +158,7 @@ export const deleteCertificateTemplate = async (id) => {
                     updatedAt: now,
                 },
             },
-            { new: true }
+            { returnDocument: 'after' }
         ).lean();
     } catch (error) {
         throw error;

@@ -5,9 +5,12 @@ import Course from '../courses/course.model.js';
 
 const { ObjectId } = mongoose.Types;
 
+// QA origin: 'generated' (AI) or 'created' (hand-written by a super admin).
+export const QA_STATUSES = ['generated', 'created'];
+
 const buildQuery = (filters = {}) => {
-  const query = { deletedAt: null, status: { $ne: 'inactive' } };
-  if (filters.status) query.status = filters.status;
+  const query = { deletedAt: null };
+  if (QA_STATUSES.includes(filters.status)) query.status = filters.status;
   if (filters.courseId && ObjectId.isValid(filters.courseId)) {
     query.courseId = new ObjectId(filters.courseId);
   }
@@ -110,7 +113,7 @@ Return ONLY a valid JSON array (no markdown fences, no extra text) in this exact
     difficulty: VALID_DIFFICULTIES.includes(q.difficulty) ? q.difficulty : 'beginner',
     explanation: q.explanation || '',
     batchNumber,
-    status: 'active',
+    status: 'generated',
     deletedAt: null,
   }));
 
@@ -148,12 +151,12 @@ export const createQuestion = async (data) => {
     answer: data.answer || '',
     difficulty: data.difficulty,
     explanation: data.explanation || '',
-    status: 'active',
+    status: 'created',
   }).save();
 };
 
 export const updateQuestion = async (updateId, data) => {
-  const fields = ['question', 'answer', 'difficulty', 'explanation', 'status'];
+  const fields = ['question', 'answer', 'difficulty', 'explanation']; // status is fixed at creation
   const updateFields = {};
   for (const field of fields) {
     if (data[field] !== undefined) updateFields[field] = data[field];
@@ -164,7 +167,7 @@ export const updateQuestion = async (updateId, data) => {
   return await AptitudeQuestion.findOneAndUpdate(
     { _id: updateId, deletedAt: null },
     { $set: { ...updateFields, updatedAt: new Date() } },
-    { new: true, runValidators: true }
+    { returnDocument: 'after', runValidators: true }
   ).lean();
 };
 

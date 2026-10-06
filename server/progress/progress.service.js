@@ -31,7 +31,7 @@ export const updateProgress = async ({ userId, courseId, topicId, watchedSeconds
       lastPosition:    Math.floor(lastPosition ?? watchedSeconds),
       completed,
     },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
+    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
   ).lean();
 };
 

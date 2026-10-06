@@ -26,6 +26,9 @@ const CourseSchema = new Schema({
   aptitudeEnabled: { type: Boolean, default: false },
   aptitudeContext: { type: String, default: '' },
   aptitudeSelectedQuestionIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "aptitude_questions", default: [] }],
+  // Aptitude test Settings tab (course builder) — see course.service.js
+  // sanitizeAptitudeSettings for the allowed keys.
+  aptitudeSettings: { type: mongoose.Schema.Types.Mixed, default: null },
   certificate_template_id: { type: mongoose.Schema.Types.ObjectId, ref: 'certificate_template', default: null },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   deletedAt: { type: Date, required: false, default: null },

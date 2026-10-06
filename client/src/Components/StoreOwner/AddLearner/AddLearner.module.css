@@ -1087,3 +1087,9 @@
     margin: 0 4px;
   }
 }
+
+
+/* Phones: the shell already pads the page — don't double it */
+@media (max-width: 640px) {
+  .content { padding: 0; }
+}

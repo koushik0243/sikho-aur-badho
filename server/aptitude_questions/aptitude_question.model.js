@@ -9,7 +9,9 @@ const AptitudeQuestionSchema = new Schema(
     difficulty:  { type: String, enum: ['beginner', 'intermediate', 'advanced'], required: true },
     explanation: { type: String, default: '' },
     batchNumber: { type: Number, default: 1 },
-    status:      { type: String, enum: ['active', 'inactive'], default: 'active' },
+    // How the question came to exist: 'generated' by AI, or 'created' by hand
+    // by a super admin in the course builder. (Removal is tracked by deletedAt.)
+    status:      { type: String, enum: ['generated', 'created'], default: 'generated' },
     deletedAt:   { type: Date, default: null },
   },
   { timestamps: true }

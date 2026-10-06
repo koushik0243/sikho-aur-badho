@@ -51,7 +51,7 @@ export const updateTag = async (id, data) => {
         return await Tag.findOneAndUpdate(
             { _id: id, deletedAt: null },
             { $set: updateFields },
-            { new: true, runValidators: true }
+            { returnDocument: 'after', runValidators: true }
         ).lean();
     } catch (error) {
         throw error;
@@ -94,7 +94,7 @@ export const deleteTag = async (id) => {
         return await Tag.findOneAndUpdate(
             { _id: id, deletedAt: null },
             { $set: { deletedAt: new Date() } },
-            { new: true }
+            { returnDocument: 'after' }
         ).lean();
     } catch (error) {
         throw error;

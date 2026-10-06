@@ -5,7 +5,7 @@ export const submitReview = async ({ userId, courseId, chapterId, rating, text }
   return await Review.findOneAndUpdate(
     { userId, chapterId },
     { userId, courseId, chapterId, rating, text },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
+    { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
   ).lean();
 };
 

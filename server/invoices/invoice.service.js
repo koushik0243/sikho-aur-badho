@@ -96,7 +96,7 @@ export const updateInvoice = async (id, data) => {
         return await Invoice.findOneAndUpdate(
             { _id: id, deletedAt: null },
             { $set: updateFields },
-            { new: true, runValidators: true }
+            { returnDocument: 'after', runValidators: true }
         ).lean();
     } catch (error) {
         throw error;

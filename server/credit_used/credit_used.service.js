@@ -49,7 +49,7 @@ export const updateCreditUsed = async (id, data) => {
     if (Object.keys(fields).length === 0) {
         return await populateRefs(CreditUsed.findById(id)).lean();
     }
-    return await CreditUsed.findByIdAndUpdate(id, { $set: fields }, { new: true }).lean();
+    return await CreditUsed.findByIdAndUpdate(id, { $set: fields }, { returnDocument: 'after' }).lean();
 };
 
 export const listCreditUsed = async (filters = {}) => {
@@ -76,6 +76,6 @@ export const deleteCreditUsed = async (id) => {
     return await CreditUsed.findByIdAndUpdate(
         id,
         { $set: { deletedAt: new Date(), status: 'inactive' } },
-        { new: true }
+        { returnDocument: 'after' }
     ).lean();
 };

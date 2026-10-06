@@ -349,7 +349,7 @@ export default function EditOrganization() {
             </p>
             <div className={s.formRow}>
               <div className={s.formGroup}>
-                <label className={s.label}>Email / Username</label>
+                <label className={s.label}>Email</label>
                 <input
                   className={s.input}
                   type="email"

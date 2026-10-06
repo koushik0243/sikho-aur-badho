@@ -154,3 +154,23 @@ a {
   outline: 2px solid #dc2626 !important;
   outline-offset: 2px !important;
 }
+
+/* ── Content protection (see Components/PlatformSecurity.js) ───────────────
+   Applies only inside the learner / store owner / super admin areas. */
+html.protected-area img,
+html.protected-area video {
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+/* Print Screen pressed → blank the page for a moment */
+html.capture-blocked body {
+  visibility: hidden !important;
+}
+
+/* Printing an account page prints nothing (certificates print from their own window) */
+@media print {
+  html.protected-area body {
+    display: none !important;
+  }
+}

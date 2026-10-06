@@ -121,7 +121,8 @@ export default function CourseCertificate() {
 
   const [courseObj, setCourseObj] = useState(null);
   const [template, setTemplate] = useState(null);
-  const [quizAttempt, setQuizAttempt] = useState(null);
+  // Server-side completion status: every lesson watched + every quiz passed.
+  const [status, setStatus] = useState(null); // { completed, completedAt, score, attempted, quizzesPassed, quizzesTotal }
   const [assignedDate, setAssignedDate] = useState(null);
   const [chapters, setChapters] = useState([]);
   const [loadingData, setLoadingData] = useState(false);
@@ -206,7 +207,7 @@ export default function CourseCertificate() {
   // ── Certificate data for learner + course ───────────────────
   useEffect(() => {
     if (!selectedLearner || !selectedCourse) {
-      setCourseObj(null); setTemplate(null); setQuizAttempt(null);
+      setCourseObj(null); setTemplate(null); setStatus(null);
       setAssignedDate(null); setChapters([]);
       return;
     }
@@ -236,15 +237,15 @@ export default function CourseCertificate() {
           setTemplate(tmplRef);
         }
 
-        const [attRes, chRes, assignRes] = await Promise.all([
-          apiServiceHandler('GET', `quiz-attempt/course-all?courseId=${selectedCourse}`).catch(() => null),
+        const [statusRes, chRes, assignRes] = await Promise.all([
+          // Timestamp defeats the 60s GET cache — completion must be current.
+          apiServiceHandler('GET', `course-completion/learner-status?userId=${selectedLearner}&courseId=${selectedCourse}&t=${Date.now()}`).catch(() => null),
           apiServiceHandler('GET', `chapter/list?courseId=${selectedCourse}`).catch(() => null),
           apiServiceHandler('GET', `course-assignment/list?userId=${selectedLearner}&courseId=${selectedCourse}`).catch(() => null),
         ]);
         if (cancelled) return;
 
-        const attempts = toArr(attRes).filter(a => String(a.userId?._id || a.userId || '') === selectedLearner);
-        setQuizAttempt(attempts[0] || null);
+        setStatus(statusRes?.data ?? null);
         setChapters(toArr(chRes));
 
         // The assignment action itself creates a course_assignments doc with no
@@ -273,14 +274,17 @@ export default function CourseCertificate() {
   const courseName = courseObj?.title
                     || courseOptions.find(c => c._id === selectedCourse)?.title
                     || '—';
-  const score          = quizAttempt ? Number(quizAttempt.totalScore || 0) : 0;
-  const passed         = quizAttempt ? quizAttempt.passed === true : false;
-  const attemptDate    = quizAttempt?.evaluatedAt || quizAttempt?.createdAt || null;
-  const completionDate = passed ? attemptDate : null;
+  // A certificate is earned only once the whole course is complete (every
+  // lesson watched and every quiz passed) — not on a single passed quiz.
+  const passed         = status?.completed === true;
+  const attempted      = status?.attempted === true;
+  const score          = passed && status?.score != null ? Number(status.score) : 0;
+  const completionDate = passed ? status?.completedAt || null : null;
   const chapterCount   = chapters.length;
   const hasData      = selectedLearner && selectedCourse && !loadingData;
   const certId       = certNumber(template?._id, selectedLearner);
-  const certHtml     = hasData ? buildCertHtml(template, learnerName, courseName, score, completionDate, chapterCount, certId) : null;
+  // Only a completed course has a certificate to preview or download.
+  const certHtml     = hasData && passed ? buildCertHtml(template, learnerName, courseName, score, completionDate, chapterCount, certId) : null;
 
   function handleDownload() {
     if (downloading || !certHtml) return;
@@ -387,7 +391,18 @@ export default function CourseCertificate() {
               <span className={s.certPanelSub}>Preview</span>
             </div>
 
-            {certHtml ? (
+            {!passed ? (
+              <div className={s.noTemplateWrap}>
+                <svg viewBox="0 0 48 48" fill="none" width="40" height="40">
+                  <rect x="12" y="21" width="24" height="17" rx="3" stroke="#64748b" strokeWidth="2" fill="#f1f5f9" />
+                  <path d="M17 21v-4a7 7 0 0114 0v4" stroke="#64748b" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                <p className={s.noTemplateTitle}>Certificate not available yet</p>
+                <p className={s.noTemplateSub}>
+                  {learnerName || 'The learner'} will get this certificate after completing every lesson and passing every quiz in this course.
+                </p>
+              </div>
+            ) : certHtml ? (
               <div className={s.certFrame} style={{ height: iframeHeight }}>
                 <iframe
                   ref={certIframeRef}
@@ -448,7 +463,7 @@ export default function CourseCertificate() {
               <div className={s.summaryRow}>
                 <span className={s.summaryLabel}>Status</span>
                 <span className={passed ? s.badgePassed : s.badgeInProgress}>
-                  {quizAttempt ? (passed ? 'Passed' : 'Not Passed') : 'Not Attempted'}
+                  {passed ? 'Passed' : attempted ? 'In Progress' : 'Not Attempted'}
                 </span>
               </div>
             </div>
@@ -476,8 +491,9 @@ export default function CourseCertificate() {
               <p className={s.achieveText}>
                 {passed
                   ? <><strong>{learnerName}</strong> has successfully completed this course.</>
-                  : quizAttempt
-                    ? <>{learnerName} attempted the quiz but hasn&apos;t passed this course yet.</>
+                  : attempted
+                    ? <>{learnerName} has started this course but hasn&apos;t completed it yet
+                        {status?.quizzesTotal > 0 && ` (${status.quizzesPassed} of ${status.quizzesTotal} quizzes passed)`}.</>
                     : <>{learnerName} hasn&apos;t attempted the course quiz yet.</>}
               </p>
             </div>

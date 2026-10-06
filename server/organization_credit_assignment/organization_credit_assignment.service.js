@@ -142,7 +142,7 @@ export const updateOrgCreditAssignment = async (updateId, data) => {
         return await OrgCreditAssignment.findOneAndUpdate(
             { _id: updateId, deletedAt: null },
             { $set: updateFields },
-            { new: false, runValidators: true }
+            { returnDocument: 'before', runValidators: true }
         ).lean();
     } catch (error) {
         throw error;
@@ -188,7 +188,7 @@ export const deleteOrgCreditAssignment = async (delId) => {
         return await OrgCreditAssignment.findOneAndUpdate(
             { _id: delId, deletedAt: null },
             { $set: { deletedAt: new Date(), status: 'inactive' } },
-            { new: false }
+            { returnDocument: 'before' }
         ).lean();
     } catch (error) {
         throw error;

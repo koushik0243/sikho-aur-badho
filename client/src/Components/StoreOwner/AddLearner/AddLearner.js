@@ -4,10 +4,9 @@ import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import { selectUser } from '../../../redux/slices/authSlice';
+import useDepartments from '../../../hooks/useDepartments';
 import apiServiceHandler, { clearGetCache } from '../../../service/apiService';
 import { toast } from 'sonner';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
 import s from "./AddLearner.module.css";
 
 // ── Icons ────────────────────────────────────────────────────────
@@ -26,15 +25,14 @@ const STEPS = [
   { num: '03', label: 'Notification & Confirm' },
 ];
 
-const DEPARTMENTS = ['Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations', 'Design'];
 const LANGUAGES   = ['English', 'Hindi'];
 
 const EMPTY_FORM = {
   firstName: '', lastName: '',
   email: '', whatsapp_no: '',
   employeeId: '', department: '',
-  designation: '', language: '', accessStartDate: '',
-  tempPassword: '', accountStatus: 'active',
+  designation: '', language: '',
+  tempPassword: '', confirmTempPassword: '', accountStatus: 'active',
 };
 
 
@@ -45,6 +43,8 @@ export default function AddLearnerPage() {
 
   const [activeStep, setActiveStep] = useState(0);
   const [form, setForm] = useState(EMPTY_FORM);
+  // Department options come from SuperAdmin → Manage Department.
+  const { departments, loading: departmentsLoading } = useDepartments(form.department);
   const [courses, setCourses] = useState([]);
   const [coursesLoading, setCoursesLoading] = useState(false);
   const [selectedCourseIds, setSelectedCourseIds] = useState([]);
@@ -155,6 +155,9 @@ export default function AddLearnerPage() {
     if (!form.firstName.trim()) { toast.error('Name is required.'); return; }
     if (!form.email.trim())     { toast.error('Email is required.'); return; }
     if (!form.tempPassword.trim()) { toast.error('Temporary password is required.'); return; }
+    if (form.tempPassword.length < 6) { toast.error('Temporary password must be at least 6 characters.'); return; }
+    if (!form.confirmTempPassword) { toast.error('Please confirm the temporary password.'); return; }
+    if (form.tempPassword !== form.confirmTempPassword) { toast.error('Temporary passwords do not match.'); return; }
 
     // Block on a duplicate email or WhatsApp No before letting the learner
     // move on — both are unique identifiers on the users table.
@@ -199,7 +202,6 @@ export default function AddLearnerPage() {
         department: form.department,
         designation: form.designation,
         course_language: form.language,
-        access_start: form.accessStartDate || null,
         status: form.accountStatus,
         user_type: 'employee',
         orgRole: 'employee',
@@ -341,9 +343,9 @@ export default function AddLearnerPage() {
                 <div className={s.fieldGroup}>
                   <label className={s.label}>Department</label>
                   <div className={s.selectWrapper}>
-                    <select className={s.select} value={form.department} onChange={set('department')}>
-                      <option value="">Select Department</option>
-                      {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                    <select className={s.select} value={form.department} onChange={set('department')} disabled={departmentsLoading}>
+                      <option value="">{departmentsLoading ? 'Loading departments…' : 'Select Department'}</option>
+                      {departments.map(d => <option key={d} value={d}>{d}</option>)}
                     </select>
                     <span className={s.selectChevron}>{Icon.chevronDown}</span>
                   </div>
@@ -363,23 +365,6 @@ export default function AddLearnerPage() {
                   </div>
                 </div>
                 <div className={s.fieldGroup}>
-                  <label className={s.label}>Access Start Date</label>
-                  <DatePicker
-                    selected={form.accessStartDate ? new Date(form.accessStartDate) : null}
-                    onChange={(date) => setForm(prev => ({ ...prev, accessStartDate: date ? date.toISOString().slice(0, 10) : '' }))}
-                    dateFormat="dd/MM/yyyy"
-                    placeholderText="DD/MM/YYYY"
-                    className={s.input}
-                    wrapperClassName={s.datePickerWrapper}
-                    autoComplete="off"
-                  />
-                </div>
-                <div className={s.fieldGroup}>
-                  <label className={s.label}>Temporary Password <span className={s.req}>*</span></label>
-                  <input className={s.input} type="password" value={form.tempPassword} onChange={set('tempPassword')} />
-                  <div className={s.fieldHint}>Learner will be prompted to reset on first login</div>
-                </div>
-                <div className={s.fieldGroup}>
                   <label className={s.label}>Account Status</label>
                   <div className={s.selectWrapper}>
                     <select className={s.select} value={form.accountStatus} onChange={set('accountStatus')}>
@@ -388,6 +373,18 @@ export default function AddLearnerPage() {
                     </select>
                     <span className={s.selectChevron}>{Icon.chevronDown}</span>
                   </div>
+                </div>
+                <div className={s.fieldGroup}>
+                  <label className={s.label}>Temporary Password <span className={s.req}>*</span></label>
+                  <input className={s.input} type="password" placeholder="Password" value={form.tempPassword} onChange={set('tempPassword')} autoComplete="new-password" />
+                </div>
+                <div className={s.fieldGroup}>
+                  <label className={s.label}>Temporary Confirm Password <span className={s.req}>*</span></label>
+                  <input className={s.input} type="password" placeholder="Re-enter the temporary password"
+                    value={form.confirmTempPassword} onChange={set('confirmTempPassword')} autoComplete="new-password" />
+                  {form.confirmTempPassword && form.confirmTempPassword !== form.tempPassword && (
+                    <div className={s.fieldHint} style={{ color: '#dc2626' }}>Passwords do not match</div>
+                  )}
                 </div>
               </div>
               <div className={s.assignCourseRow}>

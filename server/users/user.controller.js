@@ -543,7 +543,8 @@ const adminLoginUser = async (req, res, next) => {
 
 const adminLoginRequestOtp = async (req, res, next) => {
     try {
-        const userDetails = await User.findOne({ email: req.body.email, deletedAt: null });
+        // .lean(): the raw record, so a missing status isn't filled in as "active"
+        const userDetails = await User.findOne({ email: req.body.email, deletedAt: null }).lean();
         if (!userDetails) {
             return res.status(400).json({ status: 400, message: "Email does not exist." });
         }
@@ -552,6 +553,8 @@ const adminLoginRequestOtp = async (req, res, next) => {
         if (!isMatch) {
             return res.status(400).json({ status: 400, message: "Password does not match." });
         }
+        try { UserHelper.assertActiveStatus(userDetails); }
+        catch (e) { return res.status(400).json({ status: 400, message: e.message }); }
 
         const otp = Math.floor(1000 + Math.random() * 9999).toString();
         const payload = {
@@ -618,7 +621,7 @@ const adminLoginRequestOtp = async (req, res, next) => {
 
 const adminLoginVerifyOtp = async (req, res, next) => {
     try {
-        const userDetails = await User.findOne({ email: req.body.email, user_type: 'superadmin', deletedAt: null });
+        const userDetails = await User.findOne({ email: req.body.email, user_type: 'superadmin', deletedAt: null }).lean();
         if (!userDetails) {
             return res.status(400).json({ status: 400, message: "Email does not exist." });
         }
@@ -630,6 +633,8 @@ const adminLoginVerifyOtp = async (req, res, next) => {
         if (!userDetails.otpExpires || userDetails.otpExpires < Date.now()) {
             return res.status(400).json({ status: 400, message: "OTP has expired." });
         }
+        try { UserHelper.assertActiveStatus(userDetails); }
+        catch (e) { return res.status(400).json({ status: 400, message: e.message }); }
 
         const payload = {
             otp: null,
@@ -847,6 +852,19 @@ const resetPassword = async (req, res, next) => {
 const updateUserPassword = async (req, res, next) => {
     try {
         const userDetails = await User.findOne({ _id: req.params.id, deletedAt: null });
+        if (!userDetails) return res.status(404).json({ status: 404, message: "User does not exist." });
+        const isSelf = String(req.user?._id) === String(req.params.id);
+        if (!isSelf) {
+            const me = await User.findById(req.user?._id).select('user_type orgId orgRole deletedAt').lean();
+            const sameOrgAdmin = me && !me.deletedAt && me.orgId && userDetails.orgId
+                && String(me.orgId) === String(userDetails.orgId) && ['owner', 'admin'].includes(me.orgRole);
+            if (!me || me.deletedAt || (me.user_type !== 'superadmin' && !sameOrgAdmin)) {
+                return res.status(403).json({ status: 403, message: "Not allowed to change this user's password." });
+            }
+        }
+        if (typeof req.body.password !== 'string' || req.body.password.length < 6) {
+            return res.status(400).json({ status: 400, message: "Password must be at least 6 characters." });
+        }
         const payload = {
             password: req.body.password,
         }

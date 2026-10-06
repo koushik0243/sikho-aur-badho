@@ -68,9 +68,11 @@ const Users = new Schema(
         isVerified: { type: Boolean, default: false },        
         deletedAt: { type: Date, default: null },        
         status: { type: String, enum: ['active', 'inactive', 'suspended', 'deleted'], default: 'active', required: true },        
-        createdAt: { type: Date, default: Date.now },        
-        updatedAt: { type: Date, default: Date.now },        
-    }    
+    },
+    // Mongoose-managed timestamps: on create createdAt and updatedAt get the
+    // same moment; every update (save, updateOne, findOneAndUpdate, …) moves
+    // updatedAt; createdAt is immutable, so an update can never change it.
+    { timestamps: true }
 );
 
 // Matches the exact filter shape used by listUser/listUserPagination (org-scoped

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { selectUser } from '../../../../redux/slices/authSlice';
 import apiServiceHandler, { clearGetCache } from '../../../../service/apiService';
 import { API_URL } from '../../../../lib/constant';
+import { useMediaToken, getMediaToken, secureMediaUrl } from '../../../../lib/mediaToken';
 import useVoiceAnswer from '../../../../hooks/useVoiceAnswer';
 import { normalizeQuizSettings } from '../../../../Components/Learner/quizSettings';
 import { fetchCourseCompletion, recordCourseCompletion, completedChapterIdSet } from '../../../../Components/Learner/courseCompletion';
@@ -120,7 +121,15 @@ function timeAgo(d) {
 }
 
 // ── VideoPlayer ───────────────────────────────────────────────────────────────
-function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange, topicId, courseId, savedPosition, onProgress, onDurationLoad, isCompleted, serverPct, onVideoEnded, playCommand, courseCompleted, resetSignal = 0 }) {
+// Watermark position cycle: the learner's name + email drift between these spots
+// so a screen recording is always traceable to the account.
+const WATERMARK_SPOTS = [
+  { top: '12%', left: '8%' }, { top: '70%', left: '55%' }, { top: '35%', left: '62%' },
+  { top: '78%', left: '10%' }, { top: '18%', left: '48%' }, { top: '52%', left: '25%' },
+];
+const WATERMARK_MOVE_MS = 6000;
+
+function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange, topicId, courseId, savedPosition, onProgress, onDurationLoad, isCompleted, serverPct, onVideoEnded, playCommand, courseCompleted, resetSignal = 0, watermark = '', onSourceError }) {
   const videoRef      = useRef(null);
   const containerRef  = useRef(null);
   const lastSavedRef  = useRef(0);
@@ -130,6 +139,30 @@ function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange,
   const [dur,      setDur]      = useState(0);
   const [speed,    setSpeed]    = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [obscured, setObscured] = useState(false); // tab/window lost focus — video paused & blanked
+  const [wmSpot, setWmSpot] = useState(0);
+
+  // Recording deterrent: pause and blank the video whenever this tab or window
+  // loses focus (another app, tab, recorder or dev tools takes it).
+  useEffect(() => {
+    function hide() {
+      videoRef.current?.pause();
+      setObscured(true);
+    }
+    function onVisibility() { if (document.hidden) hide(); }
+    window.addEventListener('blur', hide);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('blur', hide);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!watermark) return;
+    const t = setInterval(() => setWmSpot(i => (i + 1) % WATERMARK_SPOTS.length), WATERMARK_MOVE_MS);
+    return () => clearInterval(t);
+  }, [watermark]);
 
   useEffect(() => {
     function onFsChange() {
@@ -317,7 +350,30 @@ function VideoPlayer({ videoSrc, imgSrc, isPlaying, onToggle, onPlayStateChange,
             onPlay={handlePlay}
             onPause={handlePause}
             onClick={togglePlay}
+            onError={() => onSourceError?.()}
+            onContextMenu={e => e.preventDefault()}
+            onDragStart={e => e.preventDefault()}
+            draggable={false}
+            controlsList="nodownload noremoteplayback noplaybackrate"
+            disablePictureInPicture
+            disableRemotePlayback
+            playsInline
           />
+
+          {watermark && (
+            <div className={s.videoWatermark} style={WATERMARK_SPOTS[wmSpot]} aria-hidden="true">
+              {watermark}
+            </div>
+          )}
+
+          {obscured && (
+            <button type="button" className={s.videoObscured} onClick={() => setObscured(false)}>
+              <span className={s.videoObscuredTitle}>Video paused</span>
+              <span className={s.videoObscuredText}>
+                Playback pauses when you leave this window. Click here, then press play to continue.
+              </span>
+            </button>
+          )}
 
           {/* Watched % badge — top-right */}
           <div className={s.watchPctBadge}>
@@ -1487,8 +1543,9 @@ function AssignmentPanel({ topic, isDone, onDone }) {
 
   async function handleDownload() {
     if (!fileUrl || downloading) return;
-    const fullUrl = fileUrl.startsWith('http') ? fileUrl : `${API_URL}${fileUrl}`;
     setDownloading(true);
+    const fullUrl = secureMediaUrl(fileUrl, await getMediaToken())
+      || (fileUrl.startsWith('http') ? fileUrl : `${API_URL}${fileUrl}`);
     try {
       const response = await fetch(fullUrl);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -1591,6 +1648,22 @@ export default function CourseDetailPage({ params }) {
   const [enrolledCount,   setEnrolledCount]   = useState(0); // distinct learners assigned this course, across all orgs
 
   const user = useSelector(selectUser);
+  // Lesson videos need a short-lived media token (server/middleware/mediaAuth.js).
+  const [mediaToken, refreshMediaToken] = useMediaToken();
+  // The video URL is fixed per lesson so the background token refresh never
+  // reloads a playing video; it only changes if the server rejects the token.
+  const videoUrlRef = useRef({ key: '', url: null });
+  const [videoUrlNonce, setVideoUrlNonce] = useState(0);
+  const videoRetryRef = useRef('');
+  const watermarkText = [user?.name, user?.email].filter(Boolean).join(' · ');
+  async function handleVideoSourceError(rawVid) {
+    // One retry per lesson + token: fetch a fresh token and rebuild the URL.
+    const k = `${rawVid}|${videoUrlNonce}`;
+    if (videoRetryRef.current === k) return;
+    videoRetryRef.current = k;
+    await refreshMediaToken();
+    setVideoUrlNonce(n => n + 1);
+  }
   const userId = user ? String(user._id || user.id || '') : '';
 
   useEffect(() => {
@@ -2179,7 +2252,11 @@ export default function CourseDetailPage({ params }) {
             )}
             {(topicType === 'lesson' || !activeTopic) && (() => {
               const rawVid   = activeTopic?.videoUrl || '';
-              const videoSrc = rawVid ? (rawVid.startsWith('http') ? rawVid : `${API_URL}${rawVid}`) : null;
+              const urlKey   = `${rawVid}|${videoUrlNonce}`;
+              if (videoUrlRef.current.key !== urlKey || !videoUrlRef.current.url) {
+                videoUrlRef.current = { key: urlKey, url: secureMediaUrl(rawVid, mediaToken) };
+              }
+              const videoSrc = rawVid ? videoUrlRef.current.url : null;
               const topProg  = progressMap[activeTopId];
               return (
                 <VideoPlayer
@@ -2199,6 +2276,8 @@ export default function CourseDetailPage({ params }) {
                   playCommand={playCommand}
                   courseCompleted={courseFullyComplete}
                   resetSignal={videoResetSignal}
+                  watermark={watermarkText}
+                  onSourceError={() => handleVideoSourceError(rawVid)}
                 />
               );
             })()}

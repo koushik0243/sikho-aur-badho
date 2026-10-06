@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import apiServiceHandler from '../../../service/apiService';
 import { API_URL } from '../../../lib/constant';
+import { useMediaToken, secureMediaUrl } from '../../../lib/mediaToken';
 import SuperAdminShell from '../SuperAdminShell';
 import s from "./ViewCourseBuilder.module.css";
 
@@ -31,6 +32,8 @@ const TYPE_STYLE = {
 
 export default function ViewCourseBuilder() {
   const router = useRouter();
+  // Course files open with a short-lived media token (server/middleware/mediaAuth.js).
+  const [mediaToken] = useMediaToken();
   const params = useParams();
   const id = params?.id;
 
@@ -128,7 +131,7 @@ export default function ViewCourseBuilder() {
           <div className={s.sidePanelBody}>
             {course.intro_video ? (
               <a
-                href={`${API_URL}${course.intro_video}`}
+                href={secureMediaUrl(course.intro_video, mediaToken) || undefined}
                 target="_blank"
                 rel="noreferrer"
                 style={{ fontSize: 13, color: '#2563eb', textDecoration: 'underline', wordBreak: 'break-all' }}
@@ -357,14 +360,14 @@ export default function ViewCourseBuilder() {
                                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                                   <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600, minWidth: 100, flexShrink: 0, paddingTop: 1 }}>Featured Image</span>
                                   {t.imageUrl
-                                    ? <a href={`${API_URL}${t.imageUrl}`} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#2563eb', textDecoration: 'underline', wordBreak: 'break-all', lineHeight: 1.5 }}>{t.imageUrl.split('/').pop()}</a>
+                                    ? <a href={secureMediaUrl(t.imageUrl, mediaToken) || undefined} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#2563eb', textDecoration: 'underline', wordBreak: 'break-all', lineHeight: 1.5 }}>{t.imageUrl.split('/').pop()}</a>
                                     : <span style={{ fontSize: 12, color: '#9ca3af' }}>N/A</span>}
                                 </div>
                                 {/* Video */}
                                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                                   <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600, minWidth: 100, flexShrink: 0, paddingTop: 1 }}>Video</span>
                                   {t.videoUrl
-                                    ? <a href={t.videoUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#2563eb', textDecoration: 'underline', wordBreak: 'break-all', lineHeight: 1.5 }}>{t.videoUrl}</a>
+                                    ? <a href={secureMediaUrl(t.videoUrl, mediaToken) || undefined} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#2563eb', textDecoration: 'underline', wordBreak: 'break-all', lineHeight: 1.5 }}>{t.videoUrl}</a>
                                     : <span style={{ fontSize: 12, color: '#9ca3af' }}>N/A</span>}
                                 </div>
                                 {/* Video Playback Time */}
@@ -379,7 +382,7 @@ export default function ViewCourseBuilder() {
                             {isAssignment && fileUrl && (
                               <div style={{ paddingLeft: 52 }}>
                                 <a
-                                  href={`${API_URL}${fileUrl}`}
+                                  href={secureMediaUrl(fileUrl, mediaToken) || undefined}
                                   target="_blank"
                                   rel="noreferrer"
                                   style={{ fontSize: 12, color: '#b45309', textDecoration: 'underline', wordBreak: 'break-all' }}

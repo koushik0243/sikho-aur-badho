@@ -3,8 +3,9 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import _ from 'lodash';
 import mongoose from 'mongoose';
-import { randomBytes } from 'crypto';
+
 import axios from 'axios';
+import Organization from '../organizations/organization.model.js';
 const { ObjectId } = mongoose.Types;
 
 export const createUser = async (newUser) => {
@@ -73,7 +74,8 @@ export const editUser = async (userId) => {
             other_info: user.other_info,
             isVerified: user.isVerified,
             status: user.status,
-            createdAt: user.createdAt
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt
         };
     } catch (error) {
         throw error;
@@ -107,8 +109,6 @@ export const updateUser = async (updateId, updateData) => {
         if (Object.keys(updateFields).length === 0) {
             return await User.findById(updateId).select('-password').lean();
         }
-
-        updateFields.updatedAt = new Date();
 
         return await User.findByIdAndUpdate(
             new ObjectId(updateId),
@@ -252,20 +252,67 @@ export const registerUser = async (newUser) => {
     }
 };
 
-// A user whose account status isn't "active" (inactive/suspended/deleted) must
-// never receive a login token, even with correct credentials — checked right
-// after the password match succeeds, in every login path below.
+// Only a user whose status is exactly "active" may log in — inactive,
+// suspended, deleted, missing or unknown statuses (and soft-deleted users) never
+// receive a login token, even with correct credentials. Checked in every login
+// path: email/password, Google, super-admin password/OTP/Google, OTP verify.
 const STATUS_LOGIN_MESSAGES = {
     inactive: 'Your account is inactive. Please contact your administrator.',
     suspended: 'Your account has been suspended. Please contact your administrator.',
     deleted: 'This account no longer exists. Please contact your administrator.',
 };
 
-function assertActiveStatus(status) {
-    if (!status || status === 'active') return;
+export function assertActiveStatus(user) {
+    const status = user?.deletedAt ? 'deleted' : user?.status;
+    if (status === 'active') return;
     const err = new Error(STATUS_LOGIN_MESSAGES[status] || 'Your account is not active. Please contact your administrator.');
     err.statusCode = 400;
     throw err;
+}
+
+/**
+ * Verifies a Google Sign-In ID token with Google and returns the identity it
+ * proves. Never trust an email sent in the request body — only the one Google
+ * confirms. When GOOGLE_CLIENT_ID is set, the token must also have been issued
+ * for this app (a token from some other site's Google sign-in is rejected).
+ * @returns {Promise<{ email: string, name: string }>}
+ */
+async function verifyGoogleCredential(credential) {
+    if (!credential || typeof credential !== 'string') {
+        const err = new Error('Google credential is required.');
+        err.statusCode = 400;
+        throw err;
+    }
+    let data;
+    try {
+        ({ data } = await axios.get('https://oauth2.googleapis.com/tokeninfo', { params: { id_token: credential } }));
+    } catch {
+        const err = new Error('Invalid Google sign-in. Please try again.');
+        err.statusCode = 401;
+        throw err;
+    }
+    const expectedAud = process.env.GOOGLE_CLIENT_ID?.trim();
+    if (expectedAud && data.aud !== expectedAud) {
+        const err = new Error('This Google sign-in was not issued for this app.');
+        err.statusCode = 401;
+        throw err;
+    }
+    if (!data.email || !data.email_verified || data.email_verified === 'false') {
+        const err = new Error('Google account email is not verified.');
+        err.statusCode = 401;
+        throw err;
+    }
+    return { email: String(data.email).trim().toLowerCase(), name: data.name || '' };
+}
+
+// An employee (learner) belongs to an organization — one that isn't assigned
+// to any organization, or whose organization was deleted, can't log in.
+async function assertOrgAssigned(user) {
+    if (user?.user_type !== 'employee') return;
+    const invalid = () => Object.assign(new Error('Invalid user.'), { statusCode: 400 });
+    if (!user.orgId || !mongoose.isValidObjectId(user.orgId)) throw invalid();
+    const org = await Organization.exists({ _id: user.orgId, deletedAt: null });
+    if (!org) throw invalid();
 }
 
 /* Login user against email and password */
@@ -275,7 +322,8 @@ export const loginUser = async (userData) => {
         if (user && user._id) {
             const matchPassword = await bcrypt.compare(userData.password, user.password);
             if (matchPassword) {
-                assertActiveStatus(user.status);
+                assertActiveStatus(user);
+                await assertOrgAssigned(user);
                 const token = generateJwtToken(user);
                 return {
                     _id: user._id,
@@ -308,7 +356,8 @@ export const adminLoginUser = async (userData) => {
         if (user && user._id) {
             const matchPassword = await bcrypt.compare(userData.password, user.password);
             if (matchPassword) {
-                assertActiveStatus(user.status);
+                assertActiveStatus(user);
+                await assertOrgAssigned(user);
                 const token = generateJwtToken(user);
                 return {
                     _id: user._id,
@@ -334,26 +383,18 @@ export const adminLoginUser = async (userData) => {
 /* Get user details against the id or token */ 
 export const gmLoginUser = async (userData) => {
     try {
-        const email = userData.email?.trim().toLowerCase();
+        // The account is chosen by the email GOOGLE verified — not one posted
+        // in the request (that let anyone log in as anyone).
+        const { email } = await verifyGoogleCredential(userData?.credential || userData?.id_token);
 
-        if (!email) {
-            throw new Error('Email is required');
-        }
+        const user = await User.findOne({ email }).lean();
 
-        let user = await User.findOne({ email }).lean();
+        // A learner must belong to an organization, so a Google account with no
+        // user record can't sign up here (it could never log in anyway).
+        if (!user) throw Object.assign(new Error('Invalid user.'), { statusCode: 400 });
 
-        if (!user) {
-            const fullName = userData.name?.trim() || userData.full_name?.trim() || email.split('@')[0];
-            const newUser = new User({
-                name: fullName,
-                email,
-                password: randomBytes(24).toString('hex'),
-                user_type: 'employee',
-                isVerified: true,
-                status: 'active',
-            });
-            user = await newUser.save();
-        }
+        assertActiveStatus(user);
+        await assertOrgAssigned(user);
 
         const token = generateJwtToken(user);
 
@@ -373,15 +414,8 @@ export const gmLoginUser = async (userData) => {
 
 export const adminGoogleLoginUser = async (credential) => {
     try {
-        // Verify the Google ID token using Google's tokeninfo endpoint
-        const googleRes = await axios.get(
-            `https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`
-        );
-        const { email, name, email_verified } = googleRes.data;
-
-        if (!email_verified || email_verified === 'false') {
-            throw new Error('Google account email is not verified.');
-        }
+        // Verify the Google ID token (issuer app + verified email)
+        const { email } = await verifyGoogleCredential(credential);
 
         // Only allow existing admin users — never auto-create admins
         const user = await User.findOne({ email: email.trim().toLowerCase(), user_type: 'superadmin', deletedAt: null }).lean();
@@ -389,9 +423,7 @@ export const adminGoogleLoginUser = async (credential) => {
             throw new Error('No admin account found for this Google account. Please contact your administrator.');
         }
 
-        if (user.status === 'inactive') {
-            throw new Error('Your admin account is inactive. Please contact your administrator.');
-        }
+        assertActiveStatus(user);
 
         const token = generateJwtToken(user);
         return {
@@ -444,8 +476,11 @@ export const verifyUserOtp = async (newUser) => {
         const secret = newUser.jwtSecret;
 
         const user = await User.findOne({ email });
+        if (!user) throw new Error("User does not exist");
         if (user.otp !== otp) throw new Error("OTP does not match");
         if (user.otpExpires < Date.now()) throw new Error("OTP has expired");
+        if (user.isVerified) assertActiveStatus(user);
+        else if (user.deletedAt) assertActiveStatus(user);
 
         user.isVerified = true;
         user.otp = null;
@@ -494,3 +529,4 @@ const generateJwtToken = (user) => {
         }
     );
 };
+

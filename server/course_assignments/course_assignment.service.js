@@ -77,7 +77,7 @@ export const updateCourseAssignment = async (updateId, data) => {
         return await CourseAssignment.findByIdAndUpdate(
             updateId,
             { $set: updateFields },
-            { new: false, runValidators: true }
+            { returnDocument: 'before', runValidators: true }
         ).lean();
     } catch (error) {
         throw error;

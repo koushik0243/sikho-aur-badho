@@ -55,6 +55,10 @@ const parseBodyWithFiles = (req) => {
             try { body[key] = JSON.parse(body[key]); } catch { body[key] = [body[key]]; }
         }
     });
+    // Aptitude settings arrive as a JSON string via FormData, or an object via JSON
+    if (typeof body.aptitudeSettings === 'string') {
+        try { body.aptitudeSettings = JSON.parse(body.aptitudeSettings); } catch { delete body.aptitudeSettings; }
+    }
     // Boolean coercion from FormData strings
     if (body.enable_review !== undefined) body.enable_review = body.enable_review === 'true' || body.enable_review === true;
     if (body.qna_enabled !== undefined) body.qna_enabled = body.qna_enabled === 'true' || body.qna_enabled === true;

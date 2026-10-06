@@ -14,6 +14,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const { ObjectId } = mongoose.Types;
 
+// QA origin: 'generated' (AI) or 'created' (hand-written by a super admin).
+export const QA_STATUSES = ['generated', 'created'];
+
 // Aptitude level -> quiz-question difficulty distribution. Keys on the left are
 // aptitude_attempts.level values; keys on the right are quiz_questions.difficulty tiers.
 const LEVEL_DIFFICULTY_SPLIT = {
@@ -24,8 +27,8 @@ const LEVEL_DIFFICULTY_SPLIT = {
 const DIFFICULTY_TIERS = ['beginner', 'intermediate', 'advanced'];
 
 const buildQuery = (filters = {}) => {
-  const query = { deletedAt: null, status: { $ne: 'inactive' } };
-  if (filters.status) query.status = filters.status;
+  const query = { deletedAt: null };
+  if (QA_STATUSES.includes(filters.status)) query.status = filters.status;
   if (filters.quizId && ObjectId.isValid(filters.quizId)) {
     query.quizId = new ObjectId(filters.quizId);
   }
@@ -187,7 +190,7 @@ Return ONLY a valid JSON array (no markdown fences, no extra text) in this exact
     difficulty: VALID_DIFFICULTIES.includes(q.difficulty) ? q.difficulty : 'beginner',
     explanation: q.explanation || '',
     batchNumber,
-    status: 'active',
+    status: 'generated',
     deletedAt: null,
   }));
 
@@ -206,7 +209,7 @@ export const createQuestion = async (data) => {
       difficulty: data.difficulty,
       explanation: data.explanation || '',
       batchNumber: data.batchNumber || 1,
-      status: data.status || 'active',
+      status: 'created',
     }).save();
   } catch (error) {
     throw error;
@@ -225,7 +228,7 @@ export const updateQuestion = async (updateId, data) => {
   try {
     const fields = [
       'courseId', 'chapterId', 'quizId', 'question', 'answer',
-      'options', 'difficulty', 'explanation', 'batchNumber', 'status'
+      'options', 'difficulty', 'explanation', 'batchNumber'
     ];
     const updateFields = {};
     for (const field of fields) {
@@ -376,7 +379,7 @@ export const deleteQuestion = async (delId) => {
   try {
     return await QuizQuestion.findOneAndUpdate(
       { _id: delId, deletedAt: null },
-      { $set: { deletedAt: new Date(), status: 'inactive' } },
+      { $set: { deletedAt: new Date() } },
       { returnDocument: 'before' }
     ).lean();
   } catch (error) {

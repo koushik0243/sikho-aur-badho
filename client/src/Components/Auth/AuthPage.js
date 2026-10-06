@@ -54,7 +54,6 @@ export default function AuthPage() {
   // Redirect authenticated users to their dashboard
   useEffect(() => {
     if (isAuthenticated) {
-      console.log('[AuthPage] Redirecting to:', dashboardRoute);
       router.replace(dashboardRoute);
     }
   }, [isAuthenticated, dashboardRoute, router]);

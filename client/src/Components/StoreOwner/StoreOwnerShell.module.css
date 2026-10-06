@@ -568,11 +568,13 @@
   .sidebar {
     transform: translateX(-100%);
     transition: transform 0.22s ease;
-    box-shadow: 6px 0 24px rgba(0, 0, 0, 0.18);
+    /* No shadow while closed — it would show as a strip down the left edge */
+    box-shadow: none;
   }
 
   .sidebarMobileOpen {
     transform: translateX(0);
+    box-shadow: 6px 0 24px rgba(0, 0, 0, 0.18);
   }
 
   .main,
@@ -648,4 +650,21 @@
   .content {
     padding: 12px;
   }
+}
+
+
+/* Phones: "+ Add Learner" becomes just "+" so it can't run into the logo
+   (globals.css forces every font-size, so the text is hidden instead). */
+@media (max-width: 640px) {
+  .btnAddLearnerText { display: none; }
+
+  .btnAddLearner { padding: 6px 11px; }
+}
+
+
+/* Narrowest phones (320–360px): smaller logo so it never runs into the top-bar buttons */
+@media (max-width: 360px) {
+  .topbarLogo { padding: 0 4px; }
+
+  .logoImg { height: 26px; }
 }

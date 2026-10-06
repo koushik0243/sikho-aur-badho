@@ -3059,3 +3059,116 @@
     row-gap: 6px;
   }
 }
+
+
+/* ── QA status filter (All / Generated / Created) under each column header ── */
+.qaFilterRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+  flex-shrink: 0;
+}
+
+.qaFilterBtn {
+  padding: 4px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 999px;
+  background: #fff;
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.qaFilterBtn:hover { border-color: #0b7b7b; color: #0b7b7b; }
+
+.qaFilterBtn:focus-visible { outline: 2px solid #0b7b7b; outline-offset: 1px; }
+
+.qaFilterBtnActive,
+.qaFilterBtnActive:hover {
+  background: #0b7b7b;
+  border-color: #0b7b7b;
+  color: #fff;
+}
+
+
+/* ── QA origin tag after the difficulty tag: G = generated, C = created ── */
+.qaOriginTag {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 6px;
+  border-radius: 50%;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: default;
+}
+
+.qaOriginTagGenerated { background: #e6f5f4; color: #0b7b7b; border: 1px solid #b2ddd4; }
+
+.qaOriginTagCreated { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+
+
+/* Small helper text under a settings field (e.g. Time Limit: "0 means no limit") */
+.qsHint {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+
+/* G / C legend at the right of the QA status filter row */
+.qaOriginLegend {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.qaOriginLegend .qaOriginTag { margin-left: 8px; width: 18px; height: 18px; font-size: 10px; }
+
+.qaOriginLegend .qaOriginTag:first-child { margin-left: 0; }
+
+/* Narrow columns: let the legend drop under the buttons */
+.qaFilterRow { flex-wrap: wrap; row-gap: 6px; }
+
+
+/* ── Course builder top bar on tablets / phones ─────────────────────────
+   Title + Save/Publish on the first line, the 3 steps on their own line
+   (scrollable if they still don't fit) — nothing pushed off-screen. */
+@media (max-width: 768px) {
+  .topBar {
+    height: auto;          /* desktop is a fixed 56px single line */
+    flex-wrap: wrap;
+    row-gap: 10px;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .topBarActions { margin-left: auto; }
+
+  .steps {
+    order: 3;
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+
+  .steps::-webkit-scrollbar { display: none; }
+
+  .step { white-space: nowrap; }
+}

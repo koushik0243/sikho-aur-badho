@@ -3,7 +3,7 @@ import "./globals.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 import ReduxProvider from "../redux/ReduxProvider";
 import { Toaster } from "sonner";
-import DisableContextMenu from "../Components/DisableContextMenu";
+import PlatformSecurity from "../Components/PlatformSecurity";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,7 +30,7 @@ export default function RootLayout({ children }) {
     <html lang="en" data-scroll-behavior="smooth" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body suppressHydrationWarning>
         <ReduxProvider>
-          <DisableContextMenu />
+          <PlatformSecurity />
           {children}
           <Toaster position="top-right" richColors closeButton />
         </ReduxProvider>

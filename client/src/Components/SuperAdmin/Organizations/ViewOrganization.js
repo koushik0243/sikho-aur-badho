@@ -183,7 +183,7 @@ export default function ViewOrganization() {
               <span className={s.detailValue}>{ownerName}</span>
             </div>
             <div className={s.detailItem}>
-              <span className={s.detailLabel}>Email / Username</span>
+              <span className={s.detailLabel}>Email</span>
               <span className={s.detailValue}>{ownerEmail}</span>
             </div>
           </div>

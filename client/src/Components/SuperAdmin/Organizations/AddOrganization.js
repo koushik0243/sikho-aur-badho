@@ -258,7 +258,7 @@ export default function AddOrganization() {
           <div className={s.sectionBody}>
             <div className={s.formRow}>
               <div className={s.formGroup}>
-                <label className={s.label}>Email / Username <span className={s.required}>*</span></label>
+                <label className={s.label}>Email <span className={s.required}>*</span></label>
                 <input
                   className={s.input}
                   type="email"

@@ -699,3 +699,18 @@
     max-width: 250px;
   }
 }
+
+
+/* New + Confirm Password side by side (stacked on small phones) */
+.passwordPair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
+.passwordPair .fieldGroup { min-width: 0; }
+
+@media (max-width: 480px) {
+  .passwordPair { grid-template-columns: 1fr; gap: 0; }
+}

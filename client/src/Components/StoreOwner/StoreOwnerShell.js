@@ -252,8 +252,8 @@ export default function StoreOwnerShell({ children }) {
           </div>
         </div>
         <div className={s.topbarActions}>
-          <button className={s.btnAddLearner} onClick={() => router.push('/storeowner/add-learner')}>
-            <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Add Learner
+          <button className={s.btnAddLearner} onClick={() => router.push('/storeowner/add-learner')} title="Add Learner" aria-label="Add Learner">
+            <span style={{ fontSize: 16, lineHeight: 1 }}>+</span><span className={s.btnAddLearnerText}> Add Learner</span>
           </button>
           <button className={s.topbarBtn} title="Help">{Icon.help}</button>
 

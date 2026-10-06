@@ -86,7 +86,8 @@ export default function SetNewPasswordForm({ resetToken }) {
       {displayError && <div className={styles.errorBanner}>{displayError}</div>}
 
       <form onSubmit={handleSubmit} style={{ width: '100%' }}>
-        {/* New Password */}
+        {/* New + Confirm Password — side by side */}
+        <div className={styles.passwordPair}>
         <div className={styles.fieldGroup}>
           <label className={styles.label} htmlFor="new-password">
             New Password
@@ -112,14 +113,6 @@ export default function SetNewPasswordForm({ resetToken }) {
           </div>
         </div>
 
-        {strength && (
-          <div className={styles.strengthRow}>
-            <span className={styles.strengthLabel} style={{ color: strength.color }}>
-              {strength.label} password
-            </span>
-          </div>
-        )}
-
         {/* Confirm Password */}
         <div className={styles.fieldGroup}>
           <label className={styles.label} htmlFor="confirm-password">
@@ -135,6 +128,15 @@ export default function SetNewPasswordForm({ resetToken }) {
             required
           />
         </div>
+        </div>
+
+        {strength && (
+          <div className={styles.strengthRow}>
+            <span className={styles.strengthLabel} style={{ color: strength.color }}>
+              {strength.label} password
+            </span>
+          </div>
+        )}
 
         <button
           type="submit"
