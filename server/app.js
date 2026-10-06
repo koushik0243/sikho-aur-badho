@@ -32,6 +32,7 @@ import organizationCourseAssignmentRouter from './organization_course_assignment
 import organizationCreditAssignmentRouter from './organization_credit_assignment/organization_credit_assignment.controller.js';
 
 import industryTypeRouter from './industry_type/industry_type.controller.js';
+import departmentRouter from './departments/department.controller.js';
 import tagRouter from './tags/tag.controller.js';
 import certificateTemplateRouter from './certificate_template/certificate_template.controller.js';
 import roleRouter from './roles/role.controller.js';
@@ -105,6 +106,7 @@ app.use('/organization-course', protect, organizationCourseRouter);
 app.use('/organization-course-assignment', protect, organizationCourseAssignmentRouter);
 app.use('/organization-credit-assignment', protect, organizationCreditAssignmentRouter);
 app.use('/industry-type', protect, industryTypeRouter);
+app.use('/department', protect, departmentRouter);
 app.use('/tags', protect, tagRouter);
 app.use('/certificate-template', protect, certificateTemplateRouter);
 app.use('/role', protect, roleRouter);
