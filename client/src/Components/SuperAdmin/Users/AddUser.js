@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import s from "./AddUser.module.css";
+import PasswordInput from '../../PasswordInput/PasswordInput';
 
 const BackArrow = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -108,9 +109,8 @@ export default function AddUser() {
 
             <div className={s.formGroup}>
               <label>Password <span className={s.required}>*</span></label>
-              <input
+              <PasswordInput
                 className={s.input}
-                type="password"
                 placeholder="Minimum 6 characters"
                 value={form.password}
                 onChange={e => setField('password', e.target.value)}
@@ -123,9 +123,8 @@ export default function AddUser() {
 
             <div className={s.formGroup}>
               <label>Confirm Password <span className={s.required}>*</span></label>
-              <input
+              <PasswordInput
                 className={s.input}
-                type="password"
                 placeholder="Re-enter password"
                 value={form.confirm_password}
                 onChange={e => setField('confirm_password', e.target.value)}

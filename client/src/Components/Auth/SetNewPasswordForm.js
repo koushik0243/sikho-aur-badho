@@ -10,6 +10,7 @@ import {
   clearError,
 } from '../../redux/slices/authSlice';
 import styles from './Auth.module.css';
+import PasswordInput from '../PasswordInput/PasswordInput';
 
 function EyeOffIcon() {
   return (
@@ -118,9 +119,8 @@ export default function SetNewPasswordForm({ resetToken }) {
           <label className={styles.label} htmlFor="confirm-password">
             Confirm Password
           </label>
-          <input
+          <PasswordInput
             id="confirm-password"
-            type="password"
             className={styles.input}
             value={confirmPassword}
             onChange={(e) => { setConfirmPassword(e.target.value); setLocalError(''); dispatch(clearError()); }}

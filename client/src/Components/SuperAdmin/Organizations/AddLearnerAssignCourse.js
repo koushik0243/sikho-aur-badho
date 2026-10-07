@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import apiServiceHandler, { clearGetCache } from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import s from './AddLearnerAssignCourse.module.css';
+import PasswordInput from '../../PasswordInput/PasswordInput';
 
 const BackArrow = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -198,7 +199,7 @@ export default function AddLearnerAssignCourse() {
 
             <div className={s.formGroup}>
               <label>Password <span className={s.required}>*</span></label>
-              <input className={s.input} type="password" placeholder="Minimum 6 characters"
+              <PasswordInput className={s.input} placeholder="Minimum 6 characters"
                 value={form.password} onChange={e => setField('password', e.target.value)}
                 autoComplete="new-password" readOnly={pwReadOnly} onFocus={() => setPwReadOnly(false)} />
               {errors.password && <p className={s.errorMsg}>{errors.password}</p>}
@@ -206,7 +207,7 @@ export default function AddLearnerAssignCourse() {
 
             <div className={s.formGroup}>
               <label>Confirm Password <span className={s.required}>*</span></label>
-              <input className={s.input} type="password" placeholder="Re-enter password"
+              <PasswordInput className={s.input} placeholder="Re-enter password"
                 value={form.confirm_password} onChange={e => setField('confirm_password', e.target.value)}
                 autoComplete="new-password" readOnly={confirmPwReadOnly} onFocus={() => setConfirmPwReadOnly(false)} />
               {errors.confirm_password && <p className={s.errorMsg}>{errors.confirm_password}</p>}

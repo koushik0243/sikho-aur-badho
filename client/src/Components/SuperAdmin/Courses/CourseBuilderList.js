@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
@@ -60,6 +60,13 @@ function StatusLabel({ status }) {
 
 const LIMIT = 50;
 
+const LEVELS = ['Beginner', 'Intermediate', 'Advanced'];
+
+function fmtLevel(level) {
+  if (!level) return '—';
+  return level.charAt(0).toUpperCase() + level.slice(1).toLowerCase();
+}
+
 export default function CourseBuilderList() {
   const router = useRouter();
 
@@ -72,38 +79,82 @@ export default function CourseBuilderList() {
   const [totalPages, setTotalPages] = useState(1);
   const [selected, setSelected]     = useState([]);
   const [confirm, setConfirm]       = useState({ show: false, id: null });
-  const [sortKey, setSortKey]       = useState('');
-  const [sortDir, setSortDir]       = useState('asc');
+  const [sortKey, setSortKey]       = useState('createdAt');
+  const [sortDir, setSortDir]       = useState('desc');
+
+  const [levelFilter, setLevelFilter]       = useState('');
+  const [categories, setCategories]         = useState([]);
+  const [subCategories, setSubCategories]   = useState([]);
+  const [selectedCatIds, setSelectedCatIds] = useState(new Set());
+  const [selectedSubIds, setSelectedSubIds] = useState(new Set());
+  const [catDropOpen, setCatDropOpen]       = useState(false);
+  const [catSearch, setCatSearch]           = useState('');
+  const catDropRef = useRef(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 350);
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => { setPage(1); }, [debounced]);
+  useEffect(() => { setPage(1); }, [debounced, levelFilter, selectedCatIds, selectedSubIds]);
+
+  useEffect(() => {
+    Promise.all([
+      apiServiceHandler('GET', 'course-category/list').catch(() => null),
+      apiServiceHandler('GET', 'course-subcategory/list').catch(() => null),
+    ]).then(([catRes, subRes]) => {
+      setCategories(Array.isArray(catRes?.data) ? catRes.data : (Array.isArray(catRes) ? catRes : []));
+      setSubCategories(Array.isArray(subRes?.data) ? subRes.data : (Array.isArray(subRes) ? subRes : []));
+    });
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (catDropRef.current && !catDropRef.current.contains(e.target)) {
+        setCatDropOpen(false);
+        setCatSearch('');
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchRows = useCallback(() => {
     setLoading(true);
     const params = new URLSearchParams({ page, limit: LIMIT });
+    if (debounced.trim())      params.set('search', debounced.trim());
+    if (levelFilter)           params.set('level', levelFilter.toLowerCase());
+    if (selectedCatIds.size)   params.set('catIds', [...selectedCatIds].join(','));
+    if (selectedSubIds.size)   params.set('subCatIds', [...selectedSubIds].join(','));
     apiServiceHandler('GET', `course/list-pagination?${params}`)
       .then(res => {
-        let data = Array.isArray(res?.data) ? res.data : [];
-        if (debounced) {
-          const q = debounced.toLowerCase();
-          data = data.filter(r =>
-            (r.title ?? '').toLowerCase().includes(q) ||
-            (r.catId?.title ?? '').toLowerCase().includes(q)
-          );
-        }
-        setRows(data);
+        setRows(Array.isArray(res?.data) ? res.data : []);
         setTotal(res?.total ?? 0);
         setTotalPages(res?.totalPages ?? 1);
       })
       .catch(() => setRows([]))
       .finally(() => setLoading(false));
-  }, [page, debounced]);
+  }, [page, debounced, levelFilter, selectedCatIds, selectedSubIds]);
 
   useEffect(() => { fetchRows(); }, [fetchRows]);
+
+  function toggleIn(setter, id) {
+    const sid = String(id);
+    setter(prev => {
+      const next = new Set(prev);
+      next.has(sid) ? next.delete(sid) : next.add(sid);
+      return next;
+    });
+  }
+
+  function clearFilters() {
+    setSearch('');
+    setLevelFilter('');
+    setSelectedCatIds(new Set());
+    setSelectedSubIds(new Set());
+  }
+
+  const hasActiveFilters = search || levelFilter || selectedCatIds.size > 0 || selectedSubIds.size > 0;
 
   function toggleSort(key) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -142,6 +193,12 @@ export default function CourseBuilderList() {
           if (av > bv) return sortDir === 'asc' ? 1 : -1;
           return 0;
         }
+        if (sortKey === 'level') {
+          const order = { beginner: 1, intermediate: 2, advanced: 3 };
+          const av = order[(a.level ?? '').toLowerCase()] ?? 0;
+          const bv = order[(b.level ?? '').toLowerCase()] ?? 0;
+          return sortDir === 'asc' ? av - bv : bv - av;
+        }
         if (sortKey === 'duration') {
           const av = (a.duration_hr || 0) * 60 + (a.duration_min || 0);
           const bv = (b.duration_hr || 0) * 60 + (b.duration_min || 0);
@@ -179,15 +236,133 @@ export default function CourseBuilderList() {
       </div>
 
       <div className={s.card}>
-        <div className={s.searchWrap}>
-          {Icon.search}
-          <input
-            className={s.searchInput}
-            type="text"
-            placeholder="Search by title or category…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+        <div className={s.filterBar}>
+          {/* Name search */}
+          <div className={s.filterSearch}>
+            <span className={s.filterSearchIcon}>{Icon.search}</span>
+            <input
+              className={s.filterInput}
+              type="text"
+              placeholder="Search by name…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+            {search && (
+              <button className={s.filterClearBtn} onClick={() => setSearch('')} type="button">×</button>
+            )}
+          </div>
+
+          {/* Difficulty level */}
+          <div className={s.levelBtnGroup}>
+            {LEVELS.map(lvl => (
+              <button
+                key={lvl}
+                type="button"
+                className={`${s.levelBtn} ${levelFilter === lvl ? s.levelBtnActive : ''}`}
+                onClick={() => setLevelFilter(prev => prev === lvl ? '' : lvl)}
+              >
+                {lvl}
+              </button>
+            ))}
+          </div>
+
+          {/* Category / Sub-category multi-select */}
+          <div className={s.catDropWrap} ref={catDropRef}>
+            <button
+              className={`${s.catDropTrigger} ${catDropOpen ? s.catDropTriggerOpen : ''}`}
+              onClick={() => setCatDropOpen(v => !v)}
+              type="button"
+            >
+              <span>
+                {selectedCatIds.size === 0 && selectedSubIds.size === 0
+                  ? 'All Categories'
+                  : `${selectedCatIds.size + selectedSubIds.size} selected`}
+              </span>
+              <svg viewBox="0 0 20 20" fill="currentColor" className={s.catDropArrow}>
+                <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+            {catDropOpen && (
+              <div className={s.catDropMenu}>
+                <div className={s.catDropSearch}>
+                  <svg viewBox="0 0 20 20" fill="currentColor" className={s.catDropSearchIcon}>
+                    <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                  </svg>
+                  <input
+                    type="text"
+                    className={s.catDropSearchInput}
+                    placeholder="Search categories…"
+                    value={catSearch}
+                    onChange={e => setCatSearch(e.target.value)}
+                    autoFocus
+                  />
+                  {catSearch && (
+                    <button className={s.catDropSearchClear} onClick={() => setCatSearch('')} type="button">×</button>
+                  )}
+                </div>
+
+                <div className={s.catDropList}>
+                  {(() => {
+                    const q = catSearch.toLowerCase();
+                    const visible = categories.map(cat => {
+                      const catId = String(cat._id);
+                      const catName = cat.title || cat.name || '';
+                      const subs = subCategories.filter(sc => {
+                        const parentId = sc.categoryId?._id
+                          ? String(sc.categoryId._id)
+                          : (sc.categoryId ? String(sc.categoryId) : '');
+                        return parentId === catId;
+                      });
+                      const catMatches = catName.toLowerCase().includes(q);
+                      const matchingSubs = q
+                        ? subs.filter(sc => (sc.name || sc.title || '').toLowerCase().includes(q))
+                        : subs;
+                      if (!catMatches && matchingSubs.length === 0) return null;
+                      return { catId, catName, subs: catMatches ? subs : matchingSubs };
+                    }).filter(Boolean);
+
+                    if (visible.length === 0) {
+                      return <div className={s.catDropEmpty}>{catSearch ? `No results for "${catSearch}"` : 'No categories'}</div>;
+                    }
+
+                    return visible.map(({ catId, catName, subs }) => (
+                      <div key={catId} className={s.catGroup}>
+                        <label className={`${s.catLabel} ${selectedCatIds.has(catId) ? s.catLabelChecked : ''}`}>
+                          <input
+                            type="checkbox"
+                            className={s.checkInput}
+                            checked={selectedCatIds.has(catId)}
+                            onChange={() => toggleIn(setSelectedCatIds, catId)}
+                          />
+                          <span>{catName}</span>
+                        </label>
+                        {subs.map(sc => {
+                          const scId = String(sc._id);
+                          return (
+                            <label key={scId} className={`${s.subCatLabel} ${selectedSubIds.has(scId) ? s.subCatLabelChecked : ''}`}>
+                              <input
+                                type="checkbox"
+                                className={s.checkInput}
+                                checked={selectedSubIds.has(scId)}
+                                onChange={() => toggleIn(setSelectedSubIds, scId)}
+                              />
+                              <span>{sc.name || sc.title || scId}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {hasActiveFilters && (
+            <button className={s.filterClearAll} onClick={clearFilters} type="button">
+              Clear all
+            </button>
+          )}
         </div>
 
         <div className={s.tableWrap}>
@@ -203,7 +378,7 @@ export default function CourseBuilderList() {
                 <th>Sub-Category</th>
                 <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('duration')}>Duration{sortArrow('duration')}</th>
                 <th>Chapters</th>
-                <th>Created By</th>
+                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('level')}>Difficulty Level{sortArrow('level')}</th>
                 <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('status')}>Status{sortArrow('status')}</th>
                 <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('createdAt')}>Created At{sortArrow('createdAt')}</th>
                 <th>Action</th>
@@ -245,7 +420,7 @@ export default function CourseBuilderList() {
                   </td>
                   <td>{fmtDuration(row.duration_hr, row.duration_min)}</td>
                   <td>{row.totalChapters ?? 0}</td>
-                  <td>{row.createdBy?.name ?? row.createdBy?.email ?? '—'}</td>
+                  <td>{fmtLevel(row.level)}</td>
                   <td><StatusLabel status={row.status} /></td>
                   <td>{fmtDate(row.createdAt)}</td>
                   <td>

@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import s from "./EditOrgAdmin.module.css";
+import PasswordInput from '../../PasswordInput/PasswordInput';
 
 const BackArrow = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -146,9 +147,8 @@ export default function EditOrgAdmin() {
             {/* Password (optional) */}
             <div className={s.formGroup}>
               <label>Password <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: 11.5 }}>(leave blank to keep current)</span></label>
-              <input
+              <PasswordInput
                 className={s.input}
-                type="password"
                 placeholder="New password"
                 value={form.password}
                 onChange={e => setField('password', e.target.value)}
@@ -162,9 +162,8 @@ export default function EditOrgAdmin() {
             {/* Confirm Password */}
             <div className={s.formGroup}>
               <label>Confirm Password</label>
-              <input
+              <PasswordInput
                 className={s.input}
-                type="password"
                 placeholder="Re-enter new password"
                 value={form.confirm_password}
                 onChange={e => setField('confirm_password', e.target.value)}

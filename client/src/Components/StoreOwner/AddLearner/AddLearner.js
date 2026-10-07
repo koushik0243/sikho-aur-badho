@@ -8,6 +8,7 @@ import useDepartments from '../../../hooks/useDepartments';
 import apiServiceHandler, { clearGetCache } from '../../../service/apiService';
 import { toast } from 'sonner';
 import s from "./AddLearner.module.css";
+import PasswordInput from '../../PasswordInput/PasswordInput';
 
 // ── Icons ────────────────────────────────────────────────────────
 const Icon = {
@@ -376,11 +377,11 @@ export default function AddLearnerPage() {
                 </div>
                 <div className={s.fieldGroup}>
                   <label className={s.label}>Temporary Password <span className={s.req}>*</span></label>
-                  <input className={s.input} type="password" placeholder="Password" value={form.tempPassword} onChange={set('tempPassword')} autoComplete="new-password" />
+                  <PasswordInput className={s.input} placeholder="Password" value={form.tempPassword} onChange={set('tempPassword')} autoComplete="new-password" />
                 </div>
                 <div className={s.fieldGroup}>
                   <label className={s.label}>Temporary Confirm Password <span className={s.req}>*</span></label>
-                  <input className={s.input} type="password" placeholder="Re-enter the temporary password"
+                  <PasswordInput className={s.input} placeholder="Re-enter the temporary password"
                     value={form.confirmTempPassword} onChange={set('confirmTempPassword')} autoComplete="new-password" />
                   {form.confirmTempPassword && form.confirmTempPassword !== form.tempPassword && (
                     <div className={s.fieldHint} style={{ color: '#dc2626' }}>Passwords do not match</div>

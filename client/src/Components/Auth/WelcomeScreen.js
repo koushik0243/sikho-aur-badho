@@ -10,6 +10,7 @@ import {
 } from '../../redux/slices/authSlice';
 import { useState } from 'react';
 import styles from './Auth.module.css';
+import PasswordInput from '../PasswordInput/PasswordInput';
 
 const ROLE_LABELS = {
   superadmin: 'Super Admin',
@@ -27,8 +28,6 @@ export default function WelcomeScreen() {
   const [step, setStep] = useState('info'); // 'info' | 'setPassword'
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showNew, setShowNew] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
   const [localError, setLocalError] = useState('');
 
   function handleNext() {
@@ -77,38 +76,26 @@ export default function WelcomeScreen() {
           <div className={styles.passwordPair}>
           <div className={styles.fieldGroup}>
             <label className={styles.label} htmlFor="welcome-new-pwd">New Password</label>
-            <div className={styles.inputWrap}>
-              <input
-                id="welcome-new-pwd"
-                type={showNew ? 'text' : 'password'}
-                className={`${styles.input} ${styles.inputWithEye}`}
-                value={newPassword}
-                onChange={(e) => { setNewPassword(e.target.value); setLocalError(''); dispatch(clearError()); }}
-                autoComplete="new-password"
-                required
-              />
-              <button type="button" className={styles.eyeBtn} onClick={() => setShowNew((v) => !v)}>
-                {showNew ? '🙈' : '👁️'}
-              </button>
-            </div>
+            <PasswordInput
+              id="welcome-new-pwd"
+              className={styles.input}
+              value={newPassword}
+              onChange={(e) => { setNewPassword(e.target.value); setLocalError(''); dispatch(clearError()); }}
+              autoComplete="new-password"
+              required
+            />
           </div>
 
           <div className={styles.fieldGroup}>
             <label className={styles.label} htmlFor="welcome-confirm-pwd">Confirm Password</label>
-            <div className={styles.inputWrap}>
-              <input
-                id="welcome-confirm-pwd"
-                type={showConfirm ? 'text' : 'password'}
-                className={`${styles.input} ${styles.inputWithEye}`}
-                value={confirmPassword}
-                onChange={(e) => { setConfirmPassword(e.target.value); setLocalError(''); dispatch(clearError()); }}
-                autoComplete="new-password"
-                required
-              />
-              <button type="button" className={styles.eyeBtn} onClick={() => setShowConfirm((v) => !v)}>
-                {showConfirm ? '🙈' : '👁️'}
-              </button>
-            </div>
+            <PasswordInput
+              id="welcome-confirm-pwd"
+              className={styles.input}
+              value={confirmPassword}
+              onChange={(e) => { setConfirmPassword(e.target.value); setLocalError(''); dispatch(clearError()); }}
+              autoComplete="new-password"
+              required
+            />
           </div>
           </div>
 

@@ -2,6 +2,7 @@
 
 import apiServiceHandler from '../../../service/apiService';
 import useDepartments from '../../../hooks/useDepartments';
+import PasswordInput from '../../PasswordInput/PasswordInput';
 
 // Learner details — the same fields, labels and hints as the store owner's
 // Add Learner form, shared by SuperAdmin → User → Add / Edit.
@@ -161,9 +162,8 @@ export default function LearnerFields({ form, setField, errors, s, isEdit = fals
             ? <span className={s.optionalTag}>(optional)</span>
             : <span className={s.required}>*</span>}
         </label>
-        <input
+        <PasswordInput
           className={s.input}
-          type="password"
           placeholder={isEdit ? 'Leave blank to keep current' : 'Password'}
           autoComplete="new-password"
           readOnly={pwReadOnly}
@@ -181,9 +181,8 @@ export default function LearnerFields({ form, setField, errors, s, isEdit = fals
             ? <span className={s.optionalTag}>(only if changing)</span>
             : <span className={s.required}>*</span>}
         </label>
-        <input
+        <PasswordInput
           className={s.input}
-          type="password"
           placeholder={isEdit ? 'Re-enter the new password' : 'Re-enter the password'}
           autoComplete="new-password"
           readOnly={pwReadOnly}

@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import s from "./EditUser.module.css";
+import PasswordInput from '../../PasswordInput/PasswordInput';
 
 const BackArrow = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -135,9 +136,8 @@ export default function EditUser() {
 
             <div className={s.formGroup}>
               <label>Password</label>
-              <input
+              <PasswordInput
                 className={s.input}
-                type="password"
                 placeholder="Leave blank to keep current password"
                 value={form.password}
                 onChange={e => setField('password', e.target.value)}
@@ -150,9 +150,8 @@ export default function EditUser() {
 
             <div className={s.formGroup}>
               <label>Confirm Password</label>
-              <input
+              <PasswordInput
                 className={s.input}
-                type="password"
                 placeholder="Re-enter password"
                 value={form.confirm_password}
                 onChange={e => setField('confirm_password', e.target.value)}

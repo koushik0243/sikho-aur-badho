@@ -8,6 +8,7 @@ import { API_URL } from '../../../lib/constant';
 import SuperAdminShell from '../SuperAdminShell';
 import IndustryTypeTree from './IndustryTypeTree';
 import s from "./EditOrganization.module.css";
+import PasswordInput from '../../PasswordInput/PasswordInput';
 
 const BackArrow = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -376,9 +377,8 @@ export default function EditOrganization() {
             <div className={s.formRow}>
               <div className={s.formGroup}>
                 <label className={s.label}>New Password</label>
-                <input
+                <PasswordInput
                   className={s.input}
-                  type="password"
                   placeholder="Leave blank to keep current password"
                   value={ownerPassword}
                   onChange={e => setOwnerPassword(e.target.value)}
@@ -390,9 +390,8 @@ export default function EditOrganization() {
               </div>
               <div className={s.formGroup}>
                 <label className={s.label}>Confirm New Password</label>
-                <input
+                <PasswordInput
                   className={s.input}
-                  type="password"
                   placeholder="Re-enter new password"
                   value={ownerConfirmPassword}
                   onChange={e => setOwnerConfirmPassword(e.target.value)}

@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../service/apiService';
 import IndustryTypeTree from '../SuperAdmin/Organizations/IndustryTypeTree';
 import s from "./OrganizationSignup.module.css";
+import PasswordInput from '../PasswordInput/PasswordInput';
 
 const BackArrow = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -219,9 +220,8 @@ export default function OrganizationSignup() {
               <div className={s.formRow} style={{ marginTop: "20px" }}>
                 <div className={s.formGroup}>
                   <label className={s.label}>Password <span className={s.required}>*</span></label>
-                  <input
+                  <PasswordInput
                     className={s.input}
-                    type="password"
                     placeholder="Minimum 6 characters"
                     value={ownerPassword}
                     onChange={e => setOwnerPassword(e.target.value)}
@@ -231,9 +231,8 @@ export default function OrganizationSignup() {
                 </div>
                 <div className={s.formGroup}>
                   <label className={s.label}>Confirm Password <span className={s.required}>*</span></label>
-                  <input
+                  <PasswordInput
                     className={s.input}
-                    type="password"
                     placeholder="Re-enter password"
                     value={ownerConfirmPassword}
                     onChange={e => setOwnerConfirmPassword(e.target.value)}

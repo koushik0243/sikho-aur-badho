@@ -135,11 +135,12 @@ const listCoursePagination = async (req, res, next) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
-        const { status, catId, level, createdBy } = req.query;
+        const { status, catId, level, createdBy, search, catIds, subCatIds } = req.query;
+        const filters = { status, catId, level, createdBy, search, catIds, subCatIds };
 
         const [courses, total] = await Promise.all([
-            CourseHelper.listCoursePagination(page, limit, { status, catId, level, createdBy }),
-            CourseHelper.getCourseCount({ status, catId, level, createdBy })
+            CourseHelper.listCoursePagination(page, limit, filters),
+            CourseHelper.getCourseCount(filters)
         ]);
         res.status(200).json({
             status: 200,

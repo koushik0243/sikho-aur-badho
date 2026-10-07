@@ -39,6 +39,19 @@ const buildQuery = (filters = {}) => {
     if (filters.createdBy && ObjectId.isValid(filters.createdBy)) {
         query.createdBy = new ObjectId(filters.createdBy);
     }
+    if (filters.search) {
+        const escaped = String(filters.search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (escaped) query.title = { $regex: escaped, $options: 'i' };
+    }
+    // catIds / subCatIds: comma-separated lists from the course builder filter.
+    // A course matches if it is in any selected category OR has any selected sub-category.
+    const toIds = (v) => String(v || '').split(',').filter(id => ObjectId.isValid(id)).map(id => new ObjectId(id));
+    const catIds = toIds(filters.catIds);
+    const subCatIds = toIds(filters.subCatIds);
+    const or = [];
+    if (catIds.length) or.push({ catId: { $in: catIds } });
+    if (subCatIds.length) or.push({ subCatIds: { $in: subCatIds } });
+    if (or.length) query.$or = or;
     return query;
 };
 
@@ -155,7 +168,7 @@ export const listCoursePagination = async (page, limit, filters = {}) => {
             .populate('catId', '_id title slug')
             .populate('subCatIds', '_id name slug')
             .populate('createdBy', '_id name email')
-            .sort({ createdAt: -1 })
+            .sort({ createdAt: -1, _id: -1 })
             .skip((page - 1) * limit)
             .limit(limit)
             .lean();

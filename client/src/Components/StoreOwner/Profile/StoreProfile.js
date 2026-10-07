@@ -5,6 +5,7 @@ import { useSelector } from 'react-redux';
 import { selectUser } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
 import s from "./StoreProfile.module.css";
+import PasswordInput from '../../PasswordInput/PasswordInput';
 
 const EMPTY_ORG = {
   org_name: '', industry: '', emp_count: '',
@@ -303,12 +304,12 @@ export default function StoreProfilePage() {
                 </div>
                 <div className={s.fieldGroup}>
                   <label className={s.label}>Password</label>
-                  <input className={s.input} type="password" value={password}
+                  <PasswordInput className={s.input} value={password}
                     onChange={e => setPassword(e.target.value)} placeholder="Leave blank to keep current password" autoComplete="new-password" />
                 </div>
                 <div className={s.fieldGroup}>
                   <label className={s.label}>Confirm Password</label>
-                  <input className={s.input} type="password" value={confirmPassword}
+                  <PasswordInput className={s.input} value={confirmPassword}
                     onChange={e => setConfirmPassword(e.target.value)} placeholder="Leave blank to keep current password" autoComplete="new-password" />
                 </div>
                 <div className={s.fieldGroup}>
