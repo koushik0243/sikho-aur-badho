@@ -193,7 +193,7 @@
 .detailTable tr + tr .detailTd { border-top: 1px solid #eef0f3; }
 
 .detailTh {
-  width: 240px;
+  width: var(--view-label-width, 180px);
   padding: 12px 20px;
   background: #f9fafb;
   border-right: 1px solid #eef0f3;

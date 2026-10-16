@@ -6,7 +6,11 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from "./IndustryTypeList.module.css";
+import sPage from "./IndustryTypeList.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const Icon = {
   search: (
@@ -128,8 +132,8 @@ export default function IndustryTypeList() {
     const { id } = confirm;
     setConfirm({ show: false, id: null });
     apiServiceHandler('GET', `industry-type/delete/${id}`)
-      .then(() => { toast.success('Deleted successfully.'); fetchItems(); })
-      .catch(() => toast.error('Delete failed.'));
+      .then(() => { toast.error('Deleted successfully.'); fetchItems(); })
+      .catch(() => toast.warning('Delete failed.'));
   }
 
   const allIds = pageItems.map(item => item._id);
@@ -142,8 +146,8 @@ export default function IndustryTypeList() {
     const ids = [...selected];
     setSelected([]);
     Promise.all(ids.map(id => apiServiceHandler('GET', `industry-type/delete/${id}`)))
-      .then(() => { toast.success(`${ids.length} item${ids.length !== 1 ? 's' : ''} deleted.`); fetchItems(); })
-      .catch(() => toast.error('Some deletes failed'));
+      .then(() => { toast.error(`${ids.length} item${ids.length !== 1 ? 's' : ''} deleted.`); fetchItems(); })
+      .catch(() => toast.warning('Some deletes failed'));
   }
 
   return (
@@ -213,7 +217,6 @@ export default function IndustryTypeList() {
                   <td>
                     <div className={s.nameCell} style={{ paddingLeft: item.depth * 20 }}>
                       {item.depth > 0 && <span className={s.treeArrow}>↳</span>}
-                      <span className={s.catIcon}>{Icon.item}</span>
                       <span className={s.catName}>{item.name ?? '—'}</span>
                     </div>
                   </td>
@@ -228,15 +231,15 @@ export default function IndustryTypeList() {
                   <td>{fmtDate(item.createdAt)}</td>
                   <td>
                     <div className={s.actions} onClick={e => e.stopPropagation()}>
-                      <button className={s.btnView} title="View"
+                      <button data-action="view" className={s.btnView} title="View"
                         onClick={() => router.push(`/superadmin/industry-type/${item._id}`)}>
                         {Icon.eye}
                       </button>
-                      <button className={s.btnEdit} title="Edit"
+                      <button data-action="edit" className={s.btnEdit} title="Edit"
                         onClick={() => router.push(`/superadmin/industry-type/${item._id}/edit`)}>
                         {Icon.edit}
                       </button>
-                      <button className={s.btnDelete} title="Delete"
+                      <button data-action="delete" className={s.btnDelete} title="Delete"
                         onClick={() => setConfirm({ show: true, id: item._id })}>
                         {Icon.trash}
                       </button>

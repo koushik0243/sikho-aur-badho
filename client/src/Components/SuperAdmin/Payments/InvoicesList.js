@@ -1,18 +1,19 @@
-﻿'use client';
+'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from "./InvoicesList.module.css";
+import sPage from "./InvoicesList.module.css";
+import ListFilterBar, { EMPTY_LIST_FILTERS, isDateRangeInvalid, listFilterParams } from '../ListFilterBar';
+import { usePaymentMethods } from '../../../lib/paymentMethods';
+import { withAdminKit } from '../AdminKit/AdminKit';
 
-const SearchIcon = () => (
-  <svg viewBox="0 0 20 20" fill="currentColor">
-    <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-  </svg>
-);
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
+
 const EyeIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
     <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
@@ -40,34 +41,87 @@ function fmtAmount(val, currency = 'INR') {
 
 const LIMIT = 50;
 
+// Invoice payment statuses (the "Status" filter).
+const PAYMENT_STATUSES = [
+  { value: 'paid',     label: 'Paid' },
+  { value: 'pending',  label: 'Pending' },
+  { value: 'failed',   label: 'Failed' },
+  { value: 'refunded', label: 'Refunded' },
+];
+
+const time = v => new Date(v).getTime() || 0;
+
+/** List order: by the clicked column, otherwise most recent payment first. */
+function compareInvoices(key, dir) {
+  const sign = dir === 'asc' ? 1 : -1;
+  const pick = {
+    invoice_no:     inv => (inv.invoice_no ?? '').toLowerCase(),
+    org_name:       inv => (inv.org_id?.org_name ?? '').toLowerCase(),
+    credit_title:   inv => (inv.order_id?.credit_id?.title ?? '').toLowerCase(),
+    total_amount:   inv => Number(inv.total_amount) || 0,
+    payment_status: inv => String(inv.payment_status || '').toLowerCase(),
+    payment_method: inv => String(inv.payment_method || '').toLowerCase(),
+    payment_date:   inv => time(inv.payment_date),
+    status:         inv => String(inv.status || '').toLowerCase(),
+  }[key];
+  if (!pick) return (a, b) => (time(b.payment_date || b.createdAt) - time(a.payment_date || a.createdAt)) || (time(b.createdAt) - time(a.createdAt));
+  return (a, b) => { const av = pick(a), bv = pick(b); return av < bv ? -sign : av > bv ? sign : 0; };
+}
+
 export default function InvoicesList() {
+  const { labelOf: paymentMethodLabel } = usePaymentMethods();
   const router = useRouter();
-  const [invoices, setInvoices]     = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [search, setSearch]         = useState('');
+  const [loaded, setLoaded]         = useState({ key: null, invoices: [] });   // invoices for one query
+  const [reloadToken, setReloadToken] = useState(0);
+  const [orgs, setOrgs]             = useState([]);
+  const [filters, setFilters]       = useState(EMPTY_LIST_FILTERS);
   const [page, setPage]             = useState(1);
-  const [total, setTotal]           = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [confirm, setConfirm]       = useState({ show: false, id: null });
   const [selected, setSelected]     = useState([]);
   const [bulkConfirm, setBulkConfirm] = useState(false);
-  const [sortKey, setSortKey] = useState('');
-  const [sortDir, setSortDir] = useState('asc');
+  const [sortKey, setSortKey]       = useState('');
+  const [sortDir, setSortDir]       = useState('asc');
 
-  const fetchInvoices = useCallback(() => {
-    setLoading(true);
-    const params = new URLSearchParams({ page, limit: LIMIT });
-    apiServiceHandler('GET', `invoice/list-pagination?${params}`)
-      .then(res => {
-        setInvoices(Array.isArray(res?.data) ? res.data : []);
-        setTotal(res?.total ?? 0);
-        setTotalPages(res?.totalPages ?? 1);
-      })
-      .catch(() => setInvoices([]))
-      .finally(() => setLoading(false));
-  }, [page]);
+  const dateRangeInvalid = isDateRangeInvalid(filters);
 
-  useEffect(() => { fetchInvoices(); }, [fetchInvoices]);
+  // Every invoice matching the filters (filtered on the server); sorted and paged here.
+  const queryKey = `${listFilterParams(filters, { orgParam: 'org_id', statusParam: 'payment_status' })}#${reloadToken}`;
+  const loading = !dateRangeInvalid && loaded.key !== queryKey;
+  const invoices = loaded.invoices;
+
+  useEffect(() => {
+    if (dateRangeInvalid) return undefined;
+    let cancelled = false;
+    const [query] = queryKey.split('#');
+    apiServiceHandler('GET', `invoice/list?${query}${query ? '&' : ''}t=${Date.now()}`)
+      .then(res => { if (!cancelled) setLoaded({ key: queryKey, invoices: Array.isArray(res?.data) ? res.data : [] }); })
+      .catch(() => {
+        if (cancelled) return;
+        setLoaded({ key: queryKey, invoices: [] });
+        toast.warning('Failed to load invoices.');
+      });
+    return () => { cancelled = true; };
+  }, [queryKey, dateRangeInvalid]);
+
+  const fetchInvoices = () => setReloadToken(n => n + 1);
+
+  useEffect(() => {
+    apiServiceHandler('GET', 'organization/list-pagination?limit=1000')
+      .then(res => setOrgs(Array.isArray(res?.data) ? res.data : []))
+      .catch(() => setOrgs([]));
+  }, []);
+
+  function setFilter(key, value) {
+    setFilters(prev => ({ ...prev, [key]: value }));
+    setPage(1);
+    setSelected([]);
+  }
+  function resetFilters() {
+    setFilters(EMPTY_LIST_FILTERS);
+    setPage(1);
+    setSelected([]);
+  }
+  const hasFilters = Object.values(filters).some(Boolean);
 
   function toggleSort(key) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -78,40 +132,25 @@ export default function InvoicesList() {
     return sortDir === 'asc' ? ' ↑' : ' ↓';
   }
 
-  const filtered = search
-    ? invoices.filter(inv =>
-        (inv.invoice_no || '').toLowerCase().includes(search.toLowerCase()) ||
-        (inv.org_id?.org_name || '').toLowerCase().includes(search.toLowerCase()) ||
-        (inv.bill_name || '').toLowerCase().includes(search.toLowerCase()) ||
-        (inv.payment_status || '').toLowerCase().includes(search.toLowerCase())
-      )
-    : invoices;
 
-  const sorted = sortKey
-    ? [...filtered].sort((a, b) => {
-        let av, bv;
-        if (sortKey === 'org_name') { av = (a.org_id?.org_name ?? '').toLowerCase(); bv = (b.org_id?.org_name ?? '').toLowerCase(); }
-        else if (sortKey === 'credit_title') { av = (a.order_id?.credit_id?.title ?? '').toLowerCase(); bv = (b.order_id?.credit_id?.title ?? '').toLowerCase(); }
-        else if (sortKey === 'total_amount') { return sortDir === 'asc' ? (Number(a.total_amount)||0) - (Number(b.total_amount)||0) : (Number(b.total_amount)||0) - (Number(a.total_amount)||0); }
-        else if (['payment_date','createdAt'].includes(sortKey)) { return sortDir === 'asc' ? (new Date(a[sortKey]).getTime()||0) - (new Date(b[sortKey]).getTime()||0) : (new Date(b[sortKey]).getTime()||0) - (new Date(a[sortKey]).getTime()||0); }
-        else { av = String(a[sortKey]||'').toLowerCase(); bv = String(b[sortKey]||'').toLowerCase(); }
-        if (av < bv) return sortDir === 'asc' ? -1 : 1;
-        if (av > bv) return sortDir === 'asc' ? 1 : -1;
-        return 0;
-      })
-    : filtered;
+  const sorted     = [...invoices].sort(compareInvoices(sortKey, sortDir));
+  const total      = sorted.length;
+  const totalPages = Math.max(1, Math.ceil(total / LIMIT));
+  const pageRows   = sorted.slice((page - 1) * LIMIT, page * LIMIT);
+  const from = total === 0 ? 0 : (page - 1) * LIMIT + 1;
+  const to   = Math.min(page * LIMIT, total);
 
   function doDelete() {
     const { id } = confirm;
     setConfirm({ show: false, id: null });
     apiServiceHandler('GET', `invoice/delete/${id}`)
-      .then(() => { toast.success('Invoice deleted.'); fetchInvoices(); })
-      .catch(() => toast.error('Delete failed.'));
+      .then(() => { toast.error('Invoice deleted.'); fetchInvoices(); })
+      .catch(() => toast.warning('Delete failed.'));
   }
 
-  const allIds = sorted.map(inv => inv._id);
-  const allSelected = allIds.length > 0 && allIds.every(id => selected.includes(id));
-  const toggleAll = () => setSelected(allSelected ? [] : allIds);
+  const pageIds = pageRows.map(inv => inv._id);
+  const allSelected = pageIds.length > 0 && pageIds.every(id => selected.includes(id));
+  const toggleAll = () => setSelected(allSelected ? [] : pageIds);
   const toggleOne = id => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
   function doBulkDelete() {
@@ -119,12 +158,11 @@ export default function InvoicesList() {
     const ids = [...selected];
     setSelected([]);
     Promise.all(ids.map(id => apiServiceHandler('GET', `invoice/delete/${id}`)))
-      .then(() => { toast.success(`${ids.length} invoice${ids.length !== 1 ? 's' : ''} deleted.`); fetchInvoices(); })
-      .catch(() => toast.error('Some deletes failed.'));
+      .then(() => { toast.error(`${ids.length} invoice${ids.length !== 1 ? 's' : ''} deleted.`); fetchInvoices(); })
+      .catch(() => toast.warning('Some deletes failed.'));
   }
 
-  const from = total === 0 ? 0 : (page - 1) * LIMIT + 1;
-  const to   = Math.min(page * LIMIT, total);
+  const sortable = { cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' };
 
   return (
     <SuperAdminShell activeSection="invoices">
@@ -156,77 +194,69 @@ export default function InvoicesList() {
       </div>
 
       <div className={s.card}>
-        <div className={s.toolbar}>
-          <div className={s.searchWrap}>
-            <SearchIcon />
-            <input
-              className={s.searchInput}
-              type="text"
-              placeholder="Search by invoice no, organization, or payment status…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
-        </div>
+        <ListFilterBar
+          label="Filter invoices"
+          orgs={orgs}
+          statuses={PAYMENT_STATUSES}
+          filters={filters}
+          onFilter={setFilter}
+          onClear={resetFilters}
+          canClear={hasFilters}
+        />
 
         <div className={s.tableWrap}>
           <table className={s.table}>
             <thead>
               <tr>
-                <th className={s.checkTh}><input type="checkbox" checked={allSelected} onChange={toggleAll} /></th>
+                <th className={s.checkTh}><input type="checkbox" aria-label="Select all invoices on this page" checked={allSelected} onChange={toggleAll} /></th>
                 <th>#</th>
-                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('invoice_no')}>Invoice No{sortArrow('invoice_no')}</th>
-                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('org_name')}>Organization{sortArrow('org_name')}</th>
-                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('credit_title')}>Credit Package{sortArrow('credit_title')}</th>
-                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('total_amount')}>Total{sortArrow('total_amount')}</th>
-                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('payment_status')}>Payment{sortArrow('payment_status')}</th>
-                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('payment_method')}>Method{sortArrow('payment_method')}</th>
-                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('payment_date')}>Payment Date{sortArrow('payment_date')}</th>
-                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('status')}>Status{sortArrow('status')}</th>
+                <th style={sortable} onClick={() => toggleSort('invoice_no')}>Invoice No{sortArrow('invoice_no')}</th>
+                <th style={sortable} onClick={() => toggleSort('org_name')}>Organization{sortArrow('org_name')}</th>
+                <th style={sortable} onClick={() => toggleSort('credit_title')}>Credit Package{sortArrow('credit_title')}</th>
+                <th style={sortable} onClick={() => toggleSort('total_amount')}>Total{sortArrow('total_amount')}</th>
+                <th style={sortable} onClick={() => toggleSort('payment_status')}>Payment{sortArrow('payment_status')}</th>
+                <th style={sortable} onClick={() => toggleSort('payment_method')}>Method{sortArrow('payment_method')}</th>
+                <th style={sortable} onClick={() => toggleSort('payment_date')}>Payment Date{sortArrow('payment_date')}</th>
+                <th style={sortable} onClick={() => toggleSort('status')}>Status{sortArrow('status')}</th>
                 <th>Action</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr className={s.emptyRow}><td colSpan={11}>Loading…</td></tr>
-              ) : sorted.length === 0 ? (
-                <tr className={s.emptyRow}><td colSpan={11}>No invoices found.</td></tr>
-              ) : sorted.map((inv, idx) => {
-                return (
-                  <tr key={inv._id} style={{ cursor: 'pointer' }} onClick={() => toggleOne(inv._id)}>
-                    <td className={s.checkTd} onClick={e => e.stopPropagation()}>
-                      <input type="checkbox" checked={selected.includes(inv._id)} onChange={() => toggleOne(inv._id)} />
-                    </td>
-                    <td>{(page - 1) * LIMIT + idx + 1}</td>
-                    <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{inv.invoice_no || '—'}</td>
-                    <td>{inv.org_id?.org_name || '—'}</td>
-                    <td>{inv.order_id?.credit_id?.title || '—'}</td>
-                    <td>{fmtAmount(inv.total_amount, inv.currency)}</td>
-                    <td>
-                      <span style={{ display: 'inline-block', padding: '2px 9px', borderRadius: 20, fontSize: 11.5, fontWeight: 400, background: 'transparent', color: '#000', textTransform: 'capitalize' }}>
-                        {inv.payment_status || '—'}
-                      </span>
-                    </td>
-                    <td style={{ textTransform: 'capitalize' }}>{inv.payment_method || '—'}</td>
-                    <td>{fmtDate(inv.payment_date)}</td>
-                    <td>
-                      {inv.status === 'active'
-                        ? <span className={s.badgeActive}>Active</span>
-                        : <span className={s.badgeInactive}>Inactive</span>}
-                    </td>
-                    <td>
-                      <div className={s.actions} onClick={e => e.stopPropagation()}>
-                        <button className={s.btnView} title="View" onClick={() => router.push(`/superadmin/payments/invoices/view/${inv._id}`)}>
-                          <EyeIcon />
-                        </button>
-                        <button className={s.btnDelete} title="Delete" onClick={() => setConfirm({ show: true, id: inv._id })}>
-                          <TrashIcon />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+              ) : pageRows.length === 0 ? (
+                <tr className={s.emptyRow}><td colSpan={11}>{hasFilters ? 'No invoices match these filters.' : 'No invoices found.'}</td></tr>
+              ) : pageRows.map((inv, idx) => (
+                <tr key={inv._id}>
+                  <td className={s.checkTd}>
+                    <input type="checkbox" aria-label={`Select invoice ${inv.invoice_no || ''}`}
+                      checked={selected.includes(inv._id)} onChange={() => toggleOne(inv._id)} />
+                  </td>
+                  <td>{(page - 1) * LIMIT + idx + 1}</td>
+                  <td style={{ fontFamily: 'monospace', fontSize: 12 }}>{inv.invoice_no || '—'}</td>
+                  <td>{inv.org_id?.org_name || '—'}</td>
+                  <td>{inv.order_id?.credit_id?.title || '—'}</td>
+                  <td>{fmtAmount(inv.total_amount, inv.currency)}</td>
+                  <td style={{ textTransform: 'capitalize' }}>{inv.payment_status || '—'}</td>
+                  <td>{paymentMethodLabel(inv.payment_method)}</td>
+                  <td>{fmtDate(inv.payment_date)}</td>
+                  <td>
+                    {inv.status === 'active'
+                      ? <span className={s.badgeActive}>Active</span>
+                      : <span className={s.badgeInactive}>Inactive</span>}
+                  </td>
+                  <td>
+                    <div className={s.actions}>
+                      <button data-action="view" className={s.btnView} title="View" aria-label="View invoice" onClick={() => router.push(`/superadmin/payments/invoices/view/${inv._id}`)}>
+                        <EyeIcon />
+                      </button>
+                      <button data-action="delete" className={s.btnDelete} title="Delete" aria-label="Delete invoice" onClick={() => setConfirm({ show: true, id: inv._id })}>
+                        <TrashIcon />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -238,7 +268,9 @@ export default function InvoicesList() {
                 Delete {selected.length} Selected
               </button>
             )}
-            <span>Showing {from}–{to} of {total}</span>
+            <span>
+              {total === 0 ? 'No invoices' : `Showing ${from}–${to} of ${total}`}
+            </span>
           </div>
           <div className={s.paginationBtns}>
             <button className={s.pageBtn} disabled={page <= 1} onClick={() => setPage(p => p - 1)}>‹</button>

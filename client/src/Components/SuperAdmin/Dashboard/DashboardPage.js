@@ -102,7 +102,7 @@ const OrgsIcon = () => (
 );
 
 // ── KPI Card ──────────────────────────────────────────────────────────
-function KpiCard({ icon, iconBg, iconColor, label, value, loading, trend }) {
+function KpiCard({ icon, iconBg, iconColor, label, value, loading, hint }) {
   return (
     <div className={s.kpiCard}>
       <div className={s.kpiTop}>
@@ -114,13 +114,7 @@ function KpiCard({ icon, iconBg, iconColor, label, value, loading, trend }) {
           </div>
         </div>
       </div>
-      <div className={s.kpiTrend}>
-        <svg viewBox="0 0 16 10" fill="none" stroke="#16a34a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 10 }}>
-          <polyline points="1 9 5 4 9 6 15 1"/><polyline points="11 1 15 1 15 5"/>
-        </svg>
-        <span className={s.kpiTrendPct}>{trend}%</span>
-        <span className={s.kpiTrendLbl}>from last month</span>
-      </div>
+      {hint && <div className={s.kpiHint}>{hint}</div>}
     </div>
   );
 }
@@ -431,11 +425,11 @@ export default function DashboardPage() {
 
         {/* ── KPI Cards ── */}
         <div className={s.kpiRow}>
-          <KpiCard icon={<StudentsIcon />} iconBg="#ede9fe" iconColor="#7c3aed" label="Total Students"      value={counts.employees}  loading={loading}     trend={8.5} />
-          <KpiCard icon={<CoursesIcon />}  iconBg="#dbeafe" iconColor="#2563eb" label="Total Courses"       value={counts.courses}    loading={loading}     trend={4.3} />
-          <KpiCard icon={<EnrollIcon />}   iconBg="#d1fae5" iconColor="#059669" label="Total Enrollments"   value={dashData.totalEnrollments} loading={dashLoading} trend={12.7} />
-          <KpiCard icon={<RevenueIcon />}  iconBg="#fef3c7" iconColor="#d97706" label="Total Revenue"       value={fmtRevenue(dashData.revenue)} loading={dashLoading} trend={15.3} />
-          <KpiCard icon={<OrgsIcon />}     iconBg="#fee2e2" iconColor="#dc2626" label="Total Organizations" value={counts.orgs}       loading={loading}     trend={6.1} />
+          <KpiCard icon={<StudentsIcon />} iconBg="#ede9fe" iconColor="#7c3aed" label="Total Students"      value={counts.employees}  loading={loading}     hint="Learners in all organizations" />
+          <KpiCard icon={<CoursesIcon />}  iconBg="#dbeafe" iconColor="#2563eb" label="Total Courses"       value={counts.courses}    loading={loading}     hint="In the course catalogue" />
+          <KpiCard icon={<EnrollIcon />}   iconBg="#d1fae5" iconColor="#059669" label="Total Enrollments"   value={dashData.totalEnrollments} loading={dashLoading} hint="Courses assigned to organizations" />
+          <KpiCard icon={<RevenueIcon />}  iconBg="#fef3c7" iconColor="#d97706" label="Total Revenue"       value={fmtRevenue(dashData.revenue)} loading={dashLoading} hint="Total of all orders" />
+          <KpiCard icon={<OrgsIcon />}     iconBg="#fee2e2" iconColor="#dc2626" label="Total Organizations" value={counts.orgs}       loading={loading}     hint="Registered organizations" />
         </div>
 
         {/* ── Enrollments Overview + Top Courses + Top Organizations: three columns ── */}

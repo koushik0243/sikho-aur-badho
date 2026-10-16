@@ -5,7 +5,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./OrgUserAssignmentAdd.module.css";
+import sPage from "./OrgUserAssignmentAdd.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const BackIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -108,7 +112,7 @@ function AssignUsersForm() {
       toast.success(`${selectedIds.size} user${selectedIds.size !== 1 ? 's' : ''} assigned successfully.`);
       window.location.href = backPath;
     } catch {
-      toast.error('Failed to assign users. Please try again.');
+      toast.warning('Failed to assign users. Please try again.');
     } finally {
       setSubmitting(false);
     }

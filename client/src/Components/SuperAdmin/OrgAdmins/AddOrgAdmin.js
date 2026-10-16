@@ -5,8 +5,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./AddOrgAdmin.module.css";
+import sPage from "./AddOrgAdmin.module.css";
 import PasswordInput from '../../PasswordInput/PasswordInput';
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const BackArrow = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -78,7 +82,7 @@ export default function AddOrgAdmin() {
       toast.success('Admin created successfully.');
       router.push(`/superadmin/organization-admins${orgId ? `?orgId=${orgId}` : ''}`);
     } catch (err) {
-      toast.error(err?.message || 'Failed to create admin. Please try again.');
+      toast.warning(err?.message || 'Failed to create admin. Please try again.');
     } finally {
       setSubmitting(false);
     }

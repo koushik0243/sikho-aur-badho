@@ -37,23 +37,11 @@ function fmtDate(d) {
 }
 
 // ── Gauge ring ────────────────────────────────────────────────────────────────
-function Gauge({ pct = 0, size = 52, stroke = 5, color = '#0b7b7b' }) {
-  const r  = (size - stroke) / 2;
-  const cx = size / 2;
-  const circ = 2 * Math.PI * r;
-  const dash = (pct / 100) * circ;
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle cx={cx} cy={cx} r={r} fill="none" stroke="#e8edf0" strokeWidth={stroke}/>
-      <circle cx={cx} cy={cx} r={r} fill="none" stroke={color} strokeWidth={stroke}
-        strokeDasharray={`${dash} ${circ}`} strokeDashoffset={circ / 4}
-        strokeLinecap="round" style={{ transition: 'stroke-dasharray 0.5s' }}/>
-      <text x={cx} y={cx + 4} textAnchor="middle" fontSize="11" fontWeight="700" fill="#1a2b2b">{pct}%</text>
-    </svg>
-  );
+function StatBar({ pct = 0 }) {
+  const v = Math.max(0, Math.min(100, Math.round(pct || 0)));
+  return <div className={s.statBar} aria-hidden="true">{v > 0 && <span style={{ width: `${v}%` }}/>}</div>;
 }
 
-// ── Toggle ────────────────────────────────────────────────────────────────────
 function Toggle({ on, onChange, label }) {
   return (
     <button className={`${s.toggle} ${on ? s.toggleOn : ''}`} onClick={() => onChange(!on)} aria-label={label}>
@@ -70,8 +58,13 @@ function StatusBadge({ status }) {
     completed:   { label: 'Complete',    cls: s.statusComplete },
     passed:      { label: 'Complete',    cls: s.statusComplete },
     ongoing:     { label: 'Ongoing',     cls: s.statusOngoing },
+    stopped:     { label: 'Stopped',     cls: s.statusStopped },
+    notstarted:  { label: 'Not started', cls: s.statusNotStarted },
+    not_started: { label: 'Not started', cls: s.statusNotStarted },
+    dropout:     { label: 'Stopped',     cls: s.statusStopped },
     'in progress': { label: 'In progress', cls: s.statusInProgress },
     inprogress:  { label: 'In progress', cls: s.statusInProgress },
+    in_progress: { label: 'In progress', cls: s.statusInProgress },
   };
   const norm = (status || '').toLowerCase().replace(/\s+/g, '');
   const entry = map[norm] || map[(status || '').toLowerCase()] || { label: status || 'In progress', cls: s.statusInProgress };
@@ -87,19 +80,14 @@ function CourseAvatar({ title, color }) {
 }
 
 // ── Badges ────────────────────────────────────────────────────────────────────
-const BADGES = [
-  { id: 'firstpass', label: 'First Pass', sub: 'Quiz 100% first try' },
-  { id: 'streak',    label: 'On A Streak', sub: '7 days active' },
-  { id: 'certified', label: 'Certified',   sub: '1 Course done' },
-];
 function BadgeIcon({ id }) {
-  if (id === 'firstpass') return (
+  if (id === 'first-try' || id === 'first-quiz' || id === 'high-score') return (
     <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
       <circle cx="24" cy="24" r="20" stroke="#0b7b7b" strokeWidth="3" fill="#e8f5f5"/>
       <path d="M16 24l6 6 10-10" stroke="#0b7b7b" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
-  if (id === 'streak') return (
+  if (id === 'top-three' || id === 'expert') return (
     <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
       <circle cx="24" cy="24" r="20" stroke="#0b7b7b" strokeWidth="3" fill="#e8f5f5"/>
       <path d="M24 14c-2 4-6 6-6 11a6 6 0 0012 0c0-3-2-5-3-7-1 2-1 4-1 4s-3-2-2-8z" fill="#0b7b7b" opacity="0.7"/>
@@ -132,6 +120,9 @@ export default function ProfilePage() {
 
   const [assignments, setAssignments] = useState([]);
   const [loading,     setLoading]     = useState(true);
+  // Same numbers as My Progress / My Achievements, so every page agrees.
+  const [report,      setReport]      = useState(null);
+  const [badges,      setBadges]      = useState([]);
 
   const [notifSettings, setNotifSettings] = useState({
     email: true, live: false, lang: true,
@@ -150,9 +141,15 @@ export default function ProfilePage() {
     if (!userId) { if (authReady) setLoading(false); return; }
     setLoading(true);
     try {
-      const res  = await apiServiceHandler('GET', `course-assignment/list?userId=${userId}`).catch(() => null);
+      const [res, progRes, achRes] = await Promise.all([
+        apiServiceHandler('GET', `course-assignment/list?userId=${userId}`).catch(() => null),
+        apiServiceHandler('GET', `my-report/progress?t=${Date.now()}`).catch(() => null),
+        apiServiceHandler('GET', `my-report/achievements?t=${Date.now()}`).catch(() => null),
+      ]);
       const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
       setAssignments(list);
+      setReport(progRes?.data || null);
+      setBadges(Array.isArray(achRes?.data?.badges) ? achRes.data.badges : []);
     } finally {
       setLoading(false);
     }
@@ -189,7 +186,7 @@ export default function ProfilePage() {
       toast.success('Preference updated.');
     } catch (err) {
       setNotifSettings(prev => ({ ...prev, [key]: previous })); // revert on failure
-      toast.error(err?.message || 'Could not update preference. Please try again.');
+      toast.warning(err?.message || 'Could not update preference. Please try again.');
     }
   }
 
@@ -219,22 +216,27 @@ export default function ProfilePage() {
       setEditOpen(false);
       toast.success('Personal details updated.');
     } catch (err) {
-      toast.error(err?.message || 'Could not update personal details. Please try again.');
+      toast.warning(err?.message || 'Could not update personal details. Please try again.');
     } finally {
       setEditSaving(false);
     }
   }
 
-  const completedCount = assignments.filter(a => {
-    const s = (a.status || '').toLowerCase();
-    return s === 'completed' || s === 'passed' || s === 'complete' || Number(a.score) >= 70;
-  }).length;
-
-  const totalCourses  = assignments.length;
-  const overallPct    = totalCourses > 0 ? Math.round((completedCount / totalCourses) * 100) : 0;
-  const avgScore      = assignments.length > 0
-    ? Math.round(assignments.reduce((acc, a) => acc + Number(a.score || 0), 0) / assignments.length)
-    : 0;
+  const tot = report?.totals || {};
+  const pctOf = (n, d) => (d ? (n / d) * 100 : 0);
+  const testsTaken = (tot.testsPassed || 0) + (tot.testsFailed || 0);
+  const reportCourses = Array.isArray(report?.courses) ? report.courses : [];
+  const earnedBadges = badges.filter(b => b.earned);
+  const STATS = [
+    { key: 'progress', icon: Icon.trend, label: 'Overall progress', value: `${tot.overall ?? 0}%`, pct: tot.overall,
+      sub: `${tot.completedCourses ?? 0} of ${tot.courses ?? 0} courses completed` },
+    { key: 'chapters', icon: Icon.book, label: 'Chapters done', value: `${tot.chaptersDone ?? 0}`, of: tot.chapters ?? 0,
+      pct: pctOf(tot.chaptersDone, tot.chapters), sub: `${tot.chaptersPending ?? 0} still to finish` },
+    { key: 'score', icon: Icon.quiz, label: 'My score', value: `${tot.myScore ?? 0}%`, pct: tot.myScore,
+      sub: testsTaken ? `${tot.testsPassed} of ${testsTaken} tests passed` : 'No tests taken yet' },
+    { key: 'certs', icon: Icon.cert, label: 'Certificates', value: `${tot.certificates ?? 0}`, of: tot.courses ?? 0,
+      pct: pctOf(tot.certificates, tot.courses), sub: 'Earned by completing a course' },
+  ];
 
   // `profile` (server/users/user.model.js field names) is the authoritative source once
   // loaded; `user` (Redux, login-response shape) only ever has _id/name/email/user_type/
@@ -278,50 +280,20 @@ export default function ProfilePage() {
 
         {/* Stats grid */}
         <div className={s.statsGrid}>
-          <div className={s.statCard}>
-            <div className={s.statHeader}>
-              <span className={s.statIcon}>{Icon.trend}</span>
-              <span className={s.statLbl}>Overall Progress</span>
+          {STATS.map(st => (
+            <div key={st.key} className={s.statCard}>
+              <div className={s.statHeader}>
+                <span className={s.statIcon}>{st.icon}</span>
+                <span className={s.statLbl}>{st.label}</span>
+              </div>
+              <div className={s.statBig}>
+                {loading ? '—' : st.value}
+                {!loading && st.of != null && <span className={s.statOf}> / {st.of}</span>}
+              </div>
+              <StatBar pct={loading ? 0 : st.pct}/>
+              <p className={s.statSub}>{loading ? '\u00a0' : st.sub}</p>
             </div>
-            <div className={s.statBody}>
-              <div className={s.statBig}>{overallPct}%</div>
-              <div className={s.statGauge}><Gauge pct={overallPct}/></div>
-            </div>
-            <p className={s.statSub}>{completedCount} of {totalCourses} Courses</p>
-          </div>
-          <div className={s.statCard}>
-            <div className={s.statHeader}>
-              <span className={s.statIcon}>{Icon.book}</span>
-              <span className={s.statLbl}>Chapters Done</span>
-            </div>
-            <div className={s.statBody}>
-              <div className={s.statBig}>—</div>
-              <div className={s.statGauge}><Gauge pct={0} color="#6366f1"/></div>
-            </div>
-            <p className={s.statSub}>Of Total</p>
-          </div>
-          <div className={s.statCard}>
-            <div className={s.statHeader}>
-              <span className={s.statIcon}>{Icon.quiz}</span>
-              <span className={s.statLbl}>Quiz Avg</span>
-            </div>
-            <div className={s.statBody}>
-              <div className={s.statBig}>{avgScore > 0 ? `${avgScore}%` : '—'}</div>
-              <div className={s.statGauge}><Gauge pct={avgScore} color="#f59e0b"/></div>
-            </div>
-            <p className={s.statSub}>Last 7 Quizzes</p>
-          </div>
-          <div className={s.statCard}>
-            <div className={s.statHeader}>
-              <span className={s.statIcon}>{Icon.cert}</span>
-              <span className={s.statLbl}>Certificates</span>
-            </div>
-            <div className={s.statBody}>
-              <div className={s.statBig}>{completedCount || '—'}</div>
-              <div className={s.statGauge}><Gauge pct={completedCount > 0 ? 100 : 0} color="#10b981"/></div>
-            </div>
-            <p className={s.statSub}>In Progress</p>
-          </div>
+          ))}
         </div>
       </div>
 
@@ -414,43 +386,41 @@ export default function ProfilePage() {
               <div className={s.coursesSkeleton}>
                 {[1,2,3].map(i => <div key={i} className={s.skelRow}/>)}
               </div>
-            ) : assignments.length === 0 ? (
+            ) : reportCourses.length === 0 ? (
               <p className={s.emptyText}>No courses assigned yet.</p>
             ) : (
               <div className={s.coursesList}>
-                {assignments.slice(0, 6).map((a, i) => {
-                  const title    = a.courseId?.title || a.courseTitle || `Course ${i + 1}`;
-                  const chapters = a.courseId?.totalChapters || 0;
-                  const norm     = (a.status || '').toLowerCase();
-                  const status   = norm === 'passed' || norm === 'completed' ? 'complete'
-                                 : i === 0 ? 'ongoing' : 'in progress';
-                  return (
-                    <div key={i} className={s.courseRow}>
-                      <CourseAvatar title={title}/>
-                      <div className={s.courseInfo}>
-                        <span className={s.courseName}>{title}</span>
-                        <span className={s.courseMeta}>{chapters > 0 ? `${chapters} Chapters` : ''}</span>
-                      </div>
-                      <StatusBadge status={status}/>
+                {reportCourses.map(c => (
+                  <div key={c.courseId} className={s.courseRow}>
+                    <CourseAvatar title={c.course}/>
+                    <div className={s.courseInfo}>
+                      <span className={s.courseName}>{c.course}</span>
+                      <span className={s.courseMeta}>{c.chaptersDone}/{c.chapters} chapters · {c.progress}%</span>
+                      <StatBar pct={c.progress}/>
                     </div>
-                  );
-                })}
+                    <StatusBadge status={c.status}/>
+                  </div>
+                ))}
               </div>
             )}
           </div>
 
           {/* Badges */}
           <div className={s.card}>
-            <h3 className={s.cardTitle}>Badges Earned</h3>
-            <div className={s.badgesGrid}>
-              {BADGES.map(b => (
-                <div key={b.id} className={s.badge}>
-                  <BadgeIcon id={b.id}/>
-                  <span className={s.badgeLabel}>{b.label}</span>
-                  <span className={s.badgeSub}>{b.sub}</span>
-                </div>
-              ))}
-            </div>
+            <h3 className={s.cardTitle}>Badges earned <span className={s.cardCount}>{earnedBadges.length} of {badges.length}</span></h3>
+            {badges.length === 0 ? (
+              <p className={s.emptyText}>{loading ? 'Loading…' : 'No badges yet.'}</p>
+            ) : (
+              <div className={s.badgesGrid}>
+                {badges.map(b => (
+                  <div key={b.key} className={`${s.badge} ${b.earned ? '' : s.badgeLocked}`} title={b.hint}>
+                    <BadgeIcon id={b.key}/>
+                    <span className={s.badgeLabel}>{b.label}</span>
+                    <span className={s.badgeSub}>{b.earned ? 'Earned' : b.hint}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

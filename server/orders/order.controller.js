@@ -32,8 +32,8 @@ const updateOrder = async (req, res, next) => {
 
 const listOrder = async (req, res, next) => {
     try {
-        const { status, organizer_id, credit_id } = req.query;
-        const data = await OrderHelper.listOrder({ status, organizer_id, credit_id });
+        const { status, organizer_id, credit_id, date_from, date_to } = req.query;
+        const data = await OrderHelper.listOrder({ status, organizer_id, credit_id, date_from, date_to });
         res.status(200).json({ status: 200, message: "Successfully fetched.", data });
     } catch (error) {
         next(error);
@@ -44,11 +44,11 @@ const listOrderPagination = async (req, res, next) => {
     try {
         const page  = parseInt(req.query.page)  || 1;
         const limit = parseInt(req.query.limit) || 10;
-        const { status, organizer_id, credit_id } = req.query;
+        const { status, organizer_id, credit_id, date_from, date_to } = req.query;
 
         const [orders, total] = await Promise.all([
-            OrderHelper.listOrderPagination(page, limit, { status, organizer_id, credit_id }),
-            OrderHelper.getOrderCount({ status, organizer_id, credit_id }),
+            OrderHelper.listOrderPagination(page, limit, { status, organizer_id, credit_id, date_from, date_to }),
+            OrderHelper.getOrderCount({ status, organizer_id, credit_id, date_from, date_to }),
         ]);
         res.status(200).json({
             status: 200,

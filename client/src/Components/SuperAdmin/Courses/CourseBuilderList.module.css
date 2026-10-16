@@ -1223,3 +1223,10 @@
   .filterSearch { flex: 1 1 100%; }
   .catDropMenu { width: min(260px, calc(100vw - 32px)); }
 }
+
+/* ── Column alignment: headers line up with their values ── */
+/* Header text starts where the column values start (same side padding as the cells). */
+.table thead tr th:not(:has(input[type="checkbox"])) { padding-left: 6px; padding-right: 6px; }
+/* Sub-category tags have no background: no side padding, a wider gap instead. */
+.subCatTag.subCatTag { padding-left: 0; padding-right: 0; }
+.subCatWrap.subCatWrap { gap: 4px 10px; }

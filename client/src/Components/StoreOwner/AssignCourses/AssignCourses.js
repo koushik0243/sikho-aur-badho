@@ -5,7 +5,11 @@ import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import { selectUser } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
-import s from "./AssignCourses.module.css";
+import pageStyles from "./AssignCourses.module.css";
+import { withFormKit } from '../PageKit/PageKit';
+
+// Page styles + the shared store owner form look.
+const s = withFormKit(pageStyles);
 
 // ── Icons ────────────────────────────────────────────────────────
 const Icon = {
@@ -92,7 +96,7 @@ export default function AssignCoursesPage() {
 
       await loadAssignments(effectiveOrgId);
     } catch {
-      toast.error('Failed to load data');
+      toast.warning('Failed to load data');
     } finally {
       setLoading(false);
     }
@@ -149,8 +153,8 @@ export default function AssignCoursesPage() {
     : courses;
 
   async function handleAssign() {
-    if (!selectedUserId)              { toast.error('Please select a learner');       return; }
-    if (selectedCourseIds.size === 0) { toast.error('Please select at least one course'); return; }
+    if (!selectedUserId)              { toast.warning('Please select a learner');       return; }
+    if (selectedCourseIds.size === 0) { toast.warning('Please select at least one course'); return; }
 
     // Duplicate check — skip any course already assigned to this learner
     const toAssign = [...selectedCourseIds].filter(cid => !assignedCourseIdsForUser.has(cid));
@@ -158,7 +162,7 @@ export default function AssignCoursesPage() {
 
     if (toAssign.length === 0) {
       const learnerName = learners.find(l => l._id === selectedUserId)?.name || 'This learner';
-      toast.error(`${learnerName} is already assigned to all the selected course(s)`);
+      toast.warning(`${learnerName} is already assigned to all the selected course(s)`);
       return;
     }
 
@@ -187,7 +191,7 @@ export default function AssignCoursesPage() {
       setSelectedCourseIds(new Set());
       await loadAssignments(orgId);
     } catch {
-      toast.error('Failed to assign course(s)');
+      toast.warning('Failed to assign course(s)');
     } finally {
       setSaving(false);
     }
@@ -199,9 +203,9 @@ export default function AssignCoursesPage() {
       await apiServiceHandler('GET', `course-assignment/delete/${assignmentId}`);
       setAssignments(prev => prev.filter(a => a._id !== assignmentId));
       setChecked(prev => { const next = new Set(prev); next.delete(assignmentId); return next; });
-      toast.success('Assignment removed');
+      toast.error('Assignment removed');
     } catch {
-      toast.error('Failed to remove assignment');
+      toast.warning('Failed to remove assignment');
     }
   }
 
@@ -216,9 +220,9 @@ export default function AssignCoursesPage() {
       setAssignments(prev => prev.filter(a => !checked.has(a._id)));
       setChecked(new Set());
       setAssignPage(1);
-      toast.success(`${ids.length} assignment${ids.length > 1 ? 's' : ''} removed`);
+      toast.error(`${ids.length} assignment${ids.length > 1 ? 's' : ''} removed`);
     } catch {
-      toast.error('Failed to remove some assignments');
+      toast.warning('Failed to remove some assignments');
     } finally {
       setBulkDeleting(false);
     }
@@ -474,7 +478,7 @@ export default function AssignCoursesPage() {
                   <td className={s.td}>{a.courseId?.title || '—'}</td>
                   <td className={s.td}>{formatDate(a.attemptedAt || a.createdAt)}</td>
                   <td className={s.tdAction}>
-                    <button className={s.trashBtn} title="Remove assignment" onClick={() => setConfirmId(a._id)}>
+                    <button data-action="delete" className={s.trashBtn} title="Remove assignment" onClick={() => setConfirmId(a._id)}>
                       {Icon.trash}
                     </button>
                   </td>

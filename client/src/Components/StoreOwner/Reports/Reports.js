@@ -12,6 +12,17 @@ const DownloadIcon = () => (
   </svg>
 );
 
+const Icon = {
+  book:      <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" /></svg>,
+  users:     <svg viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" /></svg>,
+  clipboard: <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>,
+  link:      <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd" /></svg>,
+  trophy:    <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h8V3a1 1 0 112 0v1h1a1 1 0 011 1v2a4 4 0 01-3.6 3.98A5.002 5.002 0 0111 13.9V16h2a1 1 0 110 2H7a1 1 0 110-2h2v-2.1a5.002 5.002 0 01-3.4-2.92A4 4 0 012 7V5a1 1 0 011-1h1V3a1 1 0 011-1zm-1 4v1a2 2 0 001.1 1.79A5 5 0 015 7V6H4zm11 1V6h1v1a2 2 0 01-1.1 1.79c.07-.26.1-.52.1-.79z" clipRule="evenodd" /></svg>,
+  alert:     <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>,
+  video:     <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" /></svg>,
+  badge:     <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>,
+};
+
 function toArr(res) {
   if (Array.isArray(res))             return res;
   if (Array.isArray(res?.data))       return res.data;
@@ -355,70 +366,106 @@ export default function ReportsPage() {
 
   const REPORTS = [
     {
-      key: 'completion', num: '01',
+      key: 'completion', icon: Icon.book,
       title: 'Course Completion Report',
-      sub: loading ? 'Loading…' : `${courseCount} course${courseCount !== 1 ? 's' : ''} · ${learnerCount} learner${learnerCount !== 1 ? 's' : ''}`,
+      desc: 'Every learner’s assigned courses, with the assigned date and latest activity date.',
+      sub: `${courseCount} course${courseCount !== 1 ? 's' : ''} · ${learnerCount} learner${learnerCount !== 1 ? 's' : ''}`,
     },
     {
-      key: 'performers', num: '02',
+      key: 'performers', icon: Icon.trophy,
       title: 'Top / Bottom Performers',
-      sub: loading ? 'Loading…' : `${attemptCount} quiz attempt${attemptCount !== 1 ? 's' : ''} · Ranked by score`,
+      desc: 'All quiz attempts ranked by score — spot your strongest and weakest learners.',
+      sub: `${attemptCount} quiz attempt${attemptCount !== 1 ? 's' : ''} · Ranked by score`,
     },
     {
-      key: 'failure', num: '03',
+      key: 'failure', icon: Icon.alert,
       title: 'Chapter Failure Analysis',
-      sub: loading ? 'Loading…' : `Retry rates · ${attemptCount} total attempt${attemptCount !== 1 ? 's' : ''}`,
+      desc: 'Attempts, failures and fail rate for each quiz, by course and chapter.',
+      sub: `Retry rates · ${attemptCount} total attempt${attemptCount !== 1 ? 's' : ''}`,
     },
     {
-      key: 'zoom', num: '04',
+      key: 'zoom', icon: Icon.video,
       title: 'Zoom Attendance Log',
-      sub: loading ? 'Loading…' : `${learnerCount} learner${learnerCount !== 1 ? 's' : ''} · Session-wise records`,
+      desc: 'Each learner with their email and the number of courses assigned to them.',
+      sub: `${learnerCount} learner${learnerCount !== 1 ? 's' : ''} · Session-wise records`,
     },
     {
-      key: 'certificates', num: '05',
+      key: 'certificates', icon: Icon.badge,
       title: 'Certificate Issuance Log',
-      sub: loading ? 'Loading…' : `${assignCount} assignment${assignCount !== 1 ? 's' : ''} · Who earned what · When`,
+      desc: 'Each course assignment with its assigned date and completion date.',
+      sub: `${assignCount} assignment${assignCount !== 1 ? 's' : ''} · Who earned what · When`,
     },
   ];
 
-  return (
-    <div className={s.card}>
-      <div className={s.cardHead}>
-        <h2 className={s.cardTitle}>Export Reports</h2>
-        {loading && <span className={s.loadingNote}>Loading data…</span>}
-      </div>
+  const KPIS = [
+    { label: 'Courses',       value: courseCount,  icon: Icon.book },
+    { label: 'Learners',      value: learnerCount, icon: Icon.users },
+    { label: 'Quiz attempts', value: attemptCount, icon: Icon.clipboard },
+    { label: 'Assignments',   value: assignCount,  icon: Icon.link },
+  ];
 
-      <div className={s.reportList}>
-        {REPORTS.map(r => (
-          <div key={r.key} className={s.reportRow}>
-            <div className={s.reportLeft}>
-              <span className={s.reportNum}>{r.num}</span>
-              <div>
-                <div className={s.reportTitle}>{r.title}</div>
-                <div className={s.reportSub}>{r.sub}</div>
-              </div>
-            </div>
-            <div className={s.reportActions}>
-              <button
-                suppressHydrationWarning
-                className={s.btnCsv}
-                disabled={loading || exporting === r.key || exporting === `${r.key}_pdf`}
-                onClick={() => handleCsv(r.key)}
-              >
-                <DownloadIcon /> {exporting === r.key ? '…' : 'CSV'}
-              </button>
-              <button
-                suppressHydrationWarning
-                className={s.btnPdf}
-                disabled={loading || exporting === r.key || exporting === `${r.key}_pdf`}
-                onClick={() => handlePdf(r.key)}
-              >
-                <DownloadIcon /> {exporting === `${r.key}_pdf` ? '…' : 'PDF'}
-              </button>
+  return (
+    <div className={s.page}>
+      <header className={s.pageHead}>
+        <div>
+          <h1 className={s.pageTitle}>Reports</h1>
+          <p className={s.pageSub}>Export your organisation’s learning data as CSV (for spreadsheets) or PDF (for sharing).</p>
+        </div>
+        {loading && <span className={s.loadingNote} role="status">Loading data…</span>}
+      </header>
+
+      <section className={s.kpis} aria-label="Data included in the reports">
+        {KPIS.map(k => (
+          <div key={k.label} className={s.kpi}>
+            <span className={s.kpiIcon} aria-hidden="true">{k.icon}</span>
+            <div>
+              <div className={s.kpiValue}>{loading ? '—' : k.value}</div>
+              <div className={s.kpiLabel}>{k.label}</div>
             </div>
           </div>
         ))}
-      </div>
+      </section>
+
+      <section aria-labelledby="rp-export-h">
+        <h2 id="rp-export-h" className={s.sectionTitle}>Export reports</h2>
+        <div className={s.reportGrid}>
+          {REPORTS.map(r => {
+            const busy = exporting === r.key || exporting === `${r.key}_pdf`;
+            return (
+              <article key={r.key} className={s.reportCard}>
+                <div className={s.reportHead}>
+                  <span className={s.reportIcon} aria-hidden="true">{r.icon}</span>
+                  <div className={s.reportText}>
+                    <h3 className={s.reportTitle}>{r.title}</h3>
+                    <p className={s.reportSub}>{loading ? 'Loading…' : r.sub}</p>
+                  </div>
+                </div>
+                <p className={s.reportDesc}>{r.desc}</p>
+                <div className={s.reportActions}>
+                  <button
+                    suppressHydrationWarning
+                    className={s.btnCsv}
+                    disabled={loading || busy}
+                    onClick={() => handleCsv(r.key)}
+                    aria-label={`Download ${r.title} as CSV`}
+                  >
+                    <DownloadIcon /> {exporting === r.key ? 'Preparing…' : 'CSV'}
+                  </button>
+                  <button
+                    suppressHydrationWarning
+                    className={s.btnPdf}
+                    disabled={loading || busy}
+                    onClick={() => handlePdf(r.key)}
+                    aria-label={`Download ${r.title} as PDF`}
+                  >
+                    <DownloadIcon /> {exporting === `${r.key}_pdf` ? 'Preparing…' : 'PDF'}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }

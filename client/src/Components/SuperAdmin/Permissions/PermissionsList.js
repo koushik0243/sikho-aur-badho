@@ -6,7 +6,11 @@ import { toast } from 'sonner';
 import apiServiceHandler, { clearGetCache } from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from "./PermissionsList.module.css";
+import sPage from "./PermissionsList.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const SearchIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -121,7 +125,7 @@ export default function PermissionsList() {
       setPage(1);
       setRefreshKey(k => k + 1);
     } catch (err) {
-      toast.error(err?.message || 'Failed to seed permissions.');
+      toast.warning(err?.message || 'Failed to seed permissions.');
     } finally {
       setSeeding(false);
     }
@@ -132,11 +136,11 @@ export default function PermissionsList() {
     setConfirm({ show: false, id: null });
     apiServiceHandler('GET', `permission/delete/${id}`)
       .then(() => {
-        toast.success('Permission deleted.');
+        toast.error('Permission deleted.');
         clearGetCache();
         setRefreshKey(k => k + 1);
       })
-      .catch(() => toast.error('Delete failed.'));
+      .catch(() => toast.warning('Delete failed.'));
   }
 
   const allIds = sorted.map(p => p._id);
@@ -150,11 +154,11 @@ export default function PermissionsList() {
     setSelected([]);
     Promise.all(ids.map(id => apiServiceHandler('GET', `permission/delete/${id}`)))
       .then(() => {
-        toast.success(`${ids.length} permission${ids.length !== 1 ? 's' : ''} deleted.`);
+        toast.error(`${ids.length} permission${ids.length !== 1 ? 's' : ''} deleted.`);
         clearGetCache();
         setRefreshKey(k => k + 1);
       })
-      .catch(() => toast.error('Some deletes failed'));
+      .catch(() => toast.warning('Some deletes failed'));
   }
 
   const from = total === 0 ? 0 : (page - 1) * LIMIT + 1;
@@ -248,21 +252,21 @@ export default function PermissionsList() {
                   <td>{fmtDate(p.createdAt)}</td>
                   <td>
                     <div className={s.actions} onClick={e => e.stopPropagation()}>
-                      <button
+                      <button data-action="view"
                         className={s.btnView}
                         title="View"
                         onClick={() => router.push(`/superadmin/permissions/${p._id}`)}
                       >
                         <EyeIcon />
                       </button>
-                      <button
+                      <button data-action="edit"
                         className={s.btnEdit}
                         title="Edit"
                         onClick={() => router.push(`/superadmin/permissions/${p._id}/edit`)}
                       >
                         <EditIcon />
                       </button>
-                      <button
+                      <button data-action="delete"
                         className={s.btnDelete}
                         title="Delete"
                         onClick={() => setConfirm({ show: true, id: p._id })}

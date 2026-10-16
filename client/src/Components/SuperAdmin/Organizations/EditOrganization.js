@@ -7,8 +7,15 @@ import apiServiceHandler from '../../../service/apiService';
 import { API_URL } from '../../../lib/constant';
 import SuperAdminShell from '../SuperAdminShell';
 import IndustryTypeTree from './IndustryTypeTree';
-import s from "./EditOrganization.module.css";
+import sPage from "./EditOrganization.module.css";
 import PasswordInput from '../../PasswordInput/PasswordInput';
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
+
+// Taller Industry Type list so more options show without scrolling.
+const INDUSTRY_LIST_HEIGHT = 200;
 
 const BackArrow = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -244,7 +251,7 @@ export default function EditOrganization() {
       toast.success('Organization updated successfully.');
       router.push('/superadmin/organizations');
     } catch (err) {
-      toast.error(err?.message || 'Failed to update organization. Please try again.');
+      toast.warning(err?.message || 'Failed to update organization. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -333,6 +340,7 @@ export default function EditOrganization() {
                   setIndustryTypes={setIndustryTypes}
                   selectedIds={industryTypeIds}
                   setSelectedIds={setIndustryTypeIds}
+                  listHeight={INDUSTRY_LIST_HEIGHT}
                 />
               </div>
             </div>

@@ -6,7 +6,11 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from './DepartmentsList.module.css';
+import sPage from './DepartmentsList.module.css';
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const Icon = {
   search: (
@@ -90,11 +94,11 @@ export default function DepartmentsList() {
     setConfirm({ show: false, id: null });
     apiServiceHandler('GET', `department/delete/${id}`)
       .then(() => {
-        toast.success('Department deleted.');
+        toast.error('Department deleted.');
         setSelected(prev => prev.filter(x => x !== id));
         fetchItems();
       })
-      .catch(() => toast.error('Delete failed.'));
+      .catch(() => toast.warning('Delete failed.'));
   }
 
   const allIds = items.map(item => String(item._id));
@@ -107,8 +111,8 @@ export default function DepartmentsList() {
     const ids = [...selected];
     setSelected([]);
     Promise.all(ids.map(id => apiServiceHandler('GET', `department/delete/${id}`)))
-      .then(() => { toast.success(`${ids.length} department${ids.length !== 1 ? 's' : ''} deleted.`); fetchItems(); })
-      .catch(() => { toast.error('Some deletes failed'); fetchItems(); });
+      .then(() => { toast.error(`${ids.length} department${ids.length !== 1 ? 's' : ''} deleted.`); fetchItems(); })
+      .catch(() => { toast.warning('Some deletes failed'); fetchItems(); });
   }
 
   const from = total === 0 ? 0 : (page - 1) * LIMIT + 1;
@@ -181,7 +185,6 @@ export default function DepartmentsList() {
                     </td>
                     <td>
                       <div className={s.nameCell}>
-                        <span className={s.catIcon}>{Icon.item}</span>
                         <span className={s.catName}>{item.name ?? '—'}</span>
                       </div>
                     </td>
@@ -194,13 +197,13 @@ export default function DepartmentsList() {
                     <td>{fmtDate(item.createdAt)}</td>
                     <td>
                       <div className={s.actions} onClick={e => e.stopPropagation()}>
-                        <button className={s.btnView} title="View" onClick={() => router.push(`${BASE}/${id}`)}>
+                        <button data-action="view" className={s.btnView} title="View" onClick={() => router.push(`${BASE}/${id}`)}>
                           {Icon.eye}
                         </button>
-                        <button className={s.btnEdit} title="Edit" onClick={() => router.push(`${BASE}/${id}/edit`)}>
+                        <button data-action="edit" className={s.btnEdit} title="Edit" onClick={() => router.push(`${BASE}/${id}/edit`)}>
                           {Icon.edit}
                         </button>
-                        <button className={s.btnDelete} title="Delete" onClick={() => setConfirm({ show: true, id })}>
+                        <button data-action="delete" className={s.btnDelete} title="Delete" onClick={() => setConfirm({ show: true, id })}>
                           {Icon.trash}
                         </button>
                       </div>

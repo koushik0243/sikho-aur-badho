@@ -21,6 +21,8 @@ export const createChapter = async (data) => {
             order: data.order,
             isPublished: data.isPublished !== undefined ? data.isPublished : true,
             totalTopics: data.totalTopics || 0,
+            isFinalAssignment: data.isFinalAssignment === true || data.isFinalAssignment === 'true',
+            isBonus: data.isBonus === true || data.isBonus === 'true',
             status: data.status || 'active'
         }).save();
     } catch (error) {

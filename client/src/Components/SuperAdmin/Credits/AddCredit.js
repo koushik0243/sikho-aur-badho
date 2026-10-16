@@ -5,7 +5,11 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./AddCredit.module.css";
+import sPage from "./AddCredit.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const BackArrow = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -112,7 +116,7 @@ export default function AddCredit() {
       toast.success('Credit created successfully.');
       router.push('/superadmin/credits');
     } catch (err) {
-      toast.error(err?.message || 'Failed to create credit. Please try again.');
+      toast.warning(err?.message || 'Failed to create credit. Please try again.');
     } finally {
       setSubmitting(false);
     }

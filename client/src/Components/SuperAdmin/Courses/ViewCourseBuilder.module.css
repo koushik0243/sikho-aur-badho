@@ -626,3 +626,26 @@
     flex-wrap: wrap;
   }
 }
+
+/* Basics tab: Options + Aptitude Test span the whole content area (under the side panel too) */
+.fullRow { grid-column: 1 / -1; min-width: 0; display: flex; flex-direction: column; }
+.fullRow .formCard.formCard { max-width: none; width: 100%; box-sizing: border-box; }
+/* The title column no longer has to fill the page height — Options sits below it */
+.main:has(+ .sidePanel + .fullRow) { min-height: 0; }
+
+/* Side panel → Categories: selected categories as a tree (parents shown for context) */
+.catTreeList, .catTreeChildren { list-style: none; margin: 0; padding: 0; }
+.catTreeList > li + li { margin-top: 6px; }
+.catTreeChildren { margin: 4px 0 0 7px; padding-left: 12px; border-left: 1px dashed #d1d5db; }
+.catTreeChildren > li { position: relative; padding-top: 4px; }
+.catTreeChildren > li::before {
+  content: ''; position: absolute; left: -12px; top: 15px; width: 9px; border-top: 1px dashed #d1d5db;
+}
+.catTreeSelected, .catTreeParent { display: inline-flex; align-items: center; gap: 6px; line-height: 1.4; }
+.catTreeSelected { color: #111827; font-weight: 500; }
+.catTreeParent { color: #9ca3af; }
+.catTreeSelected.catTreeSelected, .catTreeParent.catTreeParent { font-size: 13px !important; }
+.catTreeCheck.catTreeCheck {
+  display: inline-grid; place-items: center; width: 15px; height: 15px; border-radius: 4px;
+  background: #0b7b7b; color: #fff; font-size: 10px !important; font-weight: 700; flex-shrink: 0;
+}

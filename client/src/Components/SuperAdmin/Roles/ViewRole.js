@@ -4,7 +4,12 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import vp from "./ViewRole.module.css";
+import vpPage from "./ViewRole.module.css";
+import ViewDetailRows, { capitalize } from '../ViewDetailRows';
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const vp = withAdminKit(vpPage);
 
 const BackArrow = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -42,56 +47,36 @@ export default function ViewRole() {
   if (!role?._id) return <SuperAdminShell activeSection="roles"><p className={vp.loadingText}>Role not found.</p></SuperAdminShell>;
 
   const displayName = role.display_name || role.name || '—';
-  const isActive    = role.status === 'active';
 
   return (
     <SuperAdminShell activeSection="roles">
       <button className={vp.backBtn} onClick={() => router.push('/superadmin/roles')}>
         {BackArrow} Back to Roles
       </button>
-      <nav className={vp.breadcrumb}>
-        <button className={vp.breadcrumbLink} onClick={() => router.push('/superadmin/roles')}>Roles</button>
-        <span className={vp.breadcrumbSep}>›</span>
-        <span className={vp.breadcrumbCurr}>{displayName}</span>
-      </nav>
+      <div className={vp.viewToolbar}>
+        <nav className={vp.breadcrumb}>
+          <button className={vp.breadcrumbLink} onClick={() => router.push('/superadmin/roles')}>Roles</button>
+          <span className={vp.breadcrumbSep}>›</span>
+          <span className={vp.breadcrumbCurr}>{displayName}</span>
+        </nav>
+        <button className={vp.btnEdit} onClick={() => router.push(`/superadmin/roles/${id}/edit`)}>
+          <EditIcon /> Edit
+        </button>
+      </div>
 
       <div className={vp.detailCard}>
-        <div className={vp.detailHead}>
-          <div className={vp.detailHeadLeft}>
-            <div className={vp.detailAvatar}>{displayName.charAt(0).toUpperCase()}</div>
-            <div>
-              <h1 className={vp.detailTitle}>{displayName}</h1>
-              <div className={vp.detailBadges}>
-                <span className={isActive ? vp.badgeActive : vp.badgeInactive}>
-                  {role.status ? role.status.charAt(0).toUpperCase() + role.status.slice(1) : 'Unknown'}
-                </span>
-              </div>
-            </div>
-          </div>
-          <button className={vp.btnEdit} onClick={() => router.push(`/superadmin/roles/${id}/edit`)}>
-            <EditIcon /> Edit
-          </button>
-        </div>
 
         <div className={vp.detailBody}>
-          <div className={vp.detailRows}>
-            <div className={vp.detailRow}>
-              <span className={vp.detailLabel}>Key</span>
-              <span className={vp.detailValueMono}>{role.name || '—'}</span>
-            </div>
-            <div className={vp.detailRow}>
-              <span className={vp.detailLabel}>Display Name</span>
-              <span className={vp.detailValue}>{role.display_name || '—'}</span>
-            </div>
-            <div className={vp.detailRow}>
-              <span className={vp.detailLabel}>Created</span>
-              <span className={vp.detailValue}>{fmtDate(role.createdAt)}</span>
-            </div>
-            <div className={vp.detailRow}>
-              <span className={vp.detailLabel}>Updated</span>
-              <span className={vp.detailValue}>{fmtDate(role.updatedAt)}</span>
-            </div>
-          </div>
+          <ViewDetailRows s={vp} rows={[
+              { label: 'Key', value: role.name, variant: 'mono' },
+              { label: 'Display Name', value: role.display_name },
+              { label: 'Description', value: role.desc, variant: 'desc' },
+              { label: 'User Type', value: capitalize(role.user_type) },
+              { label: 'Organization', value: role.organizationId?.org_name || (role.organizationId ? '' : 'All organizations') },
+              { label: 'Status', value: capitalize(role.status) },
+              { label: 'Created', value: fmtDate(role.createdAt) },
+              { label: 'Updated', value: fmtDate(role.updatedAt) },
+          ]} />
         </div>
       </div>
     </SuperAdminShell>

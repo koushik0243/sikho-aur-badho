@@ -6,7 +6,11 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from "./EmployeesList.module.css";
+import sPage from "./EmployeesList.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const SearchIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -89,10 +93,10 @@ export default function EmployeesList() {
     setConfirm({ show: false, id: null, name: '' });
     try {
       await apiServiceHandler('GET', `user/admin/delete/${id}`);
-      toast.success('User deleted.');
+      toast.error('User deleted.');
       fetchUsers();
     } catch {
-      toast.error('Failed to delete user.');
+      toast.warning('Failed to delete user.');
     }
   }
 
@@ -106,8 +110,8 @@ export default function EmployeesList() {
     const ids = [...selected];
     setSelected([]);
     Promise.all(ids.map(id => apiServiceHandler('GET', `user/admin/delete/${id}`)))
-      .then(() => { toast.success(`${ids.length} user${ids.length !== 1 ? 's' : ''} deleted.`); fetchUsers(); })
-      .catch(() => toast.error('Some deletes failed'));
+      .then(() => { toast.error(`${ids.length} user${ids.length !== 1 ? 's' : ''} deleted.`); fetchUsers(); })
+      .catch(() => toast.warning('Some deletes failed'));
   }
 
   function toggleSort(key) {
@@ -211,21 +215,21 @@ export default function EmployeesList() {
                   <td>{fmtDate(u.createdAt)}</td>
                   <td>
                     <div className={s.actions} onClick={e => e.stopPropagation()}>
-                      <button
+                      <button data-action="view"
                         className={s.btnView}
                         title="View"
                         onClick={() => router.push(`/superadmin/employees/${u._id}`)}
                       >
                         <EyeIcon />
                       </button>
-                      <button
+                      <button data-action="edit"
                         className={s.btnEdit}
                         title="Edit"
                         onClick={() => router.push(`/superadmin/employees/${u._id}/edit`)}
                       >
                         <EditIcon />
                       </button>
-                      <button
+                      <button data-action="delete"
                         className={s.btnDelete}
                         title="Delete"
                         onClick={() => setConfirm({ show: true, id: u._id, name: u.name || u.email })}

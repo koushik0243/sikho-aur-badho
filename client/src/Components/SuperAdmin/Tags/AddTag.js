@@ -5,7 +5,11 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./AddTag.module.css";
+import sPage from "./AddTag.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const TagIcon = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -44,7 +48,7 @@ export default function AddTag() {
       toast.success('Tag created successfully.');
       router.push('/superadmin/tags');
     } catch {
-      toast.error('Failed to create tag. Please try again.');
+      toast.warning('Failed to create tag. Please try again.');
     } finally {
       setSubmitting(false);
     }

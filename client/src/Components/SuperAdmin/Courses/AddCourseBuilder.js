@@ -8,7 +8,12 @@ import { API_URL } from '../../../lib/constant';
 import { useMediaToken, secureMediaUrl, openMediaInNewTab } from '../../../lib/mediaToken';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from "./AddCourseBuilder.module.css";
+import sPage from "./AddCourseBuilder.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+import { MAX_VIDEOS_PER_ASSIGNMENT, DEFAULT_VIDEOS_PER_ASSIGNMENT } from '../../../lib/assignmentSubmission';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 // A quiz's Settings tab defaults. Saved on the quiz Topic (quizSettings) and
 // applied to the learner's quiz (see server/quiz_attempts/quiz_settings.js).
@@ -65,6 +70,42 @@ function QAOriginFilter({ value, onChange, label }) {
   );
 }
 
+// Toolbar for a QA column: tick questions (or Select all), then move them to
+// the other column in one go.
+function QABulkBar({ visibleIds, checkedIds, onToggleAll, onMove, moveLabel, moveTitle }) {
+  if (!visibleIds.length) return null;
+  const count = visibleIds.filter(id => checkedIds.has(id)).length;
+  const allChecked = count === visibleIds.length;
+  return (
+    <div className={s.qaBulkBar}>
+      <label className={s.qaBulkSelectAll}>
+        <input type="checkbox" checked={allChecked}
+          ref={el => { if (el) el.indeterminate = count > 0 && !allChecked; }}
+          onChange={() => onToggleAll(!allChecked)} />
+        Select all
+      </label>
+      {count > 0 && <span className={s.qaBulkCount}>{count} selected</span>}
+      <button type="button" className={s.qaBulkMoveBtn} disabled={count === 0} onClick={onMove} title={moveTitle}>
+        {moveLabel(count)}
+      </button>
+    </div>
+  );
+}
+
+// The category tree mixes categories (course_category, incl. child categories)
+// and sub-categories (course_subcategory); the course stores them separately.
+// IDs not in the tree (e.g. not loaded yet) keep their saved kind.
+function splitCategorySelection(selectedIds, allCategories, savedCatIds = []) {
+  const kindById = new Map(allCategories.map(c => [String(c._id), c.kind]));
+  const saved = new Set(savedCatIds.map(String));
+  const catIds = [], subCatIds = [];
+  for (const id of selectedIds) {
+    const kind = kindById.get(String(id)) ?? (saved.has(String(id)) ? 'category' : 'subcategory');
+    (kind === 'category' ? catIds : subCatIds).push(id);
+  }
+  return { catIds, subCatIds };
+}
+
 // Aptitude Test → Settings defaults (saved on the course as aptitudeSettings).
 // Same as the quiz's, minus attempts / pass mark / max questions.
 const DEFAULT_APTITUDE_SETTINGS = Object.freeze({
@@ -106,7 +147,7 @@ const MAX_LESSON_VIDEO_BYTES = MAX_LESSON_VIDEO_MB * 1024 * 1024;
 function pickLessonVideoFile(file) {
   if (!file) return null;
   if (file.size > MAX_LESSON_VIDEO_BYTES) {
-    toast.error(`Video file is too large. Maximum allowed size is ${MAX_LESSON_VIDEO_MB} MB.`);
+    toast.warning(`Video file is too large. Maximum allowed size is ${MAX_LESSON_VIDEO_MB} MB.`);
     return null;
   }
   return file;
@@ -195,6 +236,7 @@ export default function AddCourseBuilder({ editId } = {}) {
 
   /* ── Categories & Tags ───────────────────────────────────── */
   const [allCategories, setAllCategories] = useState([]);
+  const [savedCatIds, setSavedCatIds] = useState([]);   // the course's saved categories (to classify ids the tree hasn't loaded)
   const [tags, setTags] = useState([]);
   const [catSearch, setCatSearch] = useState('');
   const [tagSearch, setTagSearch] = useState('');
@@ -292,6 +334,11 @@ export default function AddCourseBuilder({ editId } = {}) {
   async function reorderChapters(fromIdx, toIdx) {
     if (fromIdx == null || fromIdx === toIdx) return;
 
+    // A chapter can't be dragged past the Final Course Assignment (and Bonus Content can't move above it).
+    if (Boolean(chapters[fromIdx]?.isBonus) !== Boolean(chapters[toIdx]?.isBonus)) {
+      toast.info('Chapters stay before the Final Course Assignment and Bonus Content after it.');
+      return;
+    }
     const newOrder = [...chapters];
     const [moved] = newOrder.splice(fromIdx, 1);
     newOrder.splice(toIdx, 0, moved);
@@ -306,7 +353,7 @@ export default function AddCourseBuilder({ editId } = {}) {
           courseId,
           title: ch.title.trim(),
           desc: ch.desc?.trim() || '',
-          order: idx + 1,
+          order: chapterOrderIn(newOrder, idx),
           status: ch.status || 'active',
           isPublished: true,
           totalTopics: (ch.lessons?.length || 0) + (ch.quizzes?.length || 0) +
@@ -338,8 +385,22 @@ export default function AddCourseBuilder({ editId } = {}) {
 
   /* ── Quiz modal ──────────────────────────────────────────── */
   const DIFF_ORDER = { beginner: 0, intermediate: 1, advanced: 2 };
+  // Grouped by difficulty. Within a level, questions the super admin wrote
+  // (status 'created') come first, newest first, so a just-added question shows
+  // at the top of its level; generated questions keep their order after them.
+  const createdTime = (q) => (q.status === 'created' ? (new Date(q.createdAt).getTime() || Date.now()) : null);
   const sortByDifficulty = (arr) =>
-    [...arr].sort((a, b) => (DIFF_ORDER[a.difficulty] ?? 0) - (DIFF_ORDER[b.difficulty] ?? 0));
+    arr
+      .map((q, i) => ({ q, i, t: createdTime(q) }))
+      .sort((a, b) => {
+        const byLevel = (DIFF_ORDER[a.q.difficulty] ?? 0) - (DIFF_ORDER[b.q.difficulty] ?? 0);
+        if (byLevel) return byLevel;
+        if (a.t !== null && b.t !== null) return b.t - a.t || a.i - b.i;
+        if (a.t !== null) return -1;
+        if (b.t !== null) return 1;
+        return a.i - b.i;
+      })
+      .map(x => x.q);
 
   const [quizModal, setQuizModal] = useState(null);
   const [quizTab, setQuizTab] = useState('details');
@@ -373,7 +434,19 @@ export default function AddCourseBuilder({ editId } = {}) {
   const [manualQA, setManualQA] = useState(EMPTY_MANUAL_QA);
   const [savingManualQA, setSavingManualQA] = useState(false);
   // Selected question awaiting confirmation before it's moved back to Generated QA.
-  const [qaToUnselect, setQaToUnselect] = useState(null);
+  const [qaToUnselect, setQaToUnselect] = useState(null); // { qs: [question…], kind }
+  // Selected Questions ticked for "Move to Generated QA".
+  const [qaChecked, setQaChecked] = useState(() => new Set());
+  const toggleQaChecked = (id) => setQaChecked(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const setQaCheckedMany = (ids, on) => setQaChecked(prev => {
+    const next = new Set(prev);
+    ids.forEach(id => (on ? next.add(id) : next.delete(id)));
+    return next;
+  });
   // Generated QA question awaiting confirmation before it's permanently deleted.
   // Per-column status filter in the Quiz / Aptitude QA modals.
   const [qaOriginFilter, setQaOriginFilter] = useState({ pool: 'all', selected: 'all' });
@@ -406,10 +479,10 @@ export default function AddCourseBuilder({ editId } = {}) {
       await apiServiceHandler('DELETE', endpoint);
       if (kind === 'aptitude') setAptitudeQAPool(prev => prev.filter(x => String(x._id) !== id));
       else setQuizQAPool(prev => prev.filter(x => String(x._id) !== id));
-      toast.success('Question deleted.');
+      toast.error('Question deleted.');
       setQaToDelete(null);
     } catch (err) {
-      toast.error(err?.response?.data?.message || 'Could not delete the question. Please try again.');
+      toast.warning(err?.response?.data?.message || 'Could not delete the question. Please try again.');
     } finally {
       setDeletingQA(false);
     }
@@ -481,7 +554,7 @@ export default function AddCourseBuilder({ editId } = {}) {
   async function generateQuizQA() {
     const chIdx = quizModal.chIdx;
     const chServerId = chapters[chIdx]?.serverId;
-    if (!chServerId) { toast.error('Please save the chapter first.'); return; }
+    if (!chServerId) { toast.warning('Please save the chapter first.'); return; }
 
     setQuizQAGenerating(true);
     try {
@@ -506,7 +579,7 @@ export default function AddCourseBuilder({ editId } = {}) {
       setQuizQAHasGenerated(true);
       toast.success(`${newQAs.length} questions generated.`);
     } catch (err) {
-      toast.error(err?.message || 'Failed to generate questions.');
+      toast.warning(err?.message || 'Failed to generate questions.');
     } finally {
       setQuizQAGenerating(false);
     }
@@ -518,8 +591,8 @@ export default function AddCourseBuilder({ editId } = {}) {
   async function saveManualQA(kind) {
     const question = manualQA.question.trim();
     const answer = manualQA.answer.trim();
-    if (!question) { toast.error('Question is required.'); return; }
-    if (!answer) { toast.error('Answer is required.'); return; }
+    if (!question) { toast.warning('Question is required.'); return; }
+    if (!answer) { toast.warning('Answer is required.'); return; }
 
     setSavingManualQA(true);
     try {
@@ -537,7 +610,7 @@ export default function AddCourseBuilder({ editId } = {}) {
       } else {
         const chIdx = quizModal.chIdx;
         const chServerId = chapters[chIdx]?.serverId;
-        if (!chServerId) { toast.error('Please save the chapter first.'); return; }
+        if (!chServerId) { toast.warning('Please save the chapter first.'); return; }
         const quizServerId = await ensureQuizServerId(chIdx, chServerId);
         const res = await apiServiceHandler('POST', 'quiz-questions/create', {
           courseId, chapterId: chServerId, quizId: quizServerId,
@@ -552,7 +625,7 @@ export default function AddCourseBuilder({ editId } = {}) {
       setManualQAOpen(false);
       toast.success('Question added.');
     } catch (err) {
-      toast.error(err?.message || 'Failed to add question.');
+      toast.warning(err?.message || 'Failed to add question.');
     } finally {
       setSavingManualQA(false);
     }
@@ -567,7 +640,7 @@ export default function AddCourseBuilder({ editId } = {}) {
     const id = editingAnswerId;
     const answer = editingAnswerText.trim();
     if (!id) return;
-    if (!answer) { toast.error('Answer cannot be empty.'); return; }
+    if (!answer) { toast.warning('Answer cannot be empty.'); return; }
     setSavingAnswer(true);
     try {
       const endpoint = kind === 'aptitude' ? 'aptitude-questions' : 'quiz-questions';
@@ -578,7 +651,7 @@ export default function AddCourseBuilder({ editId } = {}) {
       setEditingAnswerId(null);
       toast.success('Answer updated.');
     } catch (err) {
-      toast.error(err?.message || 'Failed to update answer.');
+      toast.warning(err?.message || 'Failed to update answer.');
     } finally {
       setSavingAnswer(false);
     }
@@ -587,6 +660,7 @@ export default function AddCourseBuilder({ editId } = {}) {
   // Clears the shared QA-panel UI state when either modal opens or closes.
   function resetQAPanelState() {
     setQaOriginFilter({ pool: 'all', selected: 'all' });
+    setQaChecked(new Set());
     setQuizQAExpandedCol(null);
     setEditingAnswerId(null);
     setManualQAOpen(false);
@@ -595,14 +669,14 @@ export default function AddCourseBuilder({ editId } = {}) {
   function saveQuiz() {
     const grade = Number(quizSettings.passingGrade);
     if (!Number.isFinite(grade) || grade < 0 || grade > 100) {
-      toast.error('Passing Grade must be between 0 and 100.');
+      toast.warning('Passing Grade must be between 0 and 100.');
       setQuizTab('settings');
       return;
     }
     const chIdx = quizModal.chIdx;
     const autoTitle = quizForm.title.trim() || `${chapters[chIdx]?.title || 'Chapter'} Quiz`;
     const chServerId = chapters[chIdx]?.serverId;
-    if (!chServerId) { toast.error('Please save the chapter first.'); return; }
+    if (!chServerId) { toast.warning('Please save the chapter first.'); return; }
     const isEdit = quizModal.editIdx != null;
     const existingQuiz = isEdit ? chapters[chIdx].quizzes[quizModal.editIdx] : null;
     const order = isEdit ? undefined : nextChapterTopicOrder(chIdx);
@@ -645,7 +719,165 @@ export default function AddCourseBuilder({ editId } = {}) {
         closeQuizModal();
         toast.success(isEdit ? 'Quiz updated.' : 'Quiz saved.');
       })
-      .catch(err => toast.error(err?.message || 'Failed to save quiz.'));
+      .catch(err => toast.warning(err?.message || 'Failed to save quiz.'));
+  }
+
+  /* ── Final Course Assignment ─────────────────────────────── */
+  // One per course, always last: a chapter holding one quiz whose questions are picked
+  // from the course's chapter quizzes. Kept out of `chapters` so adding, reordering or
+  // deleting chapters never moves it; saved with a high order so learners get it last.
+  const FINAL_TITLE = 'Final Course Assignment';
+  const FINAL_ORDER = 10000;
+  // Saved order: chapters 1, 2, …, then the Final Course Assignment (FINAL_ORDER), then
+  // Bonus Content FINAL_ORDER + 1, + 2, …  `chapters` keeps every chapter before every bonus.
+  function chapterOrderIn(list, idx) {
+    const before = list.slice(0, idx + 1);
+    return list[idx]?.isBonus ? FINAL_ORDER + before.filter(c => c.isBonus).length : before.filter(c => !c.isBonus).length;
+  }
+  const chapterLabel = (idx) => (chapters[idx]?.isBonus
+    ? `Bonus Content ${chapterOrderIn(chapters, idx) - FINAL_ORDER}`
+    : `Chapter ${chapterOrderIn(chapters, idx)}`);
+  const [finalAsg, setFinalAsg] = useState(null); // { chapterServerId, topicServerId, settings } | null
+  const [creatingFinal, setCreatingFinal] = useState(false);
+  const [finalToDelete, setFinalToDelete] = useState(false);
+  const [deletingFinal, setDeletingFinal] = useState(false);
+  const [finalCollapsed, setFinalCollapsed] = useState(false);
+  const [finalModalOpen, setFinalModalOpen] = useState(false);
+  const [finalTab, setFinalTab] = useState('details');
+  const [finalSettings, setFinalSettings] = useState(DEFAULT_QUIZ_SETTINGS);
+  const [finalPool, setFinalPool] = useState([]);
+  const [finalSelected, setFinalSelected] = useState([]);
+  const [finalLoading, setFinalLoading] = useState(false);
+  const [finalSaving, setFinalSaving] = useState(false);
+  const [expandedFinalQIds, setExpandedFinalQIds] = useState(new Set());
+  const setFS = (key, val) => setFinalSettings(prev => ({ ...prev, [key]: val }));
+  const toggleFinalQ = (id) => setExpandedFinalQIds(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
+  // Every chapter quiz in the course (saved ones only).
+  const chapterQuizzes = () => chapters.flatMap(ch => (ch.quizzes || []).filter(q => q.serverId));
+  // What the chapter quizzes have selected — the Final Course Assignment's starting selection.
+  const chapterQuizSelectedIds = () => [...new Set(chapterQuizzes().flatMap(q => (q.settings?.selectedQuestionIds || []).map(String)))];
+
+  async function createFinalTopic(chapterServerId, settings) {
+    const res = await apiServiceHandler('POST', 'topic/create', {
+      courseId, chapterId: chapterServerId, title: FINAL_TITLE, desc: '',
+      video_type: 'quiz', quizSettings: settings, order: 1, isPreview: false, status: 'active',
+    });
+    const id = res?.data?._id;
+    if (!id) throw new Error('Could not save the Final Course Assignment.');
+    return id;
+  }
+
+  async function addFinalAssignment() {
+    if (finalAsg || creatingFinal) return;
+    if (!courseId) { toast.warning('Please save course basic info (Step 1) first.'); return; }
+    setCreatingFinal(true);
+    try {
+      const chRes = await apiServiceHandler('POST', 'chapter/create', {
+        courseId, title: FINAL_TITLE, desc: '', order: FINAL_ORDER, status: 'active',
+        isPublished: true, totalTopics: 1, isFinalAssignment: true,
+      });
+      const chapterServerId = chRes?.data?._id;
+      if (!chapterServerId) throw new Error('Could not add the Final Course Assignment.');
+      const settings = { ...DEFAULT_QUIZ_SETTINGS, isFinalAssignment: true, selectedQuestionIds: chapterQuizSelectedIds() };
+      const topicServerId = await createFinalTopic(chapterServerId, settings);
+      setFinalAsg({ chapterServerId, topicServerId, settings });
+      setFinalCollapsed(false);
+      toast.success('Final Course Assignment added.');
+    } catch (err) {
+      toast.warning(err?.message || 'Could not add the Final Course Assignment.');
+    } finally {
+      setCreatingFinal(false);
+    }
+  }
+
+  // Removes the Final Course Assignment: its quiz first (course completion counts every
+  // topic of the course, so a leftover quiz would still be required), then its chapter.
+  // The "Final Course Assignment" button is available again afterwards.
+  async function removeFinalAssignment() {
+    if (!finalAsg || deletingFinal) return;
+    setDeletingFinal(true);
+    try {
+      if (finalAsg.topicServerId) await apiServiceHandler('GET', `topic/delete/${finalAsg.topicServerId}`);
+      await apiServiceHandler('GET', `chapter/delete/${finalAsg.chapterServerId}`);
+      setFinalAsg(null);
+      setFinalToDelete(false);
+      toast.error('Final Course Assignment deleted.');
+    } catch (err) {
+      toast.warning(err?.message || 'Could not delete the Final Course Assignment.');
+    } finally {
+      setDeletingFinal(false);
+    }
+  }
+
+  // Pool = every question of the chapter quizzes; Selected = the saved Final selection.
+  async function openFinalModal() {
+    if (!finalAsg) return;
+    resetQAPanelState();
+    setFinalTab('details');
+    setFinalSettings({ ...DEFAULT_QUIZ_SETTINGS, ...finalAsg.settings });
+    setExpandedFinalQIds(new Set());
+    setFinalPool([]);
+    setFinalSelected([]);
+    setFinalModalOpen(true);
+    setFinalLoading(true);
+    try {
+      const lists = await Promise.all(chapterQuizzes().map(q =>
+        apiServiceHandler('GET', `quiz-questions/list?quizId=${q.serverId}`)
+          .then(res => (Array.isArray(res?.data) ? res.data : []))
+          .catch(() => []),
+      ));
+      const byId = new Map();
+      lists.flat().forEach(q => byId.set(String(q._id), q));
+      const all = [...byId.values()];
+      const selSet = new Set((finalAsg.settings?.selectedQuestionIds || []).map(String));
+      setFinalSelected(sortByDifficulty(all.filter(q => selSet.has(String(q._id)))));
+      setFinalPool(sortByDifficulty(all.filter(q => !selSet.has(String(q._id)))));
+    } finally {
+      setFinalLoading(false);
+    }
+  }
+  function closeFinalModal() {
+    setFinalModalOpen(false);
+    resetQAPanelState();
+  }
+
+  async function saveFinalAssignment() {
+    const grade = Number(finalSettings.passingGrade);
+    if (!Number.isFinite(grade) || grade < 0 || grade > 100) {
+      toast.warning('Passing Grade must be between 0 and 100.');
+      setFinalTab('settings');
+      return;
+    }
+    if (finalSelected.length === 0) {
+      toast.warning('Select at least one question for the Final Course Assignment.');
+      setFinalTab('details');
+      return;
+    }
+    const selectedQuestionIds = finalSelected.map(q => q._id);
+    const settings = { ...finalSettings, isFinalAssignment: true, selectedQuestionIds };
+    setFinalSaving(true);
+    try {
+      let topicServerId = finalAsg.topicServerId;
+      if (topicServerId) {
+        await apiServiceHandler('PUT', `topic/update/${topicServerId}`, {
+          title: FINAL_TITLE, desc: '', video_type: 'quiz', quizSettings: settings, status: 'active',
+        });
+      } else {
+        topicServerId = await createFinalTopic(finalAsg.chapterServerId, settings);
+      }
+      setFinalAsg(prev => ({ ...prev, topicServerId, settings }));
+      closeFinalModal();
+      toast.success('Final Course Assignment saved.');
+    } catch (err) {
+      toast.warning(err?.message || 'Could not save the Final Course Assignment.');
+    } finally {
+      setFinalSaving(false);
+    }
   }
 
   /* ── Aptitude Test modal ─────────────────────────────────── */
@@ -691,7 +923,7 @@ export default function AddCourseBuilder({ editId } = {}) {
 
   async function generateAptitudeQA() {
     if (!form.aptitudeContext.trim()) {
-      toast.error('Please enter context before generating aptitude questions.');
+      toast.warning('Please enter context before generating aptitude questions.');
       return;
     }
     setAptitudeQAGenerating(true);
@@ -714,7 +946,7 @@ export default function AddCourseBuilder({ editId } = {}) {
       setAptitudeQAHasGenerated(true);
       toast.success(`${newQAs.length} questions generated.`);
     } catch (err) {
-      toast.error(err?.message || 'Failed to generate questions.');
+      toast.warning(err?.message || 'Failed to generate questions.');
     } finally {
       setAptitudeQAGenerating(false);
     }
@@ -728,7 +960,7 @@ export default function AddCourseBuilder({ editId } = {}) {
       toast.success(`Aptitude test ${checked ? 'enabled' : 'disabled'}.`);
     } catch (err) {
       setField('aptitudeEnabled', !checked);
-      toast.error(err?.message || 'Failed to update aptitude test status.');
+      toast.warning(err?.message || 'Failed to update aptitude test status.');
     }
   }
 
@@ -738,7 +970,7 @@ export default function AddCourseBuilder({ editId } = {}) {
     if (!form.desc.trim()) e.desc = 'Description is required.';
     if (Object.keys(e).length) {
       setErrors(prev => ({ ...prev, ...e }));
-      toast.error('Please fill in the course title and description before saving the aptitude test.');
+      toast.warning('Please fill in the course title and description before saving the aptitude test.');
       return;
     }
 
@@ -767,7 +999,7 @@ export default function AddCourseBuilder({ editId } = {}) {
       toast.success('Aptitude test saved.');
       closeAptitudeModal();
     } catch (err) {
-      toast.error(err?.message || 'Failed to save aptitude test.');
+      toast.warning(err?.message || 'Failed to save aptitude test.');
     } finally {
       setAptitudeSaving(false);
     }
@@ -804,10 +1036,10 @@ export default function AddCourseBuilder({ editId } = {}) {
   function setLessonField(key, val) { setLessonForm(prev => ({ ...prev, [key]: val })); }
 
   function saveLesson() {
-    if (!lessonForm.name.trim()) { toast.error('Lesson name is required.'); return; }
+    if (!lessonForm.name.trim()) { toast.warning('Lesson name is required.'); return; }
     const chIdx = lessonModal.chIdx;
     const chServerId = chapters[chIdx]?.serverId;
-    if (!chServerId) { toast.error('Please save the chapter first.'); return; }
+    if (!chServerId) { toast.warning('Please save the chapter first.'); return; }
     const isEdit = lessonModal.editIdx != null;
     const existingLesson = isEdit ? chapters[chIdx].lessons[lessonModal.editIdx] : null;
     const order = isEdit ? undefined : nextChapterTopicOrder(chIdx);
@@ -893,7 +1125,7 @@ export default function AddCourseBuilder({ editId } = {}) {
         closeLessonModal();
         toast.success(isEdit ? 'Lesson updated.' : 'Lesson saved.');
       })
-      .catch(err => toast.error(err?.message || 'Failed to save lesson.'));
+      .catch(err => toast.warning(err?.message || 'Failed to save lesson.'));
   }
 
   async function removeLesson(chIdx, lIdx) {
@@ -902,7 +1134,7 @@ export default function AddCourseBuilder({ editId } = {}) {
       try {
         await apiServiceHandler('GET', `topic/delete/${lesson.serverId}`);
       } catch (err) {
-        toast.error(err?.message || 'Failed to delete lesson.');
+        toast.warning(err?.message || 'Failed to delete lesson.');
         return;
       }
     }
@@ -919,7 +1151,7 @@ export default function AddCourseBuilder({ editId } = {}) {
       try {
         await apiServiceHandler('GET', `topic/delete/${quiz.serverId}`);
       } catch (err) {
-        toast.error(err?.message || 'Failed to delete quiz.');
+        toast.warning(err?.message || 'Failed to delete quiz.');
         return;
       }
     }
@@ -936,7 +1168,7 @@ export default function AddCourseBuilder({ editId } = {}) {
       try {
         await apiServiceHandler('GET', `topic/delete/${item.serverId}`);
       } catch (err) {
-        toast.error(err?.message || 'Failed to delete zoom link.');
+        toast.warning(err?.message || 'Failed to delete zoom link.');
         return;
       }
     }
@@ -953,7 +1185,7 @@ export default function AddCourseBuilder({ editId } = {}) {
       try {
         await apiServiceHandler('GET', `topic/delete/${item.serverId}`);
       } catch (err) {
-        toast.error(err?.message || 'Failed to delete assignment.');
+        toast.warning(err?.message || 'Failed to delete assignment.');
         return;
       }
     }
@@ -974,11 +1206,11 @@ export default function AddCourseBuilder({ editId } = {}) {
   }
   function closeZoomModal() { setZoomModal(null); }
   function saveZoom() {
-    if (!zoomForm.title.trim()) { toast.error('Title is required.'); return; }
-    if (!zoomForm.link.trim()) { toast.error('Zoom link is required.'); return; }
+    if (!zoomForm.title.trim()) { toast.warning('Title is required.'); return; }
+    if (!zoomForm.link.trim()) { toast.warning('Zoom link is required.'); return; }
     const chIdx = zoomModal.chIdx;
     const chServerId = chapters[chIdx]?.serverId;
-    if (!chServerId) { toast.error('Please save the chapter first.'); return; }
+    if (!chServerId) { toast.warning('Please save the chapter first.'); return; }
     const isEdit = zoomModal.editIdx != null;
     const existingZoom = isEdit ? chapters[chIdx].zoomLinks[zoomModal.editIdx] : null;
     const order = isEdit ? undefined : nextChapterTopicOrder(chIdx);
@@ -1016,7 +1248,7 @@ export default function AddCourseBuilder({ editId } = {}) {
         closeZoomModal();
         toast.success(isEdit ? 'Zoom link updated.' : 'Zoom link saved.');
       })
-      .catch(err => toast.error(err?.message || 'Failed to save zoom link.'));
+      .catch(err => toast.warning(err?.message || 'Failed to save zoom link.'));
   }
 
   /* ── Certificate templates ─────────────────────────────── */
@@ -1043,10 +1275,13 @@ export default function AddCourseBuilder({ editId } = {}) {
         if (!c) return;
 
         // ── Pre-fill form ──────────────────────────────────
-        const catId = c.catId?._id ?? c.catId ?? null;
+        // All selected categories (catIds); older courses only have catId.
+        const catIds = (Array.isArray(c.catIds) && c.catIds.length ? c.catIds : [c.catId])
+          .map(x => x?._id ?? x).filter(Boolean).map(String);
         const subCatIds = Array.isArray(c.subCatIds)
-          ? c.subCatIds.map(s => s._id ?? s)
+          ? c.subCatIds.map(s => s?._id ?? s).filter(Boolean).map(String)
           : [];
+        setSavedCatIds(catIds);
         const tagIds = Array.isArray(c.tagIds)
           ? c.tagIds.map(t => t._id ?? t)
           : [];
@@ -1060,7 +1295,7 @@ export default function AddCourseBuilder({ editId } = {}) {
           status: c.status || 'draft',
           duration_hr: c.duration_hr || '0',
           duration_min: c.duration_min || '00',
-          selectedCatIds: catId ? [catId, ...subCatIds] : subCatIds,
+          selectedCatIds: [...new Set([...catIds, ...subCatIds])],
           selectedTagIds: tagIds,
           difficultyLevel: c.level || 'beginner',
           enableReview: c.enable_review !== undefined ? c.enable_review : true,
@@ -1092,7 +1327,13 @@ export default function AddCourseBuilder({ editId } = {}) {
 
         // ── Reconstruct chapters with their topics ─────────
         const allTopics = Array.isArray(topicsRes?.data) ? topicsRes.data : [];
-        const rawChapters = Array.isArray(chaptersRes?.data) ? chaptersRes.data : [];
+        const allChapters = Array.isArray(chaptersRes?.data) ? chaptersRes.data : [];
+        const finalCh = allChapters.find(ch => ch.isFinalAssignment);
+        const rawChapters = allChapters.filter(ch => !ch.isFinalAssignment);
+        if (finalCh) {
+          const t = allTopics.find(x => String(x.chapterId) === String(finalCh._id) && x.video_type === 'quiz');
+          setFinalAsg({ chapterServerId: finalCh._id, topicServerId: t?._id || null, settings: t?.quizSettings || { ...DEFAULT_QUIZ_SETTINGS, isFinalAssignment: true, selectedQuestionIds: [] } });
+        }
 
         const builtChapters = rawChapters
           .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
@@ -1147,6 +1388,7 @@ export default function AddCourseBuilder({ editId } = {}) {
                 title: t.title || '',
                 fileName: t.attachments?.[0]?.name || '',
                 fileUrl: t.attachments?.[0]?.url || '',
+                maxVideos: t.maxVideos ?? null,
                 order: t.order ?? 0,
               }));
 
@@ -1162,6 +1404,7 @@ export default function AddCourseBuilder({ editId } = {}) {
               quizzes,
               zoomLinks,
               assignments,
+              isBonus: Boolean(ch.isBonus),
               saved: true,
               collapsed: false,
             };
@@ -1169,28 +1412,33 @@ export default function AddCourseBuilder({ editId } = {}) {
 
         setChapters(builtChapters);
       })
-      .catch(() => toast.error('Failed to load course data.'))
+      .catch(() => toast.warning('Failed to load course data.'))
       .finally(() => setLoadingEdit(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId]);
 
   /* ── Assignment modal ────────────────────────────────────── */
   const [assignModal, setAssignModal] = useState(null); // { chIdx } | null
-  const [assignForm, setAssignForm] = useState({ title: '', file: null });
+  const [assignForm, setAssignForm] = useState({ title: '', file: null, maxVideos: String(DEFAULT_VIDEOS_PER_ASSIGNMENT) });
 
   function openAssignModal(chIdx) {
-    setAssignForm({ title: '', file: null });
+    setAssignForm({ title: '', file: null, maxVideos: String(DEFAULT_VIDEOS_PER_ASSIGNMENT) });
     setAssignModal({ chIdx });
   }
   function closeAssignModal() { setAssignModal(null); }
   function saveAssign() {
-    if (!assignForm.title.trim()) { toast.error('Title is required.'); return; }
+    if (!assignForm.title.trim()) { toast.warning('Title is required.'); return; }
     const chIdx = assignModal.chIdx;
     const chServerId = chapters[chIdx]?.serverId;
-    if (!chServerId) { toast.error('Please save the chapter first.'); return; }
+    if (!chServerId) { toast.warning('Please save the chapter first.'); return; }
     const isEdit = assignModal.editIdx != null;
     const existingAssign = isEdit ? chapters[chIdx].assignments[assignModal.editIdx] : null;
-    if (!isEdit && !assignForm.file) { toast.error('Please upload a file.'); return; }
+    if (!isEdit && !assignForm.file) { toast.warning('Please upload a file.'); return; }
+    const maxVideos = Number(assignForm.maxVideos);
+    if (!Number.isInteger(maxVideos) || maxVideos < 1 || maxVideos > MAX_VIDEOS_PER_ASSIGNMENT) {
+      toast.warning(`"How many videos can upload?" must be a whole number from 1 to ${MAX_VIDEOS_PER_ASSIGNMENT}.`);
+      return;
+    }
     const order = isEdit ? undefined : nextChapterTopicOrder(chIdx);
     const itemBase = {
       _id: isEdit ? existingAssign._id : Date.now(),
@@ -1198,6 +1446,7 @@ export default function AddCourseBuilder({ editId } = {}) {
       title: assignForm.title.trim(),
       fileName: assignForm.file ? assignForm.file.name : (existingAssign?.fileName || ''),
       fileUrl: isEdit ? existingAssign.fileUrl : null,
+      maxVideos,
     };
     const fd = new FormData();
     fd.append('courseId', courseId);
@@ -1205,12 +1454,13 @@ export default function AddCourseBuilder({ editId } = {}) {
     fd.append('title', itemBase.title);
     fd.append('desc', '');
     fd.append('video_type', 'assignment');
+    fd.append('maxVideos', String(maxVideos));
     if (order !== undefined) fd.append('order', String(order));
     fd.append('isPreview', 'false');
     fd.append('status', 'active');
     if (assignForm.file) fd.append('assignment_file', assignForm.file);
     const apiCall = itemBase.serverId
-      ? apiServiceHandler('PUT', `topic/update/${itemBase.serverId}`, { title: itemBase.title, desc: '', video_type: 'assignment', order, status: 'active' })
+      ? apiServiceHandler('PUT', `topic/update/${itemBase.serverId}`, { title: itemBase.title, desc: '', video_type: 'assignment', order, status: 'active', maxVideos })
       : apiServiceHandler('POST', 'topic/create', fd);
     apiCall
       .then(res => {
@@ -1231,7 +1481,7 @@ export default function AddCourseBuilder({ editId } = {}) {
         closeAssignModal();
         toast.success(isEdit ? 'Assignment updated.' : 'Assignment saved.');
       })
-      .catch(err => toast.error(err?.message || 'Failed to save assignment.'));
+      .catch(err => toast.warning(err?.message || 'Failed to save assignment.'));
   }
 
   /* ── Load categories and tags ────────────────────────────── */
@@ -1248,6 +1498,7 @@ export default function AddCourseBuilder({ editId } = {}) {
           _id: String(c._id),
           name: c.title || c.name,
           parentId: c.parentId ? String(c.parentId) : null,
+          kind: 'category',
         })),
         ...subs
           .filter(s => !catIds.has(String(s._id)))
@@ -1255,6 +1506,7 @@ export default function AddCourseBuilder({ editId } = {}) {
             _id: String(s._id),
             name: s.name,
             parentId: s.categoryId?._id ? String(s.categoryId._id) : (s.categoryId ? String(s.categoryId) : null),
+            kind: 'subcategory',
           })),
       ];
       setAllCategories(unified);
@@ -1318,7 +1570,7 @@ export default function AddCourseBuilder({ editId } = {}) {
         toast.success('Tag added.');
       }
     } catch {
-      toast.error('Failed to add tag.');
+      toast.warning('Failed to add tag.');
     } finally {
       setAddingTag(false);
     }
@@ -1341,6 +1593,7 @@ export default function AddCourseBuilder({ editId } = {}) {
           _id: String(created._id),
           name: created.title || created.name,
           parentId: created.parentId ? String(created.parentId) : null,
+          kind: 'category',
         };
         setAllCategories(prev => [...prev, normalized]);
         setForm(prev => ({ ...prev, selectedCatIds: [...prev.selectedCatIds, String(created._id)] }));
@@ -1350,7 +1603,7 @@ export default function AddCourseBuilder({ editId } = {}) {
         toast.success('Category added.');
       }
     } catch {
-      toast.error('Failed to add category.');
+      toast.warning('Failed to add category.');
     } finally {
       setAddingCat(false);
     }
@@ -1377,7 +1630,19 @@ export default function AddCourseBuilder({ editId } = {}) {
   }
 
   /* ── Chapter operations ──────────────────────────────────── */
-  function addChapter() { setChapters(prev => [...prev, newChapter(prev.length + 1)]); }
+  // A new chapter goes after the last chapter — i.e. before the Final Course Assignment and Bonus Content.
+  function addChapter() {
+    setChapters(prev => {
+      const at = prev.findIndex(c => c.isBonus);
+      const ch = newChapter(prev.length + 1);
+      return at < 0 ? [...prev, ch] : [...prev.slice(0, at), ch, ...prev.slice(at)];
+    });
+  }
+  // Bonus Content: a chapter like any other, added after the Final Course Assignment.
+  function addBonusContent() {
+    if (!finalAsg) return;
+    setChapters(prev => [...prev, { ...newChapter(prev.length + 1), isBonus: true }]);
+  }
 
   async function removeChapter(idx) {
     const ch = chapters[idx];
@@ -1385,7 +1650,7 @@ export default function AddCourseBuilder({ editId } = {}) {
       try {
         await apiServiceHandler('GET', `chapter/delete/${ch.serverId}`);
       } catch (err) {
-        toast.error(err?.message || 'Failed to delete chapter.');
+        toast.warning(err?.message || 'Failed to delete chapter.');
         return;
       }
     }
@@ -1409,7 +1674,7 @@ export default function AddCourseBuilder({ editId } = {}) {
             courseId,
             title: ch.title.trim(),
             desc: ch.desc?.trim() || '',
-            order: idx + 1,
+            order: chapterOrderIn(chapters, idx),
             status: ch.status || 'active',
             isPublished: true,
             totalTopics: (ch.lessons?.length || 0) + (ch.quizzes?.length || 0) +
@@ -1424,15 +1689,16 @@ export default function AddCourseBuilder({ editId } = {}) {
 
   async function saveChapter(idx) {
     const ch = chapters[idx];
-    if (!ch.title.trim()) { toast.error('Chapter title is required.'); return; }
-    if (!courseId) { toast.error('Please save course basic info (Step 1) first.'); return; }
+    if (!ch.title.trim()) { toast.warning('Chapter title is required.'); return; }
+    if (!courseId) { toast.warning('Please save course basic info (Step 1) first.'); return; }
     setSavingChapterIdx(idx);
     try {
       const payload = {
         courseId,
         title: ch.title.trim(),
         desc: ch.desc.trim(),
-        order: idx + 1,
+        order: chapterOrderIn(chapters, idx),
+        ...(ch.isBonus ? { isBonus: true } : {}),
         status: ch.status || 'active',
         isPublished: true,
         totalTopics: (ch.lessons?.length || 0) + (ch.quizzes?.length || 0) +
@@ -1452,7 +1718,7 @@ export default function AddCourseBuilder({ editId } = {}) {
       });
       toast.success(ch.serverId ? 'Chapter updated.' : 'Chapter saved.');
     } catch (err) {
-      toast.error(err?.message || 'Failed to save chapter.');
+      toast.warning(err?.message || 'Failed to save chapter.');
     } finally {
       setSavingChapterIdx(null);
     }
@@ -1519,7 +1785,7 @@ export default function AddCourseBuilder({ editId } = {}) {
     if (!form.desc.trim()) e.desc = 'Description is required.';
     if (Object.keys(e).length) {
       setErrors(prev => ({ ...prev, ...e }));
-      toast.error('Please fill in the course title and description before proceeding.');
+      toast.warning('Please fill in the course title and description before proceeding.');
       return null;
     }
     setErrors({});
@@ -1537,8 +1803,9 @@ export default function AddCourseBuilder({ editId } = {}) {
       fd.append('enable_review', String(form.enableReview));
       fd.append('qna_enabled', String(form.qnaEnabled));
       fd.append('max_students', form.maxStudents || '0');
-      if (form.selectedCatIds.length > 0) fd.append('catId', form.selectedCatIds[0]);
-      fd.append('subCatIds', JSON.stringify(form.selectedCatIds.slice(1)));
+      const { catIds, subCatIds } = splitCategorySelection(form.selectedCatIds, allCategories, savedCatIds);
+      fd.append('catIds', JSON.stringify(catIds));
+      fd.append('subCatIds', JSON.stringify(subCatIds));
       fd.append('tagIds', JSON.stringify(form.selectedTagIds));
       fd.append('aptitudeEnabled', String(form.aptitudeEnabled));
       fd.append('aptitudeContext', form.aptitudeContext || '');
@@ -1559,12 +1826,12 @@ export default function AddCourseBuilder({ editId } = {}) {
           toast.success('Course basic info saved.');
           return id;
         } else {
-          toast.error('Failed to save course info. Please try again.');
+          toast.warning('Failed to save course info. Please try again.');
           return null;
         }
       }
     } catch (err) {
-      toast.error(err?.message || 'Failed to save course info. Please try again.');
+      toast.warning(err?.message || 'Failed to save course info. Please try again.');
       return null;
     } finally {
       setSavingStep1(false);
@@ -1603,12 +1870,12 @@ export default function AddCourseBuilder({ editId } = {}) {
 
     if (Object.keys(chapterErrors).length) {
       setErrors(prev => ({ ...prev, ...chapterErrors }));
-      toast.error('Please add a title for each chapter before going to the next step.');
+      toast.warning('Please add a title for each chapter before going to the next step.');
       return false;
     }
 
     if (hasUnsavedChapter) {
-      toast.error('Please save or remove unsaved chapters before going to the next step.');
+      toast.warning('Please save or remove unsaved chapters before going to the next step.');
       return false;
     }
 
@@ -1634,7 +1901,7 @@ export default function AddCourseBuilder({ editId } = {}) {
       const chapterTitle = typeof ch?.title === 'string' ? ch.title.trim() : '';
       if (!chapterTitle) e[`chTitle_${i}`] = `Chapter ${i + 1} title is required.`;
     });
-    if (Object.keys(e).length) { setErrors(e); toast.error('Please fix the errors before submitting.'); return; }
+    if (Object.keys(e).length) { setErrors(e); toast.warning('Please fix the errors before submitting.'); return; }
     setErrors({});
     setSubmitting(true);
     try {
@@ -1652,8 +1919,9 @@ export default function AddCourseBuilder({ editId } = {}) {
         fd.append('enable_review', String(form.enableReview));
         fd.append('qna_enabled', String(form.qnaEnabled));
         fd.append('max_students', form.maxStudents || '0');
-          if (form.selectedCatIds.length > 0) fd.append('catId', form.selectedCatIds[0]);
-        fd.append('subCatIds', JSON.stringify(form.selectedCatIds.slice(1)));
+        const { catIds, subCatIds } = splitCategorySelection(form.selectedCatIds, allCategories, savedCatIds);
+        fd.append('catIds', JSON.stringify(catIds));
+        fd.append('subCatIds', JSON.stringify(subCatIds));
         fd.append('tagIds', JSON.stringify(form.selectedTagIds));
         fd.append('aptitudeEnabled', String(form.aptitudeEnabled));
         fd.append('aptitudeContext', form.aptitudeContext || '');
@@ -1711,7 +1979,7 @@ export default function AddCourseBuilder({ editId } = {}) {
       toast.success(editId ? 'Course updated successfully.' : 'Course created successfully.');
       router.push('/superadmin/course-builder');
     } catch {
-      toast.error('Failed to create course. Please try again.');
+      toast.warning('Failed to create course. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -1861,7 +2129,7 @@ export default function AddCourseBuilder({ editId } = {}) {
                         type="button"
                         className={s.modalAddFromUrl}
                         onClick={async () => {
-                          if (!(await openMediaInNewTab(lessonForm.videoUrl))) toast.error('Could not open the video. Please try again.');
+                          if (!(await openMediaInNewTab(lessonForm.videoUrl))) toast.warning('Could not open the video. Please try again.');
                         }}
                       >
                         ▶ Play in new tab
@@ -2061,6 +2329,21 @@ export default function AddCourseBuilder({ editId } = {}) {
                   </div>
                 </div>
                 <QAOriginFilter value={qaOriginFilter.pool} onChange={setPoolFilter} label="Generated QA" />
+                <QABulkBar
+                  visibleIds={filterByOrigin(quizQAPool, qaOriginFilter.pool).map(q => String(q._id))}
+                  checkedIds={qaChecked}
+                  moveLabel={n => `Move${n ? ` ${n}` : ''} to Selected Questions →`}
+                  moveTitle="Move the ticked questions to Selected Questions"
+                  onToggleAll={on => setQaCheckedMany(filterByOrigin(quizQAPool, qaOriginFilter.pool).map(q => String(q._id)), on)}
+                  onMove={() => {
+                    const qs = quizQAPool.filter(q => qaChecked.has(String(q._id)));
+                    if (!qs.length) return;
+                    const ids = new Set(qs.map(q => String(q._id)));
+                    setQuizQAPool(prev => prev.filter(x => !ids.has(String(x._id))));
+                    setQuizQASelected(prev => sortByDifficulty([...prev, ...qs]));
+                    setQaCheckedMany([...ids], false);
+                  }}
+                />
                 <div className={s.quizQAList} ref={poolListRef}>
                   {quizQAPool.length > 0 && filterByOrigin(quizQAPool, qaOriginFilter.pool).length === 0 && (
                     <div className={s.quizQAEmpty}>No {qaOriginFilter.pool} questions here.</div>
@@ -2116,7 +2399,12 @@ export default function AddCourseBuilder({ editId } = {}) {
                             onClick={() => {
                               setQuizQAPool(prev => prev.filter(x => String(x._id) !== id));
                               setQuizQASelected(prev => sortByDifficulty([...prev, q]));
+                              setQaCheckedMany([id], false);
                             }}>
+                            <input type="checkbox" className={s.qaRowCheck} aria-label="Select question"
+                              checked={qaChecked.has(id)}
+                              onClick={e => e.stopPropagation()}
+                              onChange={() => toggleQaChecked(id)} />
                             <span className={s.quizQANum}>{i + 1}</span>
                             <span className={s.quizQAText}>{q.question}</span>
                             <button type="button" className={s.quizQADeleteBtn} title="Delete permanently"
@@ -2177,6 +2465,17 @@ export default function AddCourseBuilder({ editId } = {}) {
                   </div>
                 </div>
                 <QAOriginFilter value={qaOriginFilter.selected} onChange={setSelectedFilter} label="Selected Questions" />
+                <QABulkBar
+                  visibleIds={filterByOrigin(quizQASelected, qaOriginFilter.selected).map(q => String(q._id))}
+                  checkedIds={qaChecked}
+                  moveLabel={n => `← Move${n ? ` ${n}` : ''} to Generated QA`}
+                  moveTitle="Move the ticked questions back to Generated QA"
+                  onToggleAll={on => setQaCheckedMany(filterByOrigin(quizQASelected, qaOriginFilter.selected).map(q => String(q._id)), on)}
+                  onMove={() => {
+                    const qs = quizQASelected.filter(q => qaChecked.has(String(q._id)));
+                    if (qs.length) setQaToUnselect({ qs, kind: 'quiz' });
+                  }}
+                />
                 <div className={s.quizQAList}>
                   {quizQASelected.length > 0 && filterByOrigin(quizQASelected, qaOriginFilter.selected).length === 0 && (
                     <div className={s.quizQAEmpty}>No {qaOriginFilter.selected} questions here.</div>
@@ -2202,8 +2501,12 @@ export default function AddCourseBuilder({ editId } = {}) {
                           <div className={s.quizQAAccordionHead}
                             onClick={() => {
                               if (editingAnswerId === id) return; // don't drop a question mid-edit
-                              setQaToUnselect({ q, kind: 'quiz' }); // moved back only after the admin confirms
+                              setQaToUnselect({ qs: [q], kind: 'quiz' }); // moved back only after the admin confirms
                             }}>
+                            <input type="checkbox" className={s.qaRowCheck} aria-label="Select question"
+                              checked={qaChecked.has(id)}
+                              onClick={e => e.stopPropagation()}
+                              onChange={() => toggleQaChecked(id)} />
                             <span className={s.quizQANum}>{i + 1}</span>
                             <span className={s.quizQAText}>
                               {q.question}
@@ -2404,6 +2707,21 @@ export default function AddCourseBuilder({ editId } = {}) {
                 </div>
               </div>
               <QAOriginFilter value={qaOriginFilter.pool} onChange={setPoolFilter} label="Generated QA" />
+              <QABulkBar
+                visibleIds={filterByOrigin(aptitudeQAPool, qaOriginFilter.pool).map(q => String(q._id))}
+                checkedIds={qaChecked}
+                moveLabel={n => `Move${n ? ` ${n}` : ''} to Selected Questions →`}
+                moveTitle="Move the ticked questions to Selected Questions"
+                onToggleAll={on => setQaCheckedMany(filterByOrigin(aptitudeQAPool, qaOriginFilter.pool).map(q => String(q._id)), on)}
+                onMove={() => {
+                  const qs = aptitudeQAPool.filter(q => qaChecked.has(String(q._id)));
+                  if (!qs.length) return;
+                  const ids = new Set(qs.map(q => String(q._id)));
+                  setAptitudeQAPool(prev => prev.filter(x => !ids.has(String(x._id))));
+                  setAptitudeQASelected(prev => sortByDifficulty([...prev, ...qs]));
+                  setQaCheckedMany([...ids], false);
+                }}
+              />
               <div className={s.quizQAList} ref={poolListRef}>
                 {aptitudeQAPool.length > 0 && filterByOrigin(aptitudeQAPool, qaOriginFilter.pool).length === 0 && (
                   <div className={s.quizQAEmpty}>No {qaOriginFilter.pool} questions here.</div>
@@ -2459,7 +2777,12 @@ export default function AddCourseBuilder({ editId } = {}) {
                           onClick={() => {
                             setAptitudeQAPool(prev => prev.filter(x => String(x._id) !== id));
                             setAptitudeQASelected(prev => sortByDifficulty([...prev, q]));
+                            setQaCheckedMany([id], false);
                           }}>
+                          <input type="checkbox" className={s.qaRowCheck} aria-label="Select question"
+                            checked={qaChecked.has(id)}
+                            onClick={e => e.stopPropagation()}
+                            onChange={() => toggleQaChecked(id)} />
                           <span className={s.quizQANum}>{i + 1}</span>
                           <span className={s.quizQAText}>{q.question}</span>
                           <button type="button" className={s.quizQADeleteBtn} title="Delete permanently"
@@ -2520,6 +2843,17 @@ export default function AddCourseBuilder({ editId } = {}) {
                 </div>
               </div>
               <QAOriginFilter value={qaOriginFilter.selected} onChange={setSelectedFilter} label="Selected Questions" />
+              <QABulkBar
+                visibleIds={filterByOrigin(aptitudeQASelected, qaOriginFilter.selected).map(q => String(q._id))}
+                checkedIds={qaChecked}
+                moveLabel={n => `← Move${n ? ` ${n}` : ''} to Generated QA`}
+                moveTitle="Move the ticked questions back to Generated QA"
+                onToggleAll={on => setQaCheckedMany(filterByOrigin(aptitudeQASelected, qaOriginFilter.selected).map(q => String(q._id)), on)}
+                onMove={() => {
+                  const qs = aptitudeQASelected.filter(q => qaChecked.has(String(q._id)));
+                  if (qs.length) setQaToUnselect({ qs, kind: 'aptitude' });
+                }}
+              />
               <div className={s.quizQAList}>
                 {aptitudeQASelected.length > 0 && filterByOrigin(aptitudeQASelected, qaOriginFilter.selected).length === 0 && (
                   <div className={s.quizQAEmpty}>No {qaOriginFilter.selected} questions here.</div>
@@ -2545,8 +2879,12 @@ export default function AddCourseBuilder({ editId } = {}) {
                         <div className={s.quizQAAccordionHead}
                           onClick={() => {
                             if (editingAnswerId === id) return; // don't drop a question mid-edit
-                            setQaToUnselect({ q, kind: 'aptitude' }); // moved back only after the admin confirms
+                            setQaToUnselect({ qs: [q], kind: 'aptitude' }); // moved back only after the admin confirms
                           }}>
+                          <input type="checkbox" className={s.qaRowCheck} aria-label="Select question"
+                            checked={qaChecked.has(id)}
+                            onClick={e => e.stopPropagation()}
+                            onChange={() => toggleQaChecked(id)} />
                           <span className={s.quizQANum}>{i + 1}</span>
                           <span className={s.quizQAText}>
                             {q.question}
@@ -2667,6 +3005,251 @@ export default function AddCourseBuilder({ editId } = {}) {
     );
   }
 
+  /* ── Final Course Assignment modal ───────────────────────── */
+  // Same layout as the Quiz / Aptitude Test modals. The questions belong to the chapter
+  // quizzes, so they can't be deleted, added or have answers edited here — only picked.
+  function FinalAssignmentModal() {
+    if (!finalModalOpen) return null;
+    const poolShown = filterByOrigin(finalPool, qaOriginFilter.pool);
+    const selShown = filterByOrigin(finalSelected, qaOriginFilter.selected);
+    const select = (qs) => {
+      const ids = new Set(qs.map(q => String(q._id)));
+      setFinalPool(prev => prev.filter(x => !ids.has(String(x._id))));
+      setFinalSelected(prev => sortByDifficulty([...prev, ...qs]));
+      setQaCheckedMany([...ids], false);
+    };
+
+    return (
+      <div className={s.modalOverlay}>
+        <div className={`${s.quizModalBox} ${s.quizModalBoxWide}`}>
+          {/* Header — title, Question Details / Settings tabs, close (×) */}
+          <div className={s.quizModalHeader}>
+            <div className={s.modalHeaderLeft}>
+              <span className={s.modalType}>{FINAL_TITLE}</span>
+              <span className={s.modalTypeSep}>|</span>
+              <span className={s.modalTopic}>Course: {form.title || '(Untitled course)'}</span>
+            </div>
+            <div className={s.quizModalTabs}>
+              <button type="button"
+                className={`${s.quizTab} ${finalTab === 'details' ? s.quizTabActive : ''}`}
+                onClick={() => setFinalTab('details')}>
+                Question Details
+              </button>
+              <button type="button"
+                className={`${s.quizTab} ${finalTab === 'settings' ? s.quizTabActive : ''}`}
+                onClick={() => setFinalTab('settings')}>
+                Settings
+              </button>
+            </div>
+            <button type="button" className={s.modalClose} onClick={closeFinalModal} aria-label="Close">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/>
+              </svg>
+            </button>
+          </div>
+
+          {finalTab === 'settings' ? (
+            <div className={s.quizSettingsBody}>
+              {SettingsPanel({ settings: finalSettings, set: setFS, showScoring: true, noun: 'Quiz' })}
+              <div className={s.quizSettingsFooter}>
+                <button type="button" className={s.btnCloseAptitude} onClick={closeFinalModal}>Close</button>
+                <button type="button" className={s.btnSaveQA} disabled={finalSaving} onClick={saveFinalAssignment}>
+                  {finalSaving ? 'Saving…' : 'Save Final Assignment'}
+                </button>
+              </div>
+            </div>
+          ) : (
+          <div className={`${s.quizDetailsBody} ${quizQAExpandedCol ? s.quizDetailsBodyExpanded : ''}`}>
+
+            {/* ── Left: every chapter quiz question not selected here ── */}
+            {quizQAExpandedCol !== 'selected' && (
+            <div className={s.quizModalLeft}>
+              <div className={s.quizColHeader}>
+                <span className={s.quizColTitle}>Generated QA</span>
+                <div className={s.quizColHeaderRight}>
+                  {(finalPool.length > 0 || quizQAExpandedCol === 'pool') && (
+                    <button type="button" className={s.quizExpandIconBtn}
+                      onClick={() => toggleQuizQAExpand('pool')}
+                      title={quizQAExpandedCol === 'pool' ? 'Collapse' : 'Expand'}
+                      aria-label={quizQAExpandedCol === 'pool' ? 'Collapse' : 'Expand'}>
+                      <PanelToggleIcon expanded={quizQAExpandedCol === 'pool'} />
+                    </button>
+                  )}
+                  <span className={s.quizColBadge}>{finalPool.length}</span>
+                </div>
+              </div>
+              <QAOriginFilter value={qaOriginFilter.pool} onChange={setPoolFilter} label="Generated QA" />
+              <QABulkBar
+                visibleIds={poolShown.map(q => String(q._id))}
+                checkedIds={qaChecked}
+                moveLabel={n => `Move${n ? ` ${n}` : ''} to Selected Questions →`}
+                moveTitle="Move the ticked questions to Selected Questions"
+                onToggleAll={on => setQaCheckedMany(poolShown.map(q => String(q._id)), on)}
+                onMove={() => select(finalPool.filter(q => qaChecked.has(String(q._id))))}
+              />
+              <div className={s.quizQAList} ref={poolListRef}>
+                {finalPool.length > 0 && poolShown.length === 0 && (
+                  <div className={s.quizQAEmpty}>No {qaOriginFilter.pool} questions here.</div>
+                )}
+                {finalLoading ? (
+                  <div className={s.quizQAEmpty}>Loading questions…</div>
+                ) : finalPool.length === 0 ? (
+                  <div className={s.quizQAEmpty}>
+                    {finalSelected.length > 0
+                      ? 'All chapter quiz questions are selected.'
+                      : 'No quiz questions yet — generate questions in the chapter quizzes first.'}
+                  </div>
+                ) : (
+                  poolShown.map((q, i) => {
+                    const id = String(q._id);
+                    const open = quizQAExpandedCol === 'pool' || expandedFinalQIds.has(id);
+                    return (
+                      <div key={id} className={s.quizQAAccordion}>
+                        <div className={s.quizQAAccordionHead} onClick={() => select([q])}>
+                          <input type="checkbox" className={s.qaRowCheck} aria-label="Select question"
+                            checked={qaChecked.has(id)}
+                            onClick={e => e.stopPropagation()}
+                            onChange={() => toggleQaChecked(id)} />
+                          <span className={s.quizQANum}>{i + 1}</span>
+                          <span className={s.quizQAText}>{q.question}</span>
+                          <span className={`${s.quizQADiff} ${s[`quizQADiff_${q.difficulty}`]}`}>
+                            {DIFF_LABEL[q.difficulty] || 'B'}
+                          </span>
+                          <QAOriginTag status={q.status} />
+                          <button type="button" className={s.quizQAChevBtn} aria-label={open ? 'Hide answer' : 'Show answer'}
+                            onClick={e => { e.stopPropagation(); toggleFinalQ(id); }}>
+                            <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13"
+                              style={{ transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.18s' }}>
+                              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd"/>
+                            </svg>
+                          </button>
+                        </div>
+                        {open && q.answer && (
+                          <div className={s.quizQAAccordionBody}>
+                            <span className={s.quizQAAnswerLabel}>Answer</span>
+                            <p className={s.quizQAAnswer}>{q.answer}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+            )}
+
+            {/* ── Middle: the Final Course Assignment's questions ── */}
+            {quizQAExpandedCol !== 'pool' && (
+            <div className={s.quizModalMiddle}>
+              <div className={s.quizColHeader}>
+                <span className={s.quizColTitle}>Selected Questions</span>
+                <div className={s.quizColHeaderRight}>
+                  {(finalSelected.length > 0 || quizQAExpandedCol === 'selected') && (
+                    <button type="button" className={s.quizExpandIconBtn}
+                      onClick={() => toggleQuizQAExpand('selected')}
+                      title={quizQAExpandedCol === 'selected' ? 'Collapse' : 'Expand'}
+                      aria-label={quizQAExpandedCol === 'selected' ? 'Collapse' : 'Expand'}>
+                      <PanelToggleIcon expanded={quizQAExpandedCol === 'selected'} />
+                    </button>
+                  )}
+                  <span className={s.quizColBadge}>{finalSelected.length}</span>
+                </div>
+              </div>
+              <QAOriginFilter value={qaOriginFilter.selected} onChange={setSelectedFilter} label="Selected Questions" />
+              <QABulkBar
+                visibleIds={selShown.map(q => String(q._id))}
+                checkedIds={qaChecked}
+                moveLabel={n => `← Move${n ? ` ${n}` : ''} to Generated QA`}
+                moveTitle="Move the ticked questions back to Generated QA"
+                onToggleAll={on => setQaCheckedMany(selShown.map(q => String(q._id)), on)}
+                onMove={() => {
+                  const qs = finalSelected.filter(q => qaChecked.has(String(q._id)));
+                  if (qs.length) setQaToUnselect({ qs, kind: 'final' });
+                }}
+              />
+              <div className={s.quizQAList}>
+                {finalSelected.length > 0 && selShown.length === 0 && (
+                  <div className={s.quizQAEmpty}>No {qaOriginFilter.selected} questions here.</div>
+                )}
+                {finalSelected.length === 0 ? (
+                  <div className={s.quizMiddleEmpty}>
+                    <svg width="64" height="64" viewBox="0 0 90 90" fill="none" aria-hidden="true">
+                      <circle cx="45" cy="45" r="40" fill="#f0f1f5"/>
+                      <rect x="22" y="28" width="46" height="6" rx="3" fill="#d1d5db"/>
+                      <rect x="22" y="40" width="36" height="5" rx="2.5" fill="#e5e7eb"/>
+                      <circle cx="18" cy="43" r="4" fill="#d1d5db"/>
+                      <rect x="22" y="51" width="40" height="5" rx="2.5" fill="#e5e7eb"/>
+                      <circle cx="18" cy="54" r="4" fill="#d1d5db"/>
+                    </svg>
+                    <p className={s.quizEmptyText}>{finalLoading ? 'Loading questions…' : 'Click questions on the left to add them here.'}</p>
+                  </div>
+                ) : (
+                  selShown.map((q, i) => {
+                    const id = String(q._id);
+                    const open = quizQAExpandedCol === 'selected' || expandedFinalQIds.has(id);
+                    return (
+                      <div key={id} className={`${s.quizQAAccordion} ${s.quizQAAccordionSel}`}>
+                        <div className={s.quizQAAccordionHead} onClick={() => setQaToUnselect({ qs: [q], kind: 'final' })}>
+                          <input type="checkbox" className={s.qaRowCheck} aria-label="Select question"
+                            checked={qaChecked.has(id)}
+                            onClick={e => e.stopPropagation()}
+                            onChange={() => toggleQaChecked(id)} />
+                          <span className={s.quizQANum}>{i + 1}</span>
+                          <span className={s.quizQAText}>{q.question}</span>
+                          <span className={`${s.quizQADiff} ${s[`quizQADiff_${q.difficulty}`]}`}>
+                            {DIFF_LABEL[q.difficulty] || 'B'}
+                          </span>
+                          <QAOriginTag status={q.status} />
+                          <button type="button" className={s.quizQAChevBtn} aria-label={open ? 'Hide answer' : 'Show answer'}
+                            onClick={e => { e.stopPropagation(); toggleFinalQ(id); }}>
+                            <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13"
+                              style={{ transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.18s' }}>
+                              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd"/>
+                            </svg>
+                          </button>
+                        </div>
+                        {open && q.answer && (
+                          <div className={s.quizQAAccordionBody}>
+                            <span className={s.quizQAAnswerLabel}>Answer</span>
+                            <p className={s.quizQAAnswer}>{q.answer}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+            )}
+
+            {/* ── Right: where the questions come from + totals + save ── */}
+            <div className={s.quizModalRight}>
+              <div className={`${s.quizRightForm} ${s.quizRightFormFill}`}>
+                <p className={s.finalQAInfo}>
+                  The questions come from the quiz QA of this course&apos;s chapters. What you select here is saved only for the {FINAL_TITLE}{' '}— the chapter quizzes don&apos;t change.
+                </p>
+                <div className={s.quizRightStats}>
+                  <div className={s.quizRightStatRow}><span>Pool</span><strong>{finalPool.length}</strong></div>
+                  <div className={s.quizRightStatRow}><span>Selected</span><strong>{finalSelected.length}</strong></div>
+                  <div className={s.quizRightStatRow}><span>Total</span><strong>{finalPool.length + finalSelected.length}</strong></div>
+                </div>
+                <div className={s.quizRightFooter}>
+                  <div className={s.quizRightDivider} />
+                  <button type="button" className={s.btnSaveQA} disabled={finalSaving || finalLoading} onClick={saveFinalAssignment}>
+                    {finalSaving ? 'Saving…' : 'Save Final Assignment'}
+                  </button>
+                  <button type="button" className={s.btnCloseAptitude} onClick={closeFinalModal}>Close</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   /* ── Zoom Link Modal ─────────────────────────────────────── */
   function ZoomLinkModal() {
     if (!zoomModal) return null;
@@ -2760,12 +3343,276 @@ export default function AddCourseBuilder({ editId } = {}) {
                 </span>
               </label>
             </div>
+            <div className={s.simpleModalField}>
+              <label className={s.simpleModalLabel} htmlFor="assign-max-videos">How many videos can upload?</label>
+              <input
+                id="assign-max-videos"
+                className={`${s.simpleModalInput} ${s.maxVideosInput}`}
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={MAX_VIDEOS_PER_ASSIGNMENT}
+                step={1}
+                placeholder={String(DEFAULT_VIDEOS_PER_ASSIGNMENT)}
+                value={assignForm.maxVideos}
+                onChange={e => setAssignForm(prev => ({ ...prev, maxVideos: e.target.value.replace(/[^0-9]/g, '') }))}
+              />
+            </div>
           </div>
           <div className={s.simpleModalFooter}>
             <button type="button" className={s.modalBtnCancel} onClick={closeAssignModal}>Cancel</button>
             <button type="button" className={s.modalBtnSave} onClick={saveAssign}>Submit</button>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  /* ── One chapter (or Bonus Content) card on the Curriculum step ── */
+  function ChapterCard(ch, chIdx) {
+    return (
+              <div
+                key={ch._id}
+                className={`${s.chCard}${dragOverChIdx === chIdx && dragChIdx !== chIdx ? ' ' + s.chCardDragOver : ''}`}
+                style={{ '--ch-color': CHAPTER_COLORS[chIdx % CHAPTER_COLORS.length] }}
+                draggable
+                onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; setDragChIdx(chIdx); }}
+                onDragOver={e => { e.preventDefault(); setDragOverChIdx(chIdx); }}
+                onDrop={() => { reorderChapters(dragChIdx, dragOverChIdx); setDragChIdx(null); setDragOverChIdx(null); }}
+                onDragEnd={() => { setDragChIdx(null); setDragOverChIdx(null); }}
+              >
+                {ch.saved ? (
+                  /* ─── Saved / View mode ─────────────────── */
+                  <>
+                    <div className={s.chSavedTop}>
+                      <span className={s.chCardDrag}>⠿</span>
+                      <div className={s.chSavedInfo}>
+                        <span className={s.chSavedChapterNo}>{chapterLabel(chIdx)}</span>
+                        <span className={s.chSavedTitle}>{ch.title || '(Untitled)'}</span>
+                        {!ch.collapsed && ch.desc && (
+                          <span className={s.chSavedDesc}>{ch.desc}</span>
+                        )}
+                      </div>
+                      <div className={s.chSavedActions}>
+                        <button type="button" className={s.btnChIcon} title="Edit"
+                          onClick={() => editChapter(chIdx)}>
+                          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                          </svg>
+                        </button>
+                        <button type="button" className={s.btnChIconDanger} title="Delete"
+                          onClick={() => setChapterToDelete(chIdx)}>
+                          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd"/>
+                          </svg>
+                        </button>
+                        <button type="button" className={`${s.btnChIcon} ${ch.collapsed ? s.rotatedDown : ''}`}
+                          title={ch.collapsed ? 'Expand' : 'Collapse'}
+                          onClick={() => toggleChapterCollapse(chIdx)}>
+                          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+                            <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                    {!ch.collapsed && (
+                      <>
+                        {/* Unified sortable item list */}
+                        {(() => {
+                          const flatItems = getChapterFlatItems(ch);
+                          if (flatItems.length === 0) return null;
+                          return (
+                            <div className={s.lessonList}>
+                              {flatItems.map((item, flatIdx) => (
+                                <div
+                                  key={item._id}
+                                  className={`${s.lessonRow}${dragOverItemInfo?.chIdx === chIdx && dragOverItemInfo?.flatIdx === flatIdx ? ` ${s.lessonRowDragOver}` : ''}`}
+                                  draggable
+                                  onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; setDragItemInfo({ chIdx, flatIdx }); }}
+                                  onDragOver={e => { e.preventDefault(); setDragOverItemInfo({ chIdx, flatIdx }); }}
+                                  onDrop={() => {
+                                    if (dragItemInfo?.chIdx === chIdx) reorderChapterItem(chIdx, dragItemInfo.flatIdx, flatIdx);
+                                    setDragItemInfo(null);
+                                    setDragOverItemInfo(null);
+                                  }}
+                                  onDragEnd={() => { setDragItemInfo(null); setDragOverItemInfo(null); }}
+                                >
+                                  <span className={s.lessonDrag}>≡</span>
+                                  {item._type === 'lesson' && <span style={{ fontSize: 11, fontWeight: 600, color: '#2563eb', background: '#eff6ff', borderRadius: 4, padding: '1px 6px', flexShrink: 0 }}>Lesson</span>}
+                                  {item._type === 'quiz' && <span style={{ fontSize: 11, fontWeight: 600, color: '#7c3aed', background: '#ede9fe', borderRadius: 4, padding: '1px 6px', flexShrink: 0 }}>Quiz</span>}
+                                  {item._type === 'zoom' && <span style={{ fontSize: 11, fontWeight: 600, color: '#0891b2', background: '#ecfeff', borderRadius: 4, padding: '1px 6px', flexShrink: 0 }}>Zoom</span>}
+                                  {item._type === 'assignment' && <span style={{ fontSize: 11, fontWeight: 600, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 6px', flexShrink: 0 }}>Assignment</span>}
+                                  <span className={s.lessonName}>
+                                    {item._type === 'lesson' ? item.name : item.title}
+                                    {item._type === 'assignment' && item.fileName && (
+                                      <span style={{ fontSize: 11, color: '#6b7280', marginLeft: 6 }}>({item.fileName})</span>
+                                    )}
+                                  </span>
+                                  <div className={s.lessonRowActions}>
+                                    <button type="button" className={s.btnChIcon} title="Edit"
+                                      onClick={() => {
+                                        if (item._type === 'lesson') {
+                                          setLessonForm({ name: item.name, content: item.content, featuredImage: null, imageUrl: item.imageUrl || '', video: null, videoUrl: item.videoUrl || '', localVideo: item.video || null, playbackHour: item.playbackHour, playbackMin: item.playbackMin, playbackSec: item.playbackSec, exerciseFile: null, lessonPreview: false });
+                                          setLessonModal({ chIdx, topicName: ch.title || '(Untitled)', editIdx: item._typeIdx });
+                                        } else if (item._type === 'quiz') {
+                                          setQuizForm({ title: item.title, summary: item.summary || '' });
+                                          setQuizSettings({ ...DEFAULT_QUIZ_SETTINGS, ...item.settings });
+                                          setQuizTab('details');
+                                          setQuizQAPool([]);
+                                          setQuizQASelected([]);
+                                          setQuizQAHasGenerated(false);
+                                          setExpandedQIds(new Set());
+                                          setQuizModal({ chIdx, topicName: ch.title || '(Untitled)', editIdx: item._typeIdx });
+                                          loadQuizQA(item.serverId, item.settings?.selectedQuestionIds);
+                                        } else if (item._type === 'zoom') {
+                                          setZoomForm({ title: item.title, link: item.link });
+                                          setZoomModal({ chIdx, editIdx: item._typeIdx });
+                                        } else {
+                                          setAssignForm({ title: item.title, file: null, maxVideos: String(item.maxVideos ?? DEFAULT_VIDEOS_PER_ASSIGNMENT) });
+                                          setAssignModal({ chIdx, editIdx: item._typeIdx });
+                                        }
+                                      }}>
+                                      <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13">
+                                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                                      </svg>
+                                    </button>
+                                    <button type="button" className={s.btnChIconDanger} title="Delete"
+                                      onClick={() => {
+                                        if (item._type === 'lesson') setLessonToDelete({ chIdx, lIdx: item._typeIdx });
+                                        else if (item._type === 'quiz') setQuizToDelete({ chIdx, qIdx: item._typeIdx });
+                                        else if (item._type === 'zoom') setZoomToDelete({ chIdx, zIdx: item._typeIdx });
+                                        else setAssignToDelete({ chIdx, aIdx: item._typeIdx });
+                                      }}>
+                                      {TrashIcon}
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                        <div className={s.chCardBar}>
+                          <button type="button" className={s.btnChBarItem} onClick={() => openLessonModal(chIdx)}>+ Lesson</button>
+                          <button type="button" className={s.btnChBarItem} onClick={() => openQuizModal(chIdx)}>+ Quiz</button>
+                          <button type="button" className={s.btnChBarItem} onClick={() => openZoomModal(chIdx)}>+ Zoom Link</button>
+                          <button type="button" className={s.btnChBarItem} onClick={() => openAssignModal(chIdx)}>+ Assignment</button>
+                        </div>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  /* ─── Edit / New mode ───────────────────── */
+                  <>
+                    <div className={s.chCardTop}>
+                      <span className={s.chCardDrag}>⠿</span>
+                      <div className={s.chCardForm}>
+                        <div className={s.chCardLabel}>{chapterLabel(chIdx)}</div>
+                        <input
+                          className={s.chCardTitleInput}
+                          type="text"
+                          placeholder="Add a title"
+                          value={ch.title}
+                          onChange={e => updateChapter(chIdx, 'title', e.target.value)}
+                        />
+                        <div className={s.chCardDivider} />
+                        <textarea
+                          className={s.chCardSummary}
+                          placeholder="Add a summary"
+                          rows={3}
+                          value={ch.desc}
+                          onChange={e => updateChapter(chIdx, 'desc', e.target.value)}
+                        />
+                        <div className={s.chCardFormFooter}>
+                          <button type="button" className={s.btnChCancel}
+                            onClick={() => {
+                              if (ch.serverId) {
+                                setChapters(prev => { const c = [...prev]; c[chIdx] = { ...c[chIdx], saved: true }; return c; });
+                              } else {
+                                removeChapter(chIdx);
+                              }
+                            }}>
+                            Cancel
+                          </button>
+                          <button type="button" className={s.btnChOk}
+                            disabled={savingChapterIdx === chIdx}
+                            onClick={() => saveChapter(chIdx)}>
+                            {savingChapterIdx === chIdx ? 'Saving…' : 'Ok'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className={s.chCardBar}>
+                      <button type="button" className={s.btnChBarItem} disabled>+ Lesson</button>
+                      <button type="button" className={s.btnChBarItem} disabled>+ Quiz</button>
+                      <button type="button" className={s.btnChBarItem} disabled>+ Zoom Link</button>
+                      <button type="button" className={s.btnChBarItem} disabled>+ Assignment</button>
+                    </div>
+                  </>
+                )}
+              </div>
+    );
+  }
+
+  /* ── "+ Add Chapter" | "Final Course Assignment" | "+ Bonus Content" ── */
+  function AddChapterRow({ primary = false } = {}) {
+    return (
+      <div className={`${s.addChapterRow} ${primary ? s.addChapterRowPrimary : ''}`}>
+        <button type="button" className={s.btnAddChapter} onClick={addChapter}>+ Add Chapter</button>
+        <button type="button" className={s.btnAddFinal} onClick={addFinalAssignment}
+          disabled={Boolean(finalAsg) || creatingFinal || !courseId}
+          title={finalAsg ? 'This course already has its Final Course Assignment' : 'Add the Final Course Assignment (one per course)'}>
+          {creatingFinal ? 'Adding…' : 'Final Course Assignment'}
+        </button>
+        <button type="button" className={s.btnAddBonus} onClick={addBonusContent}
+          disabled={!finalAsg}
+          title={finalAsg ? 'Add Bonus Content after the Final Course Assignment' : 'Add the Final Course Assignment first'}>
+          + Bonus Content
+        </button>
+      </div>
+    );
+  }
+
+  /* ── The Final Course Assignment block (always after the chapters) ── */
+  function FinalAssignmentBlock() {
+    if (!finalAsg) return null;
+    return (
+      <div className={`${s.chCard} ${s.finalCard}`} style={{ '--ch-color': '#dc2626' }}>
+        <div className={s.chSavedTop}>
+          <span className={s.chCardDrag} aria-hidden="true">⠿</span>
+          <div className={s.chSavedInfo}>
+            <span className={s.chSavedChapterNo}>Chapter {chapters.filter(c => !c.isBonus).length + 1}</span>
+            <span className={s.chSavedTitle}>{FINAL_TITLE}</span>
+          </div>
+          <div className={s.chSavedActions}>
+            <button type="button" className={s.btnChIconDanger} title="Delete" aria-label="Delete the Final Course Assignment"
+              disabled={deletingFinal} onClick={() => setFinalToDelete(true)}>
+              <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd"/>
+              </svg>
+            </button>
+            <button type="button" className={`${s.btnChIcon} ${finalCollapsed ? s.rotatedDown : ''}`}
+              title={finalCollapsed ? 'Expand' : 'Collapse'} aria-label={finalCollapsed ? 'Expand' : 'Collapse'}
+              onClick={() => setFinalCollapsed(c => !c)}>
+              <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
+                <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        {!finalCollapsed && (
+          <div className={s.lessonList}>
+            <div className={s.lessonRow}>
+              <span className={s.lessonDrag} aria-hidden="true">≡</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 6px', flexShrink: 0 }}>Assignment</span>
+              <button type="button" className={s.finalQALink} onClick={openFinalModal}>
+                Click here to see the assignment QA
+              </button>
+              <span className={s.finalQACount}>
+                {(finalAsg.settings?.selectedQuestionIds || []).length} question{(finalAsg.settings?.selectedQuestionIds || []).length === 1 ? '' : 's'} selected
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -3241,198 +4088,17 @@ export default function AddCourseBuilder({ editId } = {}) {
             </div>
             <div className={s.curriculumEmptyTitle}>Start building your course!</div>
             <div className={s.curriculumEmptySub}>Add Topics, Lessons, and Quizzes to get started.</div>
-            <button type="button" className={s.btnAddChapterPrimary} onClick={addChapter}>
-              + Add Chapter
-            </button>
+            {AddChapterRow({ primary: true })}
           </div>
         ) : (
           <div className={s.chapterList}>
-            {chapters.map((ch, chIdx) => (
-              <div
-                key={ch._id}
-                className={`${s.chCard}${dragOverChIdx === chIdx && dragChIdx !== chIdx ? ' ' + s.chCardDragOver : ''}`}
-                style={{ '--ch-color': CHAPTER_COLORS[chIdx % CHAPTER_COLORS.length] }}
-                draggable
-                onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; setDragChIdx(chIdx); }}
-                onDragOver={e => { e.preventDefault(); setDragOverChIdx(chIdx); }}
-                onDrop={() => { reorderChapters(dragChIdx, dragOverChIdx); setDragChIdx(null); setDragOverChIdx(null); }}
-                onDragEnd={() => { setDragChIdx(null); setDragOverChIdx(null); }}
-              >
-                {ch.saved ? (
-                  /* ─── Saved / View mode ─────────────────── */
-                  <>
-                    <div className={s.chSavedTop}>
-                      <span className={s.chCardDrag}>⠿</span>
-                      <div className={s.chSavedInfo}>
-                        <span className={s.chSavedChapterNo}>Chapter {chIdx + 1}</span>
-                        <span className={s.chSavedTitle}>{ch.title || '(Untitled)'}</span>
-                        {!ch.collapsed && ch.desc && (
-                          <span className={s.chSavedDesc}>{ch.desc}</span>
-                        )}
-                      </div>
-                      <div className={s.chSavedActions}>
-                        <button type="button" className={s.btnChIcon} title="Edit"
-                          onClick={() => editChapter(chIdx)}>
-                          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
-                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
-                          </svg>
-                        </button>
-                        <button type="button" className={s.btnChIconDanger} title="Delete"
-                          onClick={() => setChapterToDelete(chIdx)}>
-                          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
-                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd"/>
-                          </svg>
-                        </button>
-                        <button type="button" className={`${s.btnChIcon} ${ch.collapsed ? s.rotatedDown : ''}`}
-                          title={ch.collapsed ? 'Expand' : 'Collapse'}
-                          onClick={() => toggleChapterCollapse(chIdx)}>
-                          <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
-                            <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd"/>
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                    {!ch.collapsed && (
-                      <>
-                        {/* Unified sortable item list */}
-                        {(() => {
-                          const flatItems = getChapterFlatItems(ch);
-                          if (flatItems.length === 0) return null;
-                          return (
-                            <div className={s.lessonList}>
-                              {flatItems.map((item, flatIdx) => (
-                                <div
-                                  key={item._id}
-                                  className={`${s.lessonRow}${dragOverItemInfo?.chIdx === chIdx && dragOverItemInfo?.flatIdx === flatIdx ? ` ${s.lessonRowDragOver}` : ''}`}
-                                  draggable
-                                  onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; setDragItemInfo({ chIdx, flatIdx }); }}
-                                  onDragOver={e => { e.preventDefault(); setDragOverItemInfo({ chIdx, flatIdx }); }}
-                                  onDrop={() => {
-                                    if (dragItemInfo?.chIdx === chIdx) reorderChapterItem(chIdx, dragItemInfo.flatIdx, flatIdx);
-                                    setDragItemInfo(null);
-                                    setDragOverItemInfo(null);
-                                  }}
-                                  onDragEnd={() => { setDragItemInfo(null); setDragOverItemInfo(null); }}
-                                >
-                                  <span className={s.lessonDrag}>≡</span>
-                                  {item._type === 'lesson' && <span style={{ fontSize: 11, fontWeight: 600, color: '#2563eb', background: '#eff6ff', borderRadius: 4, padding: '1px 6px', flexShrink: 0 }}>Lesson</span>}
-                                  {item._type === 'quiz' && <span style={{ fontSize: 11, fontWeight: 600, color: '#7c3aed', background: '#ede9fe', borderRadius: 4, padding: '1px 6px', flexShrink: 0 }}>Quiz</span>}
-                                  {item._type === 'zoom' && <span style={{ fontSize: 11, fontWeight: 600, color: '#0891b2', background: '#ecfeff', borderRadius: 4, padding: '1px 6px', flexShrink: 0 }}>Zoom</span>}
-                                  {item._type === 'assignment' && <span style={{ fontSize: 11, fontWeight: 600, color: '#b45309', background: '#fef3c7', borderRadius: 4, padding: '1px 6px', flexShrink: 0 }}>Assignment</span>}
-                                  <span className={s.lessonName}>
-                                    {item._type === 'lesson' ? item.name : item.title}
-                                    {item._type === 'assignment' && item.fileName && (
-                                      <span style={{ fontSize: 11, color: '#6b7280', marginLeft: 6 }}>({item.fileName})</span>
-                                    )}
-                                  </span>
-                                  <div className={s.lessonRowActions}>
-                                    <button type="button" className={s.btnChIcon} title="Edit"
-                                      onClick={() => {
-                                        if (item._type === 'lesson') {
-                                          setLessonForm({ name: item.name, content: item.content, featuredImage: null, imageUrl: item.imageUrl || '', video: null, videoUrl: item.videoUrl || '', localVideo: item.video || null, playbackHour: item.playbackHour, playbackMin: item.playbackMin, playbackSec: item.playbackSec, exerciseFile: null, lessonPreview: false });
-                                          setLessonModal({ chIdx, topicName: ch.title || '(Untitled)', editIdx: item._typeIdx });
-                                        } else if (item._type === 'quiz') {
-                                          setQuizForm({ title: item.title, summary: item.summary || '' });
-                                          setQuizSettings({ ...DEFAULT_QUIZ_SETTINGS, ...item.settings });
-                                          setQuizTab('details');
-                                          setQuizQAPool([]);
-                                          setQuizQASelected([]);
-                                          setQuizQAHasGenerated(false);
-                                          setExpandedQIds(new Set());
-                                          setQuizModal({ chIdx, topicName: ch.title || '(Untitled)', editIdx: item._typeIdx });
-                                          loadQuizQA(item.serverId, item.settings?.selectedQuestionIds);
-                                        } else if (item._type === 'zoom') {
-                                          setZoomForm({ title: item.title, link: item.link });
-                                          setZoomModal({ chIdx, editIdx: item._typeIdx });
-                                        } else {
-                                          setAssignForm({ title: item.title, file: null });
-                                          setAssignModal({ chIdx, editIdx: item._typeIdx });
-                                        }
-                                      }}>
-                                      <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13">
-                                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
-                                      </svg>
-                                    </button>
-                                    <button type="button" className={s.btnChIconDanger} title="Delete"
-                                      onClick={() => {
-                                        if (item._type === 'lesson') setLessonToDelete({ chIdx, lIdx: item._typeIdx });
-                                        else if (item._type === 'quiz') setQuizToDelete({ chIdx, qIdx: item._typeIdx });
-                                        else if (item._type === 'zoom') setZoomToDelete({ chIdx, zIdx: item._typeIdx });
-                                        else setAssignToDelete({ chIdx, aIdx: item._typeIdx });
-                                      }}>
-                                      {TrashIcon}
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        })()}
-                        <div className={s.chCardBar}>
-                          <button type="button" className={s.btnChBarItem} onClick={() => openLessonModal(chIdx)}>+ Lesson</button>
-                          <button type="button" className={s.btnChBarItem} onClick={() => openQuizModal(chIdx)}>+ Quiz</button>
-                          <button type="button" className={s.btnChBarItem} onClick={() => openZoomModal(chIdx)}>+ Zoom Link</button>
-                          <button type="button" className={s.btnChBarItem} onClick={() => openAssignModal(chIdx)}>+ Assignment</button>
-                        </div>
-                      </>
-                    )}
-                  </>
-                ) : (
-                  /* ─── Edit / New mode ───────────────────── */
-                  <>
-                    <div className={s.chCardTop}>
-                      <span className={s.chCardDrag}>⠿</span>
-                      <div className={s.chCardForm}>
-                        <div className={s.chCardLabel}>Chapter {chIdx + 1}</div>
-                        <input
-                          className={s.chCardTitleInput}
-                          type="text"
-                          placeholder="Add a title"
-                          value={ch.title}
-                          onChange={e => updateChapter(chIdx, 'title', e.target.value)}
-                        />
-                        <div className={s.chCardDivider} />
-                        <textarea
-                          className={s.chCardSummary}
-                          placeholder="Add a summary"
-                          rows={3}
-                          value={ch.desc}
-                          onChange={e => updateChapter(chIdx, 'desc', e.target.value)}
-                        />
-                        <div className={s.chCardFormFooter}>
-                          <button type="button" className={s.btnChCancel}
-                            onClick={() => {
-                              if (ch.serverId) {
-                                setChapters(prev => { const c = [...prev]; c[chIdx] = { ...c[chIdx], saved: true }; return c; });
-                              } else {
-                                removeChapter(chIdx);
-                              }
-                            }}>
-                            Cancel
-                          </button>
-                          <button type="button" className={s.btnChOk}
-                            disabled={savingChapterIdx === chIdx}
-                            onClick={() => saveChapter(chIdx)}>
-                            {savingChapterIdx === chIdx ? 'Saving…' : 'Ok'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                    <div className={s.chCardBar}>
-                      <button type="button" className={s.btnChBarItem} disabled>+ Lesson</button>
-                      <button type="button" className={s.btnChBarItem} disabled>+ Quiz</button>
-                      <button type="button" className={s.btnChBarItem} disabled>+ Zoom Link</button>
-                      <button type="button" className={s.btnChBarItem} disabled>+ Assignment</button>
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
-            <button type="button" className={s.btnAddChapter} onClick={addChapter}>
-              + Add Chapter
-            </button>
+            {chapters.map((ch, chIdx) => (ch.isBonus ? null : ChapterCard(ch, chIdx)))}
+            {FinalAssignmentBlock()}
+            {chapters.map((ch, chIdx) => (ch.isBonus ? ChapterCard(ch, chIdx) : null))}
+            {AddChapterRow()}
           </div>
         )}
+        {chapters.length === 0 && finalAsg && <div className={s.chapterList} style={{ marginTop: 14 }}>{FinalAssignmentBlock()}</div>}
       </div>
     );
   }
@@ -3598,6 +4264,17 @@ export default function AddCourseBuilder({ editId } = {}) {
       )}
 
       {/* Delete chapter confirmation */}
+      {finalToDelete && (
+        <ConfirmModal
+          show={true}
+          title="Delete Final Course Assignment"
+          message="Delete the Final Course Assignment from this course? Learners will no longer need to pass it to finish the course. You can add it again later."
+          confirmLabel={deletingFinal ? 'Deleting…' : 'Delete'}
+          onConfirm={removeFinalAssignment}
+          onCancel={() => setFinalToDelete(false)}
+        />
+      )}
+
       {chapterToDelete !== null && (
         <ConfirmModal
           show={true}
@@ -3657,19 +4334,25 @@ export default function AddCourseBuilder({ editId } = {}) {
       {qaToUnselect && (
         <ConfirmModal
           show={true}
-          title="Remove Question"
-          message={`Remove "${qaToUnselect.q.question}" from Selected Questions? It will be moved back to Generated QA.`}
-          confirmLabel="Remove"
+          title={qaToUnselect.qs.length > 1 ? 'Move Questions' : 'Remove Question'}
+          message={qaToUnselect.qs.length > 1
+            ? `Move ${qaToUnselect.qs.length} selected questions back to Generated QA?`
+            : `Remove "${qaToUnselect.qs[0].question}" from Selected Questions? It will be moved back to Generated QA.`}
+          confirmLabel={qaToUnselect.qs.length > 1 ? 'Move' : 'Remove'}
           onConfirm={() => {
-            const { q, kind } = qaToUnselect;
-            const id = String(q._id);
+            const { qs, kind } = qaToUnselect;
+            const ids = new Set(qs.map(q => String(q._id)));
             if (kind === 'aptitude') {
-              setAptitudeQASelected(prev => prev.filter(x => String(x._id) !== id));
-              setAptitudeQAPool(prev => sortByDifficulty([...prev, q]));
+              setAptitudeQASelected(prev => prev.filter(x => !ids.has(String(x._id))));
+              setAptitudeQAPool(prev => sortByDifficulty([...prev, ...qs]));
+            } else if (kind === 'final') {
+              setFinalSelected(prev => prev.filter(x => !ids.has(String(x._id))));
+              setFinalPool(prev => sortByDifficulty([...prev, ...qs]));
             } else {
-              setQuizQASelected(prev => prev.filter(x => String(x._id) !== id));
-              setQuizQAPool(prev => sortByDifficulty([...prev, q]));
+              setQuizQASelected(prev => prev.filter(x => !ids.has(String(x._id))));
+              setQuizQAPool(prev => sortByDifficulty([...prev, ...qs]));
             }
+            setQaCheckedMany([...ids], false);
             setQaToUnselect(null);
           }}
           onCancel={() => setQaToUnselect(null)}
@@ -3695,6 +4378,9 @@ export default function AddCourseBuilder({ editId } = {}) {
 
       {/* Aptitude Test modal */}
       {AptitudeModal()}
+
+      {/* Final Course Assignment modal */}
+      {FinalAssignmentModal()}
 
       {/* Zoom Link modal */}
       {ZoomLinkModal()}

@@ -4,7 +4,12 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import vp from "./ViewIndustryType.module.css";
+import vpPage from "./ViewIndustryType.module.css";
+import ViewDetailRows, { capitalize } from '../ViewDetailRows';
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const vp = withAdminKit(vpPage);
 
 const BackArrow = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -53,61 +58,35 @@ export default function ViewIndustryType() {
   if (loading) return <SuperAdminShell activeSection="industry-type"><p className={vp.loadingText}>Loading…</p></SuperAdminShell>;
   if (!item?._id) return <SuperAdminShell activeSection="industry-type"><p className={vp.loadingText}>Industry type not found.</p></SuperAdminShell>;
 
-  const isActive = item.status === 'active';
 
   return (
     <SuperAdminShell activeSection="industry-type">
       <button className={vp.backBtn} onClick={() => router.push('/superadmin/industry-type')}>
         {BackArrow} Back to Industry Types
       </button>
-      <nav className={vp.breadcrumb}>
-        <button className={vp.breadcrumbLink} onClick={() => router.push('/superadmin/industry-type')}>Industry Types</button>
-        <span className={vp.breadcrumbSep}>›</span>
-        <span className={vp.breadcrumbCurr}>{item.name}</span>
-      </nav>
+      <div className={vp.viewToolbar}>
+        <nav className={vp.breadcrumb}>
+          <button className={vp.breadcrumbLink} onClick={() => router.push('/superadmin/industry-type')}>Industry Types</button>
+          <span className={vp.breadcrumbSep}>›</span>
+          <span className={vp.breadcrumbCurr}>{item.name}</span>
+        </nav>
+        <button className={vp.btnEdit} onClick={() => router.push(`/superadmin/industry-type/${id}/edit`)}>
+          <EditIcon /> Edit
+        </button>
+      </div>
 
       <div className={vp.detailCard}>
-        <div className={vp.detailHead}>
-          <div className={vp.detailHeadLeft}>
-            <div className={vp.detailAvatar}>{(item.name || 'I').charAt(0).toUpperCase()}</div>
-            <div>
-              <h1 className={vp.detailTitle}>{item.name}</h1>
-              <div className={vp.detailBadges}>
-                {parentName && <span className={vp.badgeNeutral}>{parentName}</span>}
-                <span className={isActive ? vp.badgeActive : vp.badgeInactive}>
-                  {item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1) : 'Unknown'}
-                </span>
-              </div>
-            </div>
-          </div>
-          <button className={vp.btnEdit} onClick={() => router.push(`/superadmin/industry-type/${id}/edit`)}>
-            <EditIcon /> Edit
-          </button>
-        </div>
 
         <div className={vp.detailBody}>
-          <div className={vp.detailRows}>
-            {parentName && (
-              <div className={vp.detailRow}>
-                <span className={vp.detailLabel}>Parent Type</span>
-                <span className={vp.detailValue}>{parentName}</span>
-              </div>
-            )}
-            <div className={vp.detailRow}>
-              <span className={vp.detailLabel}>Created</span>
-              <span className={vp.detailValue}>{fmtDate(item.createdAt)}</span>
-            </div>
-            <div className={vp.detailRow}>
-              <span className={vp.detailLabel}>Updated</span>
-              <span className={vp.detailValue}>{fmtDate(item.updatedAt)}</span>
-            </div>
-            {item.description && (
-              <div className={vp.detailRow}>
-                <span className={vp.detailLabel}>Description</span>
-                <span className={vp.detailValueDesc}>{item.description}</span>
-              </div>
-            )}
-          </div>
+          <ViewDetailRows s={vp} rows={[
+              { label: 'Name', value: item.name },
+              { label: 'Slug', value: item.slug, variant: 'mono' },
+              { label: 'Parent Type', value: parentName },
+              { label: 'Description', value: item.description, variant: 'desc' },
+              { label: 'Status', value: capitalize(item.status) },
+              { label: 'Created', value: fmtDate(item.createdAt) },
+              { label: 'Updated', value: fmtDate(item.updatedAt) },
+          ]} />
         </div>
       </div>
     </SuperAdminShell>

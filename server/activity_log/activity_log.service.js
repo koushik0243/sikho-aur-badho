@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import QuizAttempt from '../quiz_attempts/quiz_attempt.model.js';
 import AptitudeAttempt from '../aptitude_attempts/aptitude_attempt.model.js';
 import CourseAssignment from '../course_assignments/course_assignment.model.js';
+import TopicActivity from '../topic_activity/topic_activity.model.js';
 
 const { ObjectId } = mongoose.Types;
 
@@ -19,7 +20,7 @@ export const listActivity = async (userId) => {
   }
   const userObjId = new ObjectId(userId);
 
-  const [quizAttempts, aptitudeAttempts, courseAssignments] = await Promise.all([
+  const [quizAttempts, aptitudeAttempts, courseAssignments, reviewedHomework] = await Promise.all([
     QuizAttempt.find({ userId: userObjId })
       .sort({ createdAt: -1 }).limit(20)
       .populate('courseId', 'title')
@@ -33,6 +34,12 @@ export const listActivity = async (userId) => {
     CourseAssignment.find({ userId: userObjId })
       .sort({ attemptedAt: -1 }).limit(20)
       .populate('courseId', 'title')
+      .lean(),
+    // Homework a reviewer marked complete or sent back for a new video
+    TopicActivity.find({ userId: userObjId, type: 'assignment_done', 'review.status': { $in: ['approved', 'reupload'] } })
+      .sort({ 'review.reviewedAt': -1 }).limit(20)
+      .populate('courseId', 'title')
+      .populate('topicId', 'title')
       .lean(),
   ]);
 
@@ -66,6 +73,18 @@ export const listActivity = async (userId) => {
       description: courseTitle,
       badge: null,
       createdAt: ca.attemptedAt,
+    });
+  });
+
+  reviewedHomework.forEach(r => {
+    const courseTitle = r.courseId?.title || 'Untitled Course';
+    const topicTitle = r.topicId?.title || 'Assignment';
+    const reupload = r.review.status === 'reupload';
+    activity.push({
+      title: reupload ? `Re-upload requested — ${topicTitle}` : `Assignment approved — ${topicTitle}`,
+      description: reupload && r.review.note ? `${courseTitle} · "${r.review.note}"` : courseTitle,
+      badge: reupload ? 'RE-UPLOAD' : 'APPROVED',
+      createdAt: r.review.reviewedAt || r.updatedAt,
     });
   });
 

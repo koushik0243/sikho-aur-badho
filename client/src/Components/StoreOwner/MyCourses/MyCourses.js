@@ -5,14 +5,10 @@ import { useSelector } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import { selectUser } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
-import { API_URL } from '../../../lib/constant';
 import s from "./MyCourses.module.css";
+import StoreCourseCard from '../CourseTile/StoreCourseCard';
 
 const Icon = {
-  courses:  <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4 7.962 7.962 0 009 5.189V4.804z" /></svg>,
-  clock:    <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" /></svg>,
-  chapters: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>,
-  folder:   <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>,
   level:    <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>,
   learners: <svg viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v1h8v-1zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-1a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v1h-3zM4.75 14.094A5.973 5.973 0 004 17v1H1v-1a3 3 0 013.75-2.906z" /></svg>,
   check:    <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>,
@@ -28,15 +24,6 @@ function getTokenUserId() {
     const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
     return payload._id || null;
   } catch { return null; }
-}
-
-function fmtDuration(hr, min) {
-  const h = parseInt(hr, 10) || 0;
-  const m = parseInt(min, 10) || 0;
-  if (!h && !m) return null;
-  if (h && m) return `${h}h ${m}m`;
-  if (h) return `${h}h`;
-  return `${m}m`;
 }
 
 const PAGE_SIZE = 12;
@@ -369,60 +356,20 @@ const lMap = {};
             {courses.length === 0 ? 'No courses assigned to this organisation yet.' : 'No courses match your filters.'}
           </div>
         ) : (
-          <div className={s.courseGrid}>
+          <div className={s.courseGrid} role="list" aria-label="My courses">
             {filteredCourses.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(item => {
               const c = item.courseId || {};
-              const thumb = c.course_image ? `${API_URL}${c.course_image}` : null;
-              const duration = fmtDuration(c.duration_hr, c.duration_min);
               const orgStatus = (item.status || 'active').toLowerCase();
-              const courseStatus = (c.status || 'published').toLowerCase();
-              const chapters = parseInt(c.totalChapters, 10) || 0;
               const cId = item.courseId?._id
                 ? String(item.courseId._id)
                 : (item.courseId ? String(item.courseId) : null);
               const learnerCount = cId != null ? (learnerMap[cId] ?? 0) : 0;
-
               return (
-                <div key={item._id} className={s.courseCard}>
-                  {/* Thumbnail */}
-                  <div className={s.courseThumb}>
-                    {thumb
-                      ? <img src={thumb} alt={c.title} className={s.courseThumbImg} />
-                      : <div className={s.courseThumbPlaceholder}>{Icon.courses}</div>
-                    }
-                    <span className={`${s.badge} ${courseStatus === 'published' ? s.badgePublished : courseStatus === 'draft' ? s.badgeDraft : s.badgeInactive} ${s.thumbBadge}`}>
-                      {courseStatus}
-                    </span>
-                  </div>
-
-                  {/* Body */}
-                  <div className={s.courseCardBody}>
-                    <div className={s.courseCardTitle}>{c.title || '—'}</div>
-
-                    {c.desc && <div className={s.courseCardDesc}>{c.desc}</div>}
-
-                    {/* Meta chips */}
-                    <div className={s.courseMetaRow}>
-                      {c.catId?.title && (
-                        <span className={s.metaChipCat}>
-                          {Icon.folder}{c.catId.title}
-                        </span>
-                      )}
-                      {c.level && <span className={s.metaChipLevel}>{c.level}</span>}
-                      {duration && (
-                        <span className={s.metaChip}>
-                          {Icon.clock}{duration}
-                        </span>
-                      )}
-                      {chapters > 0 && (
-                        <span className={s.metaChip}>
-                          {Icon.chapters}{chapters} ch
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Footer */}
-                    <div className={s.courseCardFooter}>
+                <StoreCourseCard
+                  key={item._id}
+                  course={c}
+                  footer={
+                    <>
                       <span className={s.learnerChip}>
                         {Icon.learners}
                         <span>{learnerCount} Learner{learnerCount !== 1 ? 's' : ''}</span>
@@ -430,17 +377,12 @@ const lMap = {};
                       {orgStatus === 'inactive' && (
                         <span className={`${s.badge} ${s.badgeInactive}`}>org inactive</span>
                       )}
-                    </div>
-                  </div>
-                  {cId && (
-                    <button
-                      className={s.btnDetails}
-                      onClick={() => router.push(`/storeowner/my-courses/${cId}`)}
-                    >
-                      Details
-                    </button>
-                  )}
-                </div>
+                    </>
+                  }
+                  action={cId
+                    ? { label: 'Details', onClick: () => router.push(`/storeowner/my-courses/${cId}`) }
+                    : { label: 'Details', disabled: true }}
+                />
               );
             })}
           </div>

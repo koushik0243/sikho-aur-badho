@@ -6,13 +6,14 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from "./SupportTicketsList.module.css";
+import sPage from "./SupportTicketsList.module.css";
+import fb from '../ListFilterBar.module.css';
+import { ISSUE_TYPES, PRIORITIES } from '../../../lib/supportTickets';
+import { withAdminKit } from '../AdminKit/AdminKit';
 
-const SearchIcon = () => (
-  <svg viewBox="0 0 20 20" fill="currentColor">
-    <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-  </svg>
-);
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
+
 const EyeIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
     <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
@@ -50,12 +51,20 @@ const PRIORITY_CLS = { Low: 'priLow', Normal: 'priNormal', High: 'priHigh', Urge
 
 const LIMIT = 50;
 
+const EMPTY_FILTERS = Object.freeze({ orgId: '', issueType: '', priority: '', dateFrom: '', dateTo: '', status: '' });
+
+/** "2026-10-13" → that day's first / last millisecond in local time. */
+function dayTime(ymd, end) {
+  const [y, m, d] = ymd.split('-').map(Number);
+  return (end ? new Date(y, m - 1, d, 23, 59, 59, 999) : new Date(y, m - 1, d)).getTime();
+}
+
 export default function SupportTicketsList() {
   const router = useRouter();
   const [tickets, setTickets]       = useState([]);
   const [loading, setLoading]       = useState(true);
-  const [search, setSearch]         = useState('');
-  const [statusFilter, setStatus]   = useState('');
+  const [orgs, setOrgs]             = useState([]);
+  const [filters, setFilters]       = useState(EMPTY_FILTERS);
   const [page, setPage]             = useState(1);
   const [confirm, setConfirm]       = useState({ show: false, id: null });
   const [selected, setSelected]     = useState([]);
@@ -63,9 +72,9 @@ export default function SupportTicketsList() {
   const [sortKey, setSortKey]       = useState('createdAt');
   const [sortDir, setSortDir]       = useState('desc');
 
+  // Timestamp skips apiServiceHandler's GET cache, so a reload after a delete is fresh.
   const fetchTickets = useCallback(() => {
-    setLoading(true);
-    apiServiceHandler('GET', 'support-ticket/list')
+    apiServiceHandler('GET', `support-ticket/list?t=${Date.now()}`)
       .then(res => setTickets(Array.isArray(res?.data) ? res.data : []))
       .catch(() => setTickets([]))
       .finally(() => setLoading(false));
@@ -73,9 +82,27 @@ export default function SupportTicketsList() {
 
   useEffect(() => { fetchTickets(); }, [fetchTickets]);
 
-  useEffect(() => { setPage(1); }, [search, statusFilter, sortKey, sortDir]);
+  useEffect(() => {
+    apiServiceHandler('GET', 'organization/list-pagination?limit=1000')
+      .then(res => setOrgs(Array.isArray(res?.data) ? res.data : []))
+      .catch(() => setOrgs([]));
+  }, []);
+
+  function setFilter(key, value) {
+    setFilters(prev => ({ ...prev, [key]: value }));
+    setPage(1);
+    setSelected([]);
+  }
+  function clearFilters() {
+    setFilters(EMPTY_FILTERS);
+    setPage(1);
+    setSelected([]);
+  }
+  const hasFilters = Object.values(filters).some(Boolean);
+  const dateRangeInvalid = Boolean(filters.dateFrom && filters.dateTo && filters.dateFrom > filters.dateTo);
 
   function toggleSort(key) {
+    setPage(1);
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortKey(key); setSortDir('asc'); }
   }
@@ -84,14 +111,19 @@ export default function SupportTicketsList() {
     return sortDir === 'asc' ? ' ↑' : ' ↓';
   }
 
-  const filtered = tickets.filter(t => {
-    if (statusFilter && t.status !== statusFilter) return false;
-    if (search) {
-      const q = search.replace(/^#/, '').toLowerCase();
-      const inId      = (t.ticket_id || '').toLowerCase().includes(q);
-      const inSubject = (t.subject || '').toLowerCase().includes(q);
-      const inOrg     = (t.orgId?.org_name || '').toLowerCase().includes(q);
-      if (!inId && !inSubject && !inOrg) return false;
+  // Raised On range (both days inclusive); an inverted range shows nothing until fixed.
+  const fromTime = filters.dateFrom ? dayTime(filters.dateFrom, false) : null;
+  const toTime   = filters.dateTo ? dayTime(filters.dateTo, true) : null;
+  const filtered = dateRangeInvalid ? [] : tickets.filter(t => {
+    if (filters.orgId && String(t.orgId?._id ?? t.orgId ?? '') !== filters.orgId) return false;
+    if (filters.issueType && t.issue_type !== filters.issueType) return false;
+    if (filters.priority && t.priority !== filters.priority) return false;
+    if (filters.status && t.status !== filters.status) return false;
+    if (fromTime !== null || toTime !== null) {
+      const raised = new Date(t.createdAt).getTime();
+      if (!raised) return false;
+      if (fromTime !== null && raised < fromTime) return false;
+      if (toTime !== null && raised > toTime) return false;
     }
     return true;
   });
@@ -115,8 +147,8 @@ export default function SupportTicketsList() {
     const id = confirm.id;
     setConfirm({ show: false, id: null });
     apiServiceHandler('GET', `support-ticket/delete/${id}`)
-      .then(() => { toast.success('Ticket deleted.'); fetchTickets(); })
-      .catch(() => toast.error('Delete failed.'));
+      .then(() => { toast.error('Ticket deleted.'); fetchTickets(); })
+      .catch(() => toast.warning('Delete failed.'));
   }
 
   const allIds = paged.map(t => t._id);
@@ -129,8 +161,8 @@ export default function SupportTicketsList() {
     const ids = [...selected];
     setSelected([]);
     Promise.all(ids.map(id => apiServiceHandler('GET', `support-ticket/delete/${id}`)))
-      .then(() => { toast.success(`${ids.length} ticket${ids.length !== 1 ? 's' : ''} deleted.`); fetchTickets(); })
-      .catch(() => toast.error('Some deletes failed.'));
+      .then(() => { toast.error(`${ids.length} ticket${ids.length !== 1 ? 's' : ''} deleted.`); fetchTickets(); })
+      .catch(() => toast.warning('Some deletes failed.'));
   }
 
   return (
@@ -160,28 +192,50 @@ export default function SupportTicketsList() {
       </div>
 
       <div className={s.card}>
-        <div className={s.toolbar}>
-          <div className={s.searchWrap}>
-            <SearchIcon />
-            <input
-              className={s.searchInput}
-              type="text"
-              placeholder="Search by #TKT-001, subject or org…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
-          <select
-            className={s.filterSelect}
-            value={statusFilter}
-            onChange={e => setStatus(e.target.value)}
-          >
-            <option value="">All Statuses</option>
-            {Object.entries(STATUS_MAP).filter(([k]) => k !== 'deleted').map(([k, v]) => (
-              <option key={k} value={k}>{v.label}</option>
-            ))}
-          </select>
+        <div className={fb.filterBar} style={{ '--filter-cols': 6 }} role="search" aria-label="Filter support tickets">
+          <label className={fb.filterField}>
+            <span className={fb.filterLabel}>Organization</span>
+            <select className={fb.filterControl} value={filters.orgId} onChange={e => setFilter('orgId', e.target.value)}>
+              <option value="">All Organizations</option>
+              {orgs.map(o => <option key={o._id} value={o._id}>{o.org_name}</option>)}
+            </select>
+          </label>
+          <label className={fb.filterField}>
+            <span className={fb.filterLabel}>Issue Type</span>
+            <select className={fb.filterControl} value={filters.issueType} onChange={e => setFilter('issueType', e.target.value)}>
+              <option value="">All Issue Types</option>
+              {ISSUE_TYPES.map(it => <option key={it} value={it}>{it}</option>)}
+            </select>
+          </label>
+          <label className={fb.filterField}>
+            <span className={fb.filterLabel}>Priority</span>
+            <select className={fb.filterControl} value={filters.priority} onChange={e => setFilter('priority', e.target.value)}>
+              <option value="">All Priorities</option>
+              {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </label>
+          <label className={fb.filterField}>
+            <span className={fb.filterLabel}>Date From</span>
+            <input type="date" className={fb.filterControl} value={filters.dateFrom} max={filters.dateTo || undefined}
+              onChange={e => setFilter('dateFrom', e.target.value)} />
+          </label>
+          <label className={fb.filterField}>
+            <span className={fb.filterLabel}>Date To</span>
+            <input type="date" className={fb.filterControl} value={filters.dateTo} min={filters.dateFrom || undefined}
+              onChange={e => setFilter('dateTo', e.target.value)} />
+          </label>
+          <label className={fb.filterField}>
+            <span className={fb.filterLabel}>Status</span>
+            <select className={fb.filterControl} value={filters.status} onChange={e => setFilter('status', e.target.value)}>
+              <option value="">All Statuses</option>
+              {Object.entries(STATUS_MAP).filter(([k]) => k !== 'deleted').map(([k, v]) => (
+                <option key={k} value={k}>{v.label}</option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className={fb.btnClear} onClick={clearFilters} disabled={!hasFilters}>Clear</button>
         </div>
+        {dateRangeInvalid && <p className={fb.filterError} role="alert">Date From must be on or before Date To.</p>}
 
         <div className={s.tableWrap}>
           <table className={s.table}>
@@ -211,7 +265,7 @@ export default function SupportTicketsList() {
               {loading ? (
                 <tr className={s.emptyRow}><td colSpan={10}>Loading…</td></tr>
               ) : paged.length === 0 ? (
-                <tr className={s.emptyRow}><td colSpan={10}>No tickets found.</td></tr>
+                <tr className={s.emptyRow}><td colSpan={10}>{hasFilters ? 'No tickets match these filters.' : 'No tickets found.'}</td></tr>
               ) : paged.map((t, idx) => {
                 const sc  = STATUS_MAP[t.status] ?? STATUS_MAP.open;
                 const pc  = PRIORITY_CLS[t.priority] ?? 'priNormal';
@@ -232,21 +286,21 @@ export default function SupportTicketsList() {
                     <td>{fmtDate(t.createdAt)}</td>
                     <td>
                       <div className={s.actions} onClick={e => e.stopPropagation()}>
-                        <button
+                        <button data-action="view"
                           className={s.btnView}
                           title="View"
                           onClick={() => router.push(`/superadmin/support-tickets/${t._id}`)}
                         >
                           <EyeIcon />
                         </button>
-                        <button
+                        <button data-action="edit"
                           className={s.btnEdit}
                           title="Edit"
                           onClick={() => router.push(`/superadmin/support-tickets/${t._id}/edit`)}
                         >
                           <EditIcon />
                         </button>
-                        <button
+                        <button data-action="delete"
                           className={s.btnDelete}
                           title="Delete"
                           onClick={() => setConfirm({ show: true, id: t._id })}

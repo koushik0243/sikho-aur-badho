@@ -3,9 +3,15 @@ import * as Service from './aptitude_attempt.service.js';
 
 const Router = express.Router();
 
+/** Seconds the learner spent (sent by the player): whole seconds up to a day, else not recorded. */
+const cleanSeconds = (v) => {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) && n >= 0 && n <= 86400 ? n : null;
+};
+
 const submit = async (req, res, next) => {
   try {
-    const { courseId, answers } = req.body;
+    const { courseId, answers, timeTakenSec } = req.body;
     if (!courseId || !Array.isArray(answers) || answers.length === 0) {
       return res.status(400).json({ status: 400, message: 'courseId and answers are required.' });
     }
@@ -13,6 +19,7 @@ const submit = async (req, res, next) => {
       userId: req.user._id,
       courseId,
       answers,
+      timeTakenSec: cleanSeconds(timeTakenSec),
     });
     res.status(200).json({ status: 200, message: 'Aptitude test evaluated.', data: attempt });
   } catch (error) {

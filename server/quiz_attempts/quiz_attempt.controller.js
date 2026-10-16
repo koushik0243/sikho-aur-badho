@@ -4,9 +4,15 @@ import * as Service from './quiz_attempt.service.js';
 
 const Router = express.Router();
 
+/** Seconds the learner spent (sent by the player): whole seconds up to a day, else not recorded. */
+const cleanSeconds = (v) => {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) && n >= 0 && n <= 86400 ? n : null;
+};
+
 const submit = async (req, res, next) => {
   try {
-    const { topicId, courseId, chapterId, answers } = req.body;
+    const { topicId, courseId, chapterId, answers, timeTakenSec } = req.body;
     if (!topicId || !Array.isArray(answers) || answers.length === 0) {
       return res.status(400).json({ status: 400, message: 'topicId and answers are required.' });
     }
@@ -16,6 +22,7 @@ const submit = async (req, res, next) => {
       courseId:   courseId  || null,
       chapterId:  chapterId || null,
       answers,
+      timeTakenSec: cleanSeconds(timeTakenSec),
     });
     // The quiz is over — free this course's lesson videos right away instead of
     // waiting for the lock to lapse.

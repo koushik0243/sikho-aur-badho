@@ -5,8 +5,12 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./AddOrder.module.css";
+import sPage from "./AddOrder.module.css";
 import AppDatePicker from '../AppDatePicker';
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const BackArrow = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -74,7 +78,7 @@ export default function AddOrder() {
       toast.success('Order created successfully.');
       router.push('/superadmin/payments/orders');
     } catch (err) {
-      toast.error(err?.message || 'Failed to create order.');
+      toast.warning(err?.message || 'Failed to create order.');
     } finally {
       setSubmitting(false);
     }

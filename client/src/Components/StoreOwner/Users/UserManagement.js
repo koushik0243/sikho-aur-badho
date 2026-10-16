@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { selectUser } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
 import s from "./UserManagement.module.css";
+import { kit as k, PageHeader, KpiTiles, Card, Pill, Pager, SkeletonRows, KitIcon } from '../PageKit/PageKit';
 
 const STATUS_OPTIONS = [
   { value: 'active',    label: 'Active' },
@@ -27,13 +28,6 @@ const Icon = {
 
 // Real account-status badge — pulled directly from the users table's `status`
 // field (active/inactive/suspended/deleted), not a derived metric.
-const STATUS_BADGE_CLASS = {
-  active:      s.statusActiveReal,
-  inactive:    s.statusInactiveReal,
-  suspended:   s.statusSuspendedReal,
-  deactivated: s.statusSuspendedReal,
-  deleted:     s.statusDeletedReal,
-};
 
 const LIMIT = 10;
 
@@ -43,32 +37,6 @@ function computeStats(list) {
   const inactive = list.filter(u => u.status === 'inactive').length;
   const deactivated = list.filter(u => u.status === 'deactivated' || u.status === 'suspended').length;
   return { total, active, inactive, deactivated };
-}
-
-function StatRing({ value, pct, light }) {
-  const R = 24, sw = 5;
-  const size = (R + sw) * 2 + 4;
-  const cx = size / 2, cy = size / 2;
-  const circ = 2 * Math.PI * R;
-  const arc = (Math.max(0, Math.min(pct ?? 0, 100)) / 100) * circ;
-  return (
-    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}
-           style={{ display: 'block', transform: 'rotate(-90deg)' }}>
-        <circle cx={cx} cy={cy} r={R} fill="none"
-                stroke={light ? 'rgba(255,255,255,0.28)' : '#d4eeee'} strokeWidth={sw} />
-        <circle cx={cx} cy={cy} r={R} fill="none"
-                stroke={light ? '#fff' : '#0b7b7b'} strokeWidth={sw}
-                strokeDasharray={`${arc} ${circ - arc}`} strokeLinecap="round" />
-      </svg>
-      <div style={{
-        position: 'absolute', inset: 0, display: 'flex',
-        alignItems: 'center', justifyContent: 'center',
-        fontSize: 11, fontWeight: 700, lineHeight: 1,
-        color: light ? '#fff' : '#1a2b2b',
-      }}>{value}</div>
-    </div>
-  );
 }
 
 export default function UserManagementPage() {
@@ -192,7 +160,7 @@ export default function UserManagementPage() {
       toast.success('Status updated.');
       setStatusModalLearner(null);
     } catch (err) {
-      toast.error(err?.message || 'Failed to update status. Please try again.');
+      toast.warning(err?.message || 'Failed to update status. Please try again.');
     } finally {
       setSavingStatus(false);
     }
@@ -227,176 +195,102 @@ export default function UserManagementPage() {
   const inactivePct    = pctOfTotal(displayStats.inactive);
   const deactivatedPct = pctOfTotal(displayStats.deactivated);
 
+  const STATUS_TONE = { active: 'good', inactive: 'neutral', deactivated: 'bad' };
+
   return (
-    <>
-      {/* ── Stats row ── */}
-      <div className={s.statsRow}>
+    <div className={k.page}>
+      <PageHeader
+        title="Users"
+        sub="Every learner in your organisation — search, open a learner, edit details or change their access."
+        actions={<button className={k.btnPrimary} onClick={() => router.push('/storeowner/add-learner')}>+ Add Learner</button>}
+      />
 
-        <div className={`${s.statCard} ${s.statCardTeal}`}>
-          <div className={s.statBody}>
-            <div className={s.statHeader}>
-              <div className={s.statIcon}>{Icon.learners}</div>
-              <div className={s.statLabel}>Total Learners</div>
-            </div>
-            <div className={s.statValue}>{loading ? '—' : displayStats.total}</div>
-            <div className={`${s.statDelta} ${newThisMonth > 0 ? s.statDeltaUp : ''}`}>
-              {loading ? '' : newThisMonth > 0 ? `↑ ${newThisMonth} This Month` : 'No new learners this month'}
-            </div>
-          </div>
-          <StatRing value={loading ? 0 : displayStats.total} pct={Math.min(displayStats.total, 100)} light />
+      <KpiTiles items={[
+        { label: 'Total learners', value: loading ? '—' : displayStats.total, icon: KitIcon.users,
+          hint: loading ? '' : newThisMonth > 0 ? `↑ ${newThisMonth} this month` : 'No new learners this month' },
+        { label: 'Active',      value: loading ? '—' : displayStats.active,      icon: KitIcon.check, tone: 'good', hint: loading ? '' : `${activePct}% of total · can log in` },
+        { label: 'Inactive',    value: loading ? '—' : displayStats.inactive,    icon: KitIcon.clock, tone: displayStats.inactive ? 'warn' : '', hint: loading ? '' : `${inactivePct}% of total` },
+        { label: 'Deactivated', value: loading ? '—' : displayStats.deactivated, icon: KitIcon.x,     tone: displayStats.deactivated ? 'bad' : '', hint: loading ? '' : `${deactivatedPct}% of total` },
+      ]} />
+
+      <Card title="All learners" meta={!loading && <Pill tone="neutral">{filteredLearners.length} learner{filteredLearners.length !== 1 ? 's' : ''}</Pill>} flush>
+        <div className={k.toolbar} role="search" aria-label="Search learners">
+          <label className={k.search}>
+            <span className={k.srOnly}>Search learners</span>
+            {KitIcon.search}
+            <input className={k.input} type="text" placeholder="Search by name, email or WhatsApp no…"
+              value={search} onChange={e => setSearch(e.target.value)} />
+          </label>
         </div>
 
-        <div className={s.statCard}>
-          <div className={s.statBody}>
-            <div className={s.statHeader}>
-              <div className={s.statIcon}>{Icon.active}</div>
-              <div className={s.statLabel}>Active</div>
-            </div>
-            <div className={s.statValue}>{loading ? '—' : displayStats.active}</div>
-            <div className={`${s.statDelta} ${s.statDeltaUp}`}>{loading ? '' : `${activePct}% of Total`}</div>
-          </div>
-          <StatRing value={loading ? 0 : displayStats.active}
-            pct={displayStats.total ? Math.round(displayStats.active / displayStats.total * 100) : 0} />
-        </div>
-
-        <div className={s.statCard}>
-          <div className={s.statBody}>
-            <div className={s.statHeader}>
-              <div className={s.statIcon}>{Icon.inactive}</div>
-              <div className={s.statLabel}>Inactive</div>
-            </div>
-            <div className={s.statValue}>{loading ? '—' : displayStats.inactive}</div>
-            <div className={s.statDelta}>{loading ? '' : `${inactivePct}% of Total`}</div>
-          </div>
-          <StatRing value={loading ? 0 : displayStats.inactive}
-            pct={displayStats.total ? Math.round(displayStats.inactive / displayStats.total * 100) : 0} />
-        </div>
-
-        <div className={s.statCard}>
-          <div className={s.statBody}>
-            <div className={s.statHeader}>
-              <div className={s.statIcon}>{Icon.deactivated}</div>
-              <div className={s.statLabel}>Deactivated</div>
-            </div>
-            <div className={s.statValue}>{loading ? '—' : displayStats.deactivated}</div>
-            <div className={s.statDelta}>{loading ? '' : `${deactivatedPct}% of Total`}</div>
-          </div>
-          <StatRing value={loading ? 0 : displayStats.deactivated}
-            pct={displayStats.total ? Math.round(displayStats.deactivated / displayStats.total * 100) : 0} />
-        </div>
-
-      </div>
-
-      {/* ── Table card ── */}
-      <div className={s.tableCard}>
-        <div className={s.cardHead}>
-          <div className={s.tableCardTitle}>All Learners</div>
-          <div className={s.searchWrap}>
-            {Icon.search}
-            <input
-              className={s.searchInput}
-              type="text"
-              placeholder="Search by name, email or WhatsApp no…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
-        </div>
-        <table className={s.table}>
-          <thead>
-            <tr>
-              <th className={s.th}>Name</th>
-              <th className={s.th}>Email</th>
-              <th className={s.th}>WhatsApp No</th>
-              <th className={s.th}>Assigned Courses</th>
-              <th className={s.th}>Last Active</th>
-              <th className={s.th}>Status</th>
-              <th className={s.th}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <tr key={i} className={s.tr}>
-                  <td className={s.td} colSpan={7}>
-                    <div className={s.skeletonRow} />
-                  </td>
-                </tr>
-              ))
-            ) : filteredLearners.length === 0 ? (
-              <tr className={s.tr}>
-                <td className={s.td} colSpan={7} style={{ textAlign: 'center', padding: '16px 0' }}>No learners found.</td>
+        <div className={k.tableWrap}>
+          <table className={k.table}>
+            <thead>
+              <tr>
+                <th>Learner</th>
+                <th>WhatsApp no</th>
+                <th className={k.center}>Courses</th>
+                <th>Last active</th>
+                <th>Status</th>
+                <th className={k.num}><span className={k.srOnly}>Actions</span></th>
               </tr>
-            ) : pagedLearners.map(learner => {
-              const realStatus = (learner.status || 'active').toLowerCase();
-              return (
-                <tr key={learner._id} className={s.tr}>
-                  <td className={s.td}>
-                    <div className={s.nameCell}>
-                      <div className={s.avatar}>{getInitials(learner.name)}</div>
-                      <span className={s.learnerName}>{learner.name || learner.email}</span>
-                    </div>
-                  </td>
-                  <td className={s.td}><span className={s.emailText}>{learner.email}</span></td>
-                  <td className={s.td}><span className={s.emailText}>{learner.whatsapp_no || '—'}</span></td>
-                  <td className={s.td}><span className={s.courseCount}>{courseMap[String(learner._id)]?.length ?? '—'}</span></td>
-                  <td className={s.td}><span className={s.lastActive}>{formatLastActive(learner.lastActive || learner.last_active)}</span></td>
-                  <td className={s.td}>
-                    <button
-                      type="button"
-                      className={`${s.statusBadgeReal} ${s.statusBadgeLink} ${STATUS_BADGE_CLASS[realStatus] || s.statusActiveReal}`}
-                      onClick={e => { e.stopPropagation(); openStatusModal(learner); }}
-                      title="Click to update status"
-                    >
-                      {realStatus}
-                    </button>
-                  </td>
-                  <td className={s.td}>
-                    <div className={s.actionsCell} onClick={e => e.stopPropagation()}>
-                      <button className={s.btnView} title="View" onClick={() => router.push(`/storeowner/users/${learner._id}`)}>
-                        {Icon.eye}
+            </thead>
+            <tbody>
+              {loading ? <SkeletonRows cols={6} /> : filteredLearners.length === 0 ? (
+                <tr><td colSpan={6} className={k.empty}>{debouncedSearch ? 'No learners match your search.' : 'No learners yet.'}</td></tr>
+              ) : pagedLearners.map(learner => {
+                const realStatus = (learner.status || 'active').toLowerCase();
+                const name = learner.name || learner.email;
+                return (
+                  <tr key={learner._id}>
+                    <td>
+                      <div className={s.nameCell}>
+                        <div className={s.avatar} aria-hidden="true">{getInitials(learner.name)}</div>
+                        <div className={s.nameText}>
+                          <span className={k.strong}>{name}</span>
+                          <span className={s.emailText}>{learner.email}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className={k.muted}>{learner.whatsapp_no || '—'}</td>
+                    <td className={k.center}><span className={s.courseCount}>{courseMap[String(learner._id)]?.length ?? 0}</span></td>
+                    <td className={k.muted}>{formatLastActive(learner.lastActive || learner.last_active)}</td>
+                    <td>
+                      <button type="button" className={s.statusBtn} onClick={() => openStatusModal(learner)}
+                        title="Change status" aria-label={`Status: ${realStatus}. Change status for ${name}`}>
+                        <Pill tone={STATUS_TONE[realStatus] || 'neutral'}>{realStatus}</Pill>
+                        <svg className={s.statusCaret} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                       </button>
-                      <button className={s.btnEdit} title="Edit" onClick={() => router.push(`/storeowner/users/${learner._id}/edit`)}>
-                        {Icon.edit}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-
-        <div className={s.pagination}>
-          <div className={s.footerLeft}>
-            <span>Showing {from}–{to} of {learners.length}</span>
-          </div>
-          <div className={s.paginationBtns}>
-            <button className={s.pageBtn} disabled={page <= 1} onClick={() => setPage(p => p - 1)}>‹</button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-              <button
-                key={p}
-                className={`${s.pageBtn} ${p === page ? s.pageBtnActive : ''}`}
-                onClick={() => setPage(p)}
-              >
-                {p}
-              </button>
-            ))}
-            <button className={s.pageBtn} disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>›</button>
-          </div>
+                    </td>
+                    <td>
+                      <div className={k.actions}>
+                        <button data-action="view" className={k.iconBtn} title="View learner" aria-label={`View ${name}`} onClick={() => router.push(`/storeowner/users/${learner._id}`)}>
+                          {KitIcon.eye}
+                        </button>
+                        <button data-action="edit" className={k.iconBtn} title="Edit learner" aria-label={`Edit ${name}`} onClick={() => router.push(`/storeowner/users/${learner._id}/edit`)}>
+                          {Icon.edit}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-
-      </div>
+        {!loading && <Pager page={page} pageSize={LIMIT} total={filteredLearners.length} onPage={setPage} />}
+      </Card>
 
       {/* ── Update status modal ── */}
       {statusModalLearner && (
         <div className={s.modalOverlay} onClick={closeStatusModal}>
-          <div className={s.modalBox} onClick={e => e.stopPropagation()}>
-            <div className={s.modalTitle}>Update Status</div>
+          <div className={s.modalBox} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="status-modal-h">
+            <div id="status-modal-h" className={s.modalTitle}>Update Status</div>
             <div className={s.modalSubtitle}>Learner: {statusModalLearner.name || statusModalLearner.email}</div>
 
-            <label className={s.modalLabel}>Account Status</label>
+            <label className={s.modalLabel} htmlFor="status-modal-select">Account Status</label>
             <select
+              id="status-modal-select"
               className={s.modalSelect}
               value={statusModalValue}
               onChange={e => setStatusModalValue(e.target.value)}
@@ -418,6 +312,6 @@ export default function UserManagementPage() {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

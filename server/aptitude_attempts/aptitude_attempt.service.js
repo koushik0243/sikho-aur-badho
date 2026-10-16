@@ -41,7 +41,7 @@ function computeLevel(score) {
   return 'expert';
 }
 
-export const submitAttempt = async ({ userId, courseId, answers }) => {
+export const submitAttempt = async ({ userId, courseId, answers, timeTakenSec = null }) => {
   const n = answers.length;
   if (n === 0) throw new Error('No answers submitted.');
 
@@ -87,6 +87,7 @@ export const submitAttempt = async ({ userId, courseId, answers }) => {
     answers: evaluated,
     totalScore,
     level,
+    timeTakenSec,
     status: 'evaluated',
     evaluatedAt: new Date(),
   });

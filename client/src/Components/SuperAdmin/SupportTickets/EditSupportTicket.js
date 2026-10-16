@@ -5,7 +5,11 @@ import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./EditSupportTicket.module.css";
+import sPage from "./EditSupportTicket.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const BackArrow = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -88,7 +92,7 @@ export default function EditSupportTicket() {
           setResolveText('');
         }
       })
-      .catch(() => toast.error('Failed to load ticket.'))
+      .catch(() => toast.warning('Failed to load ticket.'))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -103,7 +107,7 @@ export default function EditSupportTicket() {
       toast.success('Ticket updated successfully.');
       router.push(`/superadmin/support-tickets/${id}`);
     } catch (err) {
-      toast.error(err?.message || 'Failed to update ticket.');
+      toast.warning(err?.message || 'Failed to update ticket.');
     } finally {
       setSubmitting(false);
     }

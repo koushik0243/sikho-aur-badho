@@ -836,3 +836,11 @@
 
   .logoImg { height: 26px; }
 }
+
+/* Divider between groups of items in the side nav panel */
+.navSeparator {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 8px 12px;
+  flex-shrink: 0;
+}

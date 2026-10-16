@@ -4,8 +4,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import apiServiceHandler from '../../../service/apiService';
 import { API_URL } from '../../../lib/constant';
-import vp from "./LearnerDetail.module.css";
-import s from "./LearnerDetail.module.css";
+import ViewToolbar from '../../ViewToolbar/ViewToolbar';
+import AssignmentSubmissions from '../../AssignmentSubmissions/AssignmentSubmissions';
+import pageStyles from "./LearnerDetail.module.css";
+import { withDetailKit } from '../PageKit/PageKit';
+
+// Page styles + the shared store owner detail-page look.
+const vp = withDetailKit(pageStyles);
+const s = withDetailKit(pageStyles);
 
 const Icon = {
   back:     <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" /></svg>,
@@ -78,26 +84,16 @@ export default function LearnerDetailPage() {
         {Icon.back} Back to User Management
       </button>
 
-      {/* ── Breadcrumb ── */}
-      <nav className={vp.breadcrumb} style={{ justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button className={vp.breadcrumbLink} onClick={() => router.push('/storeowner/users')}>
-            User Management
-          </button>
-          <span className={vp.breadcrumbSep}>›</span>
-          <span className={vp.breadcrumbCurr}>
-            {loading ? '…' : (learner?.name || 'Learner')}
-          </span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button type="button" className={s.btnEditLearner} onClick={() => router.push(`/storeowner/users/${id}/edit`)}>
-            Edit
-          </button>
+      <ViewToolbar
+        parent={{ label: 'User Management', onClick: () => router.push('/storeowner/users') }}
+        current={loading ? '…' : (learner?.name || 'Learner')}
+        onEdit={() => router.push(`/storeowner/users/${id}/edit`)}
+        extra={
           <button type="button" className={s.btnAddLearner} onClick={() => router.push('/storeowner/add-learner')}>
             + Add Learner
           </button>
-        </div>
-      </nav>
+        }
+      />
 
       {loading ? (
         <div className={s.skeletonWrap}>
@@ -281,6 +277,11 @@ export default function LearnerDetailPage() {
             </div>
 
           </div>
+
+          {/* Homework videos this learner submitted (watchable here) */}
+          <AssignmentSubmissions userId={id} showLearner={false} showOrganization={false}
+            title="Assignment submissions" sub="Videos this learner uploaded after completing a homework assignment."
+            className={s.submissionsCard} />
         </>
       )}
     </>

@@ -261,6 +261,7 @@ export default function AptitudeTestPage({ params }) {
           userAnswer: allAnswers[String(q._id)]?.transcript || '',
           status: allAnswers[String(q._id)]?.status || 'skipped',
         })),
+        timeTakenSec: testElapsed,
       };
       const res = await apiServiceHandler('POST', 'aptitude-attempt/submit', payload);
       const result = res?.data || res;

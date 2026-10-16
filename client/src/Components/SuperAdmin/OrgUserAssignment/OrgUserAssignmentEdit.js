@@ -5,7 +5,11 @@ import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./OrgUserAssignmentEdit.module.css";
+import sPage from "./OrgUserAssignmentEdit.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const BackIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -42,7 +46,7 @@ export default function OrgUserAssignmentEdit() {
         }
         setOrgs(Array.isArray(orgsRes?.data) ? orgsRes.data : []);
       })
-      .catch(() => toast.error('Failed to load data.'))
+      .catch(() => toast.warning('Failed to load data.'))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -58,7 +62,7 @@ export default function OrgUserAssignmentEdit() {
       toast.success('Assignment updated.');
       window.location.href = '/superadmin/organization-user-assignment';
     } catch {
-      toast.error('Failed to update assignment.');
+      toast.warning('Failed to update assignment.');
     } finally {
       setSaving(false);
     }

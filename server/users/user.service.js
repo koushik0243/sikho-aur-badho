@@ -325,6 +325,7 @@ export const loginUser = async (userData) => {
                 assertActiveStatus(user);
                 await assertOrgAssigned(user);
                 const token = generateJwtToken(user);
+                markLoggedIn(user._id);
                 return {
                     _id: user._id,
                     name: user.name,
@@ -359,6 +360,7 @@ export const adminLoginUser = async (userData) => {
                 assertActiveStatus(user);
                 await assertOrgAssigned(user);
                 const token = generateJwtToken(user);
+                markLoggedIn(user._id);
                 return {
                     _id: user._id,
                     name: user.name,
@@ -397,6 +399,7 @@ export const gmLoginUser = async (userData) => {
         await assertOrgAssigned(user);
 
         const token = generateJwtToken(user);
+        markLoggedIn(user._id);
 
         return {
             _id: user._id,
@@ -426,6 +429,7 @@ export const adminGoogleLoginUser = async (credential) => {
         assertActiveStatus(user);
 
         const token = generateJwtToken(user);
+        markLoggedIn(user._id);
         return {
             _id: user._id,
             name: user.name,
@@ -514,6 +518,12 @@ const generatePasswordHash = async (password) => {
     const TEN = 10;
     const salt = await bcrypt.genSalt(TEN);
     return await bcrypt.hash(password, salt);
+};
+
+/** Saves when the user last signed in (reports). Never blocks or fails the login. */
+export const markLoggedIn = (userId) => {
+    User.updateOne({ _id: userId }, { $set: { lastLoginAt: new Date() } }, { timestamps: false })
+        .catch(error => console.error('markLoggedIn failed:', error.message));
 };
 
 const generateJwtToken = (user) => {

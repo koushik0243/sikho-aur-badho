@@ -19,6 +19,7 @@ const quizAttemptSchema = new mongoose.Schema({
   totalScore:  { type: Number, default: 0 },
   passed:      { type: Boolean, default: false },
   passingGrade: { type: Number }, // the quiz's pass mark (%) when this attempt was marked
+  timeTakenSec: { type: Number, default: null }, // seconds spent on the attempt (null = not recorded)
   status:      { type: String, enum: ['pending', 'evaluated'], default: 'evaluated' },
   evaluatedAt: { type: Date },
 }, { timestamps: true });
@@ -29,4 +30,4 @@ quizAttemptSchema.index({ userId: 1, topicId: 1 });
 // the existing single-field courseId index doesn't cover the userId prefix.
 quizAttemptSchema.index({ userId: 1, courseId: 1 });
 
-export default mongoose.model('QuizAttempt', quizAttemptSchema);
+export default mongoose.model('QuizAttempt', quizAttemptSchema, 'quiz_attempts');

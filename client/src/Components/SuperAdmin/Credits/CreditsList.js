@@ -6,7 +6,11 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from "./CreditsList.module.css";
+import sPage from "./CreditsList.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const SearchIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -85,8 +89,8 @@ export default function CreditsList() {
     const id = confirm.id;
     setConfirm({ show: false, id: null });
     apiServiceHandler('GET', `credit/delete/${id}`)
-      .then(() => { toast.error('Credit deleted.'); fetchCredits(); })
-      .catch(() => toast.error('Delete failed.'));
+      .then(() => { toast.warning('Credit deleted.'); fetchCredits(); })
+      .catch(() => toast.warning('Delete failed.'));
   }
 
   const allIds = filtered.map(c => c._id);
@@ -99,8 +103,8 @@ export default function CreditsList() {
     const ids = [...selected];
     setSelected([]);
     Promise.all(ids.map(id => apiServiceHandler('GET', `credit/delete/${id}`)))
-      .then(() => { toast.success(`${ids.length} credit${ids.length !== 1 ? 's' : ''} deleted.`); fetchCredits(); })
-      .catch(() => toast.error('Some deletes failed'));
+      .then(() => { toast.error(`${ids.length} credit${ids.length !== 1 ? 's' : ''} deleted.`); fetchCredits(); })
+      .catch(() => toast.warning('Some deletes failed'));
   }
 
   function toggleSort(key) {
@@ -214,14 +218,14 @@ export default function CreditsList() {
                   <td>{fmtDate(c.createdAt)}</td>
                   <td>
                     <div className={s.actions} onClick={e => e.stopPropagation()}>
-                      <button
+                      <button data-action="edit"
                         className={s.btnEdit}
                         title="Edit"
                         onClick={() => router.push(`/superadmin/credits/${c._id}`)}
                       >
                         <EditIcon />
                       </button>
-                      <button
+                      <button data-action="delete"
                         className={s.btnDelete}
                         title="Delete"
                         onClick={() => setConfirm({ show: true, id: c._id })}

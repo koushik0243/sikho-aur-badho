@@ -5,7 +5,11 @@ import { useSelector } from 'react-redux';
 import { selectUser, selectAuthReady } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
 import { fetchCourseCompletion, recordCourseCompletion } from '../../../Components/Learner/courseCompletion';
-import s from "./Certificate.module.css";
+import pageStyles from "./Certificate.module.css";
+import { withLearnerKit } from '../../../Components/Learner/LearnerKit/LearnerKit';
+
+// Page styles + the shared learner page look.
+const s = withLearnerKit(pageStyles);
 
 const BackArrow = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -178,9 +182,10 @@ function CertificatePageInner() {
     let cancelled = false;
     async function load() {
       try {
-        const [assignRes, allRes] = await Promise.all([
+        const [assignRes, allRes, progRes] = await Promise.all([
           apiServiceHandler('GET', `course-assignment/list?userId=${userId}`).catch(() => null),
           apiServiceHandler('GET', 'course/list').catch(() => null),
+          apiServiceHandler('GET', `my-report/progress?t=${Date.now()}`).catch(() => null),
         ]);
         if (cancelled) return;
         const assigned = toArr(assignRes);
@@ -197,6 +202,11 @@ function CertificatePageInner() {
         setCourses(list);
         if (courseIdParam && list.some(x => String(x.course?._id) === courseIdParam)) {
           setSelectedId(courseIdParam);
+        } else {
+          // No course in the URL: open on the first course with a certificate earned.
+          const earned = new Set((progRes?.data?.courses || []).filter(c => c.phases?.completion?.certificate).map(c => String(c.courseId)));
+          const first = list.find(x => earned.has(String(x.course?._id)));
+          if (first) setSelectedId(String(first.course._id));
         }
       } finally {
         if (!cancelled) setLoadingCourses(false);

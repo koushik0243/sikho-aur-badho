@@ -5,15 +5,11 @@ import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 import { selectUser } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
-import { API_URL } from '../../../lib/constant';
 import s from "./AllCourses.module.css";
+import StoreCourseCard from '../CourseTile/StoreCourseCard';
 
 // Same icon set as Components/StoreOwner/MyCourses/MyCourses.js, for visual parity.
 const Icon = {
-  courses:  <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4 7.962 7.962 0 009 5.189V4.804z" /></svg>,
-  clock:    <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" /></svg>,
-  chapters: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>,
-  folder:   <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>,
   check:    <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>,
 };
 
@@ -25,15 +21,6 @@ function getTokenUserId() {
     const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
     return payload._id || null;
   } catch { return null; }
-}
-
-function fmtDuration(hr, min) {
-  const h = parseInt(hr, 10) || 0;
-  const m = parseInt(min, 10) || 0;
-  if (!h && !m) return null;
-  if (h && m) return `${h}h ${m}m`;
-  if (h) return `${h}h`;
-  return `${m}m`;
 }
 
 const PAGE_SIZE = 12;
@@ -179,7 +166,7 @@ export default function AllCoursesPage() {
   // here (unlike organization-credit-assignment, which is the paid flow elsewhere).
   async function handleAdd(course) {
     const courseId = String(course._id);
-    if (!orgId) { toast.error('Organisation not found.'); return; }
+    if (!orgId) { toast.warning('Organisation not found.'); return; }
     setAddingId(courseId);
     try {
       await apiServiceHandler('POST', 'organization-course/create', {
@@ -188,7 +175,7 @@ export default function AllCoursesPage() {
       setAddedIds(prev => new Set(prev).add(courseId));
       toast.success(`"${course.title}" added to your courses.`);
     } catch (err) {
-      toast.error(err?.message || 'Could not add this course. Please try again.');
+      toast.warning(err?.message || 'Could not add this course. Please try again.');
     } finally {
       setAddingId(null);
     }
@@ -364,68 +351,18 @@ export default function AllCoursesPage() {
             {courses.length === 0 ? 'No published courses available right now.' : 'No courses match your filters.'}
           </div>
         ) : (
-          <div className={s.courseGrid}>
+          <div className={s.courseGrid} role="list" aria-label="All courses">
             {filteredCourses.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(c => {
-              const thumb = c.course_image ? `${API_URL}${c.course_image}` : null;
-              const duration = fmtDuration(c.duration_hr, c.duration_min);
-              const courseStatus = (c.status || 'published').toLowerCase();
-              const chapters = parseInt(c.totalChapters, 10) || 0;
               const cId = String(c._id);
-              const isAdded = addedIds.has(cId);
               const isAdding = addingId === cId;
-
               return (
-                <div key={cId} className={s.courseCard}>
-                  {/* Thumbnail */}
-                  <div className={s.courseThumb}>
-                    {thumb
-                      ? <img src={thumb} alt={c.title} className={s.courseThumbImg} />
-                      : <div className={s.courseThumbPlaceholder}>{Icon.courses}</div>
-                    }
-                    <span className={`${s.badge} ${courseStatus === 'published' ? s.badgePublished : courseStatus === 'draft' ? s.badgeDraft : s.badgeInactive} ${s.thumbBadge}`}>
-                      {courseStatus}
-                    </span>
-                  </div>
-
-                  {/* Body */}
-                  <div className={s.courseCardBody}>
-                    <div className={s.courseCardTitle}>{c.title || '—'}</div>
-
-                    {c.desc && <div className={s.courseCardDesc}>{c.desc}</div>}
-
-                    {/* Meta chips */}
-                    <div className={s.courseMetaRow}>
-                      {c.catId?.title && (
-                        <span className={s.metaChipCat}>
-                          {Icon.folder}{c.catId.title}
-                        </span>
-                      )}
-                      {c.level && <span className={s.metaChipLevel}>{c.level}</span>}
-                      {duration && (
-                        <span className={s.metaChip}>
-                          {Icon.clock}{duration}
-                        </span>
-                      )}
-                      {chapters > 0 && (
-                        <span className={s.metaChip}>
-                          {Icon.chapters}{chapters} ch
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {isAdded ? (
-                    <div className={`${s.btnDetails} ${s.btnAdded}`}>✓ Added</div>
-                  ) : (
-                    <button
-                      className={s.btnDetails}
-                      onClick={() => handleAdd(c)}
-                      disabled={isAdding}
-                    >
-                      {isAdding ? 'Adding…' : 'Add'}
-                    </button>
-                  )}
-                </div>
+                <StoreCourseCard
+                  key={cId}
+                  course={c}
+                  action={addedIds.has(cId)
+                    ? { label: '✓ Added', done: true }
+                    : { label: isAdding ? 'Adding…' : 'Add', onClick: () => handleAdd(c), disabled: isAdding }}
+                />
               );
             })}
           </div>

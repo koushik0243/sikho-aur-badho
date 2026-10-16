@@ -6,6 +6,7 @@ import { useSelector } from 'react-redux';
 import { selectUser } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
 import s from './QuizResult.module.css';
+import QuizResultReport from './QuizResultReport';
 
 const BackArrow = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -49,15 +50,18 @@ function numberAttempts(list) {
   return numbered.reverse();
 }
 
-const DIFF_LABEL = { beginner: 'Basic', intermediate: 'Intermediate', advanced: 'Advanced' };
-
 const ChevronIcon = (
   <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
     <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
   </svg>
 );
 
-export default function QuizResult() {
+/**
+ * Quiz review: pick a learner, course, chapter and attempt.
+ * Store owner: their own organization. Super admin passes `orgId` for any organization.
+ * @param {{ orgId?: string, orgName?: string }} props
+ */
+export default function QuizResult({ orgId: orgIdProp = '', orgName = '' } = {}) {
   const router = useRouter();
   const user = useSelector(selectUser);
 
@@ -85,7 +89,7 @@ export default function QuizResult() {
     async function load() {
       setLoadingBase(true);
       try {
-        let resolvedOrgId = user?.orgId ? String(user.orgId) : null;
+        let resolvedOrgId = orgIdProp ? String(orgIdProp) : (user?.orgId ? String(user.orgId) : null);
         if (!resolvedOrgId) {
           const uid = user?._id || user?.id;
           if (uid) {
@@ -98,26 +102,34 @@ export default function QuizResult() {
         if (cancelled) return;
         setOrgId(resolvedOrgId);
 
-        const [learnerRes, ocRes] = await Promise.all([
-          apiServiceHandler('GET', `user/admin/list?orgId=${resolvedOrgId}&user_type=employee&orgRole=employee`).catch(() => null),
-          apiServiceHandler('GET', `organization-course/list?orgId=${resolvedOrgId}`).catch(() => null),
-        ]);
+        const learnerRes = await apiServiceHandler('GET', `user/admin/list?orgId=${resolvedOrgId}&user_type=employee&orgRole=employee`).catch(() => null);
         if (cancelled) return;
-
         setLearners(toArr(learnerRes));
-
-        const drop = toArr(ocRes).map(oc => {
-          const c = oc.courseId;
-          return c?._id ? { _id: String(c._id), title: c.title || 'Untitled' } : null;
-        }).filter(Boolean);
-        setCoursesForDrop(drop);
       } finally {
         if (!cancelled) setLoadingBase(false);
       }
     }
     if (user) load();
     return () => { cancelled = true; };
-  }, [user?._id]);
+  }, [user?._id, orgIdProp]);
+
+// ── Courses: only the selected learner's own courses (none until a learner is picked) ──
+  useEffect(() => {
+    if (!selectedLearner) return undefined;
+    let cancelled = false;
+    apiServiceHandler('GET', `course-assignment/list?userId=${selectedLearner}&t=${Date.now()}`)
+      .then(res => {
+        if (cancelled) return;
+        const seen = new Map();
+        toArr(res).forEach(a => {
+          const c = a.courseId;
+          if (c?._id && !seen.has(String(c._id))) seen.set(String(c._id), { _id: String(c._id), title: c.title || 'Untitled' });
+        });
+        setCoursesForDrop([...seen.values()].sort((x, y) => x.title.localeCompare(y.title)));
+      })
+      .catch(() => { if (!cancelled) setCoursesForDrop([]); });
+    return () => { cancelled = true; };
+  }, [selectedLearner]);
 
   // ── Chapters for selected course ────────────────────────────
   useEffect(() => {
@@ -128,8 +140,16 @@ export default function QuizResult() {
     setSelectedChapter('');
     async function loadChapters() {
       try {
-        const res = await apiServiceHandler('GET', `chapter/list?courseId=${selectedCourse}`).catch(() => null);
-        if (!cancelled) setChapters(toArr(res));
+        // Only chapters that contain a quiz. Each keeps its number in the whole course (n),
+        // so "Ch 4" stays Ch 4 even when earlier chapters without a quiz are hidden.
+        const [chRes, topicRes] = await Promise.all([
+          apiServiceHandler('GET', `chapter/list?courseId=${selectedCourse}`).catch(() => null),
+          apiServiceHandler('GET', `topic/list?courseId=${selectedCourse}`).catch(() => null),
+        ]);
+        const withQuiz = new Set(toArr(topicRes)
+          .filter(t => String(t?.video_type || '').toLowerCase() === 'quiz' && !t.deletedAt)
+          .map(t => String(t.chapterId)));
+        if (!cancelled) setChapters(toArr(chRes).map((ch, i) => ({ ...ch, n: i + 1 })).filter(ch => withQuiz.has(String(ch._id))));
       } finally {
         if (!cancelled) setLoadingChapters(false);
       }
@@ -202,8 +222,6 @@ export default function QuizResult() {
   const questionMap = {};
   questionBank.forEach(q => { questionMap[String(q._id)] = q; });
 
-  const score = attempt ? Number(attempt.totalScore || 0) : 0;
-  const passed = attempt ? attempt.passed === true : false;
   const topicTitle = attempt?.topicId?.title || '';
   const chapterTitle = attempt?.chapterId?.title || '';
   const label = chapterTitle ? `${chapterTitle} — ${topicTitle}` : topicTitle;
@@ -218,7 +236,7 @@ export default function QuizResult() {
       {/* ── Filter bar ── */}
       <div className={s.filterCard}>
         <p className={s.filterMeta}>Quiz Review</p>
-        <h2 className={s.filterTitle}>Quiz Result</h2>
+        <h2 className={s.filterTitle}>Quiz Result{orgName ? ` — ${orgName}` : ''}</h2>
         <div className={s.filterRow}>
           <div className={s.filterGroup}>
             <label className={s.filterLabel}>Learner</label>
@@ -226,7 +244,7 @@ export default function QuizResult() {
               <select
                 className={s.select}
                 value={selectedLearner}
-                onChange={e => setSelectedLearner(e.target.value)}
+                onChange={e => { setSelectedLearner(e.target.value); setSelectedCourse(''); setCoursesForDrop([]); }}
                 disabled={loadingBase}
               >
                 <option value="">
@@ -249,10 +267,10 @@ export default function QuizResult() {
                 className={s.select}
                 value={selectedCourse}
                 onChange={e => setSelectedCourse(e.target.value)}
-                disabled={loadingBase}
+                disabled={!selectedLearner}
               >
                 <option value="">
-                  {loadingBase ? 'Loading courses…' : '— Select a course —'}
+                  {!selectedLearner ? '— Select a learner first —' : coursesForDrop.length ? '— Select a course —' : 'No courses assigned'}
                 </option>
                 {coursesForDrop.map(c => (
                   <option key={c._id} value={c._id}>{c.title}</option>
@@ -272,11 +290,11 @@ export default function QuizResult() {
                 disabled={!selectedCourse || loadingChapters}
               >
                 <option value="">
-                  {loadingChapters ? 'Loading chapters…' : '— Select a chapter —'}
+                  {loadingChapters ? 'Loading chapters…' : !selectedCourse || chapters.length ? '— Select a chapter —' : 'No chapter with a quiz'}
                 </option>
-                {chapters.map((ch, i) => (
+                {chapters.map(ch => (
                   <option key={String(ch._id)} value={String(ch._id)}>
-                    Ch {i + 1} – {ch.title || `Chapter ${i + 1}`}
+                    Ch {ch.n} – {ch.title || `Chapter ${ch.n}`}
                   </option>
                 ))}
               </select>
@@ -346,124 +364,15 @@ export default function QuizResult() {
       {/* ── Result ── */}
       {selectedLearner && selectedCourse && selectedChapter && !loadingResult && attempt && (
         <>
-          {attemptsForTopic > 1 && (
-            <div className={s.attemptsBanner}>
-              <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-              </svg>
-              Showing attempt {attempt.attemptNo} of {attemptsForTopic} by {learnerName}
-              {' '}for this quiz{attempt.attemptNo === attemptsForTopic ? ' (latest)' : ''}
-              {' '}— pick another attempt from the Attempt dropdown
-            </div>
-          )}
-
-          {/* Summary bar */}
-          <div className={s.summaryCard}>
-            <div className={s.summaryTopBar}>
-              <div className={s.summaryLeft}>
-                <h3 className={s.summaryLearner}>{learnerName}</h3>
-                <p className={s.summaryMeta}>{label || activeCourse?.title}</p>
-              </div>
-              <span className={`${s.resultBadge} ${passed ? s.badgePassed : s.badgeFailed}`}>
-                {passed ? `Passed — ${score}%` : `Failed — ${score}%`}
-              </span>
-            </div>
-            <div className={s.summaryStatsRow}>
-              <div className={s.summaryStat}>
-                <span className={s.summaryStatVal}>{score}%</span>
-                <span className={s.summaryStatLbl}>Final Score</span>
-              </div>
-              <div className={s.summaryDivider} />
-              <div className={s.summaryStat}>
-                <span className={s.summaryStatVal}>
-                  {answers.filter(a => a.status === 'answered').length}/{answers.length}
-                </span>
-                <span className={s.summaryStatLbl}>Answered</span>
-              </div>
-              <div className={s.summaryDivider} />
-              <div className={s.summaryStat}>
-                <span className={s.summaryStatDate}>{fmtDate(attempt.createdAt)}</span>
-                <span className={s.summaryStatLbl}>{fmtTimeOfDay(attempt.createdAt)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Question comparison grid ── */}
-          {answers.length > 0 && (
-            <div className={s.compareGrid}>
-
-              {/* Left: learner's given answers */}
-              <div className={s.compareCard}>
-                <div className={s.compareHead}>
-                  <p className={s.compareMeta}>What {learnerName || 'the learner'} answered</p>
-                  <h3 className={s.compareTitle}>Learner&apos;s Answers</h3>
-                </div>
-                <div className={s.qList}>
-                  {answers.map((a, i) => {
-                    const skipped = a.status === 'skipped';
-                    const aiScore = Number(a.aiScore || 0);
-                    const maxScore = Number(a.maxScore || 0);
-                    const pct = maxScore > 0 ? Math.round((aiScore / maxScore) * 100) : 0;
-                    const isWeak = !skipped && pct < 60;
-                    const difficulty = questionMap[String(a.questionId)]?.difficulty;
-                    const diffLabel = DIFF_LABEL[difficulty];
-                    return (
-                      <div key={i} className={`${s.qRow} ${isWeak || skipped ? s.qRowWrong : ''}`}>
-                        <div className={s.qHead}>
-                          <span className={s.qHeadLeft}>
-                            <span className={s.qNum}>Q{i + 1}</span>
-                            {diffLabel && (
-                              <span className={`${s.diffBadge} ${s[`diff_${difficulty}`] || ''}`}>{diffLabel}</span>
-                            )}
-                          </span>
-                          <span className={`${s.scoreBadge} ${isWeak || skipped ? s.scoreBadgeWrong : s.scoreBadgeOk}`}>
-                            {skipped ? '—' : `${aiScore}/${maxScore}`}
-                          </span>
-                        </div>
-                        <p className={s.qText}>{a.questionText || 'Question'}</p>
-                        {skipped ? (
-                          <span className={s.qSkipped}>Skipped</span>
-                        ) : (
-                          <p className={s.qAnswer}>{a.userAnswer || '—'}</p>
-                        )}
-                        {a.aiFeedback && <p className={s.qFeedback}>{a.aiFeedback}</p>}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Right: actual questions and answers */}
-              <div className={s.compareCard}>
-                <div className={s.compareHead}>
-                  <p className={s.compareMeta}>Correct reference</p>
-                  <h3 className={s.compareTitle}>Actual Questions &amp; Answers</h3>
-                </div>
-                <div className={s.qList}>
-                  {answers.map((a, i) => {
-                    const q = questionMap[String(a.questionId)];
-                    const diffLabel = DIFF_LABEL[q?.difficulty];
-                    return (
-                      <div key={i} className={s.qRow}>
-                        <div className={s.qHead}>
-                          <span className={s.qHeadLeft}>
-                            <span className={s.qNum}>Q{i + 1}</span>
-                            {diffLabel && (
-                              <span className={`${s.diffBadge} ${s[`diff_${q?.difficulty}`] || ''}`}>{diffLabel}</span>
-                            )}
-                          </span>
-                        </div>
-                        <p className={s.qText}>{q?.question || a.questionText || 'Question'}</p>
-                        <p className={s.qAnswer}>{q?.answer || 'No reference answer available.'}</p>
-                        {q?.explanation && <p className={s.qFeedback}>{q.explanation}</p>}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-            </div>
-          )}
+          <QuizResultReport
+            attempt={attempt}
+            answers={answers}
+            questionMap={questionMap}
+            learnerName={learnerName}
+            quizLabel={label || activeCourse?.title || ''}
+            attemptNo={attempt.attemptNo}
+            attemptsForTopic={attemptsForTopic}
+          />
         </>
       )}
     </div>

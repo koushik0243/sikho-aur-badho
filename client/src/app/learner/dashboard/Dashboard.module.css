@@ -123,9 +123,10 @@
 
 
 /* ─── Mid row ──────────────────────────────────────────────────── */
+/* Recent Activity Log = 8 of 12 columns, Upcoming Live Sessions = 4 of 12 */
 .midRow {
   display: grid;
-  grid-template-columns: 1fr 320px;
+  grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
   gap: 14px;
   align-items: start;
 }
@@ -187,51 +188,53 @@
 
 
 
-.courseGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
+/* All courses in a single row — scroll sideways (arrows, trackpad, swipe). */
+.courseRowWrap { position: relative; }
+.courseRow {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 2px;
+  padding: 4px 2px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: #b9dcdc transparent;
 }
-
-
+.courseRow::-webkit-scrollbar { height: 6px; }
+.courseRow::-webkit-scrollbar-thumb { background: #b9dcdc; border-radius: 999px; }
+.courseRow > * { flex: 0 0 272px; scroll-snap-align: start; }
+.rowArrow {
+  position: absolute;
+  top: 56px;
+  z-index: 2;
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  border: 1px solid #d7e4e4;
+  background: rgba(255,255,255,0.96);
+  color: #0b7b7b;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(15,60,60,0.16);
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, transform 0.15s;
+}
+.rowArrow.rowArrow { font-size: 24px !important; line-height: 1; }
+.rowArrow:hover { background: #0b7b7b; color: #fff; transform: scale(1.06); }
+.rowArrow:focus-visible { outline: 2px solid #0b7b7b; outline-offset: 2px; }
+.rowArrowPrev { left: -10px; }
+.rowArrowNext { right: -10px; }
 
 /* ─── Skeleton loaders ───────────────────────────────────────── */
 .skelCard {
-  background: #fff;
-  border-radius: 12px;
-  border: 1px solid #e8edf0;
-  overflow: hidden;
-}
-
-
-
-.skelCard {
-  height: 210px;
-  border-radius: 12px;
+  height: 290px;
+  border-radius: 14px;
   background: linear-gradient(90deg, #f0f4f4 25%, #e8f0f0 50%, #f0f4f4 75%);
   background-size: 200% 100%;
   animation: shimmer 1.3s infinite;
 }
 
-
-
 /* ─── Empty state ────────────────────────────────────────────── */
-.empty {
-  text-align: center;
-  padding: 60px 20px;
-  color: #9aa5b4;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-
-
-.empty svg  { width: 32px; height: 32px; color: #c0d8d8; }
-
-
-
-/* ─── Empty / skeleton states ──────────────────────────────────── */
 .empty {
   display: flex;
   flex-direction: column;
@@ -242,223 +245,11 @@
   color: #9aadad;
   font-size: 13px;
 }
-
-
+.empty svg  { width: 32px; height: 32px; color: #c0d8d8; }
 .empty span { display: flex; }
-
-
 .empty p    { margin: 0; }
 
 
-
-.courseCard {
-  border: 1px solid #e8edf0;
-  border-radius: 12px;
-  overflow: hidden;
-  background: #fff;
-  display: flex;
-  flex-direction: column;
-  transition: box-shadow 0.15s;
-}
-
-
-.courseCard:hover { box-shadow: 0 4px 16px rgba(11,123,123,0.10); }
-
-
-
-.courseThumb {
-  position: relative;
-  height: 140px;
-  background: #e8f5f5;
-  overflow: hidden;
-}
-
-
-
-.courseImg {
-  width: 100%;
-  height: 90%;
-  object-fit: contain;
-  object-position: center;
-  display: block;
-  background: #f0f4f4;
-  padding-top: 3%;
-}
-
-
-
-.courseImgPlaceholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #0b7b7b;
-}
-
-
-.courseImgPlaceholder svg { width: 40px; height: 40px; }
-
-
-
-.progressTrack {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 5px;
-  background: rgba(255,255,255,0.4);
-}
-
-
-.progressFill {
-  height: 100%;
-  background: #0b7b7b;
-  border-radius: 0 3px 3px 0;
-  transition: width 0.4s ease;
-}
-
-
-.progressFill::after {
-  content: '';
-  position: absolute;
-  right: -5px; top: 50%;
-  transform: translateY(-50%);
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  background: #0b7b7b;
-}
-
-
-.progressLabel {
-  position: absolute;
-  top: 6px;
-  right: 8px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #fff;
-  background: rgba(11,123,123,0.85);
-  padding: 1px 5px;
-  border-radius: 4px;
-}
-
-
-
-.courseBody {
-  padding: 12px 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
-}
-
-
-
-.courseTopRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-
-
-.courseMenuBtn {
-  background: none;
-  border: none;
-  color: #9aa5b4;
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0;
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.courseMenuBtn:hover { color: #6b7a7a; }
-
-
-
-.courseCategory {
-  font-size: 11px;
-  font-weight: 600;
-  color: #0b7b7b;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin: 0;
-}
-
-
-
-.courseTitle {
-  font-size: 14px;
-  font-weight: 700;
-  color: #1a2b2b;
-  margin: 0;
-  line-height: 1.35;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-
-
-.courseDesc {
-  font-size: 11.5px;
-  color: #6b7280;
-  margin: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  line-height: 1.45;
-}
-
-
-
-.courseBtns {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-
-
-.btnExplore {
-  padding: 8px 18px;
-  border-radius: 7px;
-  border: none;
-  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-
-.btnExplore:hover { opacity: 0.88; }
-
-
-
-.btnResume {
-  padding: 8px 18px;
-  border-radius: 7px;
-  border: none;
-  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-
-.btnResume:hover { background: linear-gradient(180deg, #036067 0%, #23897d 100%); }
 
 
 
@@ -718,9 +509,6 @@
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .courseGrid {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 480px) {
@@ -738,3 +526,67 @@
     padding: 14px;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .rowArrow { transition: none; }
+}
+
+/* ── Redesign: page header, stat tiles with a slim bar, status-coloured badges ── */
+.pageHead { display: flex; flex-direction: column; gap: 2px; }
+.sectionHeading.sectionHeading { margin: 0; font-size: 22px !important; font-weight: 800; color: #12302f; letter-spacing: -0.01em; }
+.pageSub.pageSub { margin: 0; color: #6b7d7d; font-size: 13.5px !important; }
+
+.statCard.statCard {
+  background: #fff; border: 1px solid #e6eded; border-radius: 14px; padding: 16px 18px; gap: 8px;
+  box-shadow: 0 1px 2px rgba(15, 60, 60, 0.04);
+}
+.statCardAccent.statCardAccent { background: linear-gradient(135deg, #0b7b7b 0%, #0a9090 100%); border-color: transparent; box-shadow: 0 8px 20px rgba(11, 123, 123, 0.22); }
+.statLabel.statLabel { text-transform: none; letter-spacing: 0; font-weight: 600; color: #4d6464; font-size: 13px !important; }
+.statValue.statValue { font-weight: 800; color: #12302f; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; font-size: 28px !important; line-height: 1.1; }
+.statSub.statSub { color: #9aa9a9; font-weight: 700; font-size: 16px !important; }
+.statCaption.statCaption { color: #6b7d7d; font-size: 12.5px !important; }
+.statCardAccent .statLabel.statLabel { color: rgba(255, 255, 255, 0.85); }
+.statCardAccent .statValue.statValue { color: #fff; }
+
+.statBar { height: 6px; border-radius: 999px; background: #e8f0f0; overflow: hidden; }
+.statBar span { display: block; height: 100%; border-radius: 999px; background: #0b7b7b; }
+.statBarAccent { background: rgba(255, 255, 255, 0.22); }
+.statBarAccent span { background: #fff; }
+
+.activityBadge.activityBadge { border-radius: 999px; padding: 2px 8px; font-weight: 700; letter-spacing: 0.02em; font-size: 11px !important; }
+.badgeBad.badgeBad   { color: #b91c1c; background: #fdecec; border-color: #f6caca; }
+.badgeGood.badgeGood { color: #15803d; background: #e7f7ee; border-color: #bfe8cf; }
+
+/* Recent activity: cap the list so a long history scrolls inside the card */
+.activityList.activityList { max-height: 420px; overflow-y: auto; padding-right: 4px; }
+
+@media (max-width: 1100px) { .statsRow.statsRow { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px)  { .statsRow.statsRow { grid-template-columns: minmax(0, 1fr); gap: 10px; } .statValue.statValue { font-size: 24px !important; } }
+.statCardAccent .statCaption.statCaption { color: rgba(255, 255, 255, 0.85); }
+
+/* ── My Courses: a paged grid instead of a sideways-scrolling row ── */
+.courseGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 1200px) { .courseGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px)  { .courseGrid { grid-template-columns: minmax(0, 1fr); } }
+
+/* ── Pager (same look as the Courses page) ── */
+.pagination {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  margin-top: 14px; padding-top: 12px; border-top: 1px solid #e8edf0;
+}
+.paginationInfo.paginationInfo { color: #4a6060; font-variant-numeric: tabular-nums; font-size: 12.5px !important; }
+.paginationBtns { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.pageBtn.pageBtn {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 30px; padding: 0 10px;
+  border-radius: 7px; border: 1px solid #e2e9ec; background: #fff; color: #1a2b2b; font-weight: 600; cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s; font-size: 12.5px !important;
+}
+.pageBtn.pageBtn:hover:not(:disabled) { background: #f0f7f7; color: #0b7b7b; border-color: #c5dcdc; }
+.pageBtn.pageBtn:focus-visible { outline: 2px solid #0b7b7b; outline-offset: 2px; }
+.pageBtn.pageBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+.pageBtnActive.pageBtnActive, .pageBtnActive.pageBtnActive:hover:not(:disabled) {
+  background: linear-gradient(180deg, #047279 0%, #299c8f 100%); color: #fff; border-color: #047279;
+}
+/* Activity list is paged now — no inner scroll needed */
+.activityList.activityList { max-height: none; overflow: visible; }
+.badgeWarn.badgeWarn { color: #b45309; background: #fff4e0; border-color: #fcd9a8; }

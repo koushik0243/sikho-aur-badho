@@ -5,7 +5,11 @@ import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./EditIndustryType.module.css";
+import sPage from "./EditIndustryType.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const LayersIcon = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -107,7 +111,7 @@ export default function EditIndustryType() {
       toast.success('Updated successfully.');
       router.push('/superadmin/industry-type');
     } catch {
-      toast.error('Failed to update. Please try again.');
+      toast.warning('Failed to update. Please try again.');
     } finally {
       setSubmitting(false);
     }

@@ -5,25 +5,28 @@ import { useRouter } from 'next/navigation';
 import { selectUser, selectAuthReady } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
 import { API_URL } from '../../../lib/constant';
+import CourseCard from '../../../Components/Learner/CourseCard/CourseCard';
+import CourseFilters from '../../../Components/Learner/CourseCard/CourseFilters';
+import { STAGE_LABEL, STAGE_RANK, courseState } from '../../../Components/Learner/CourseCard/courseCardData';
 import s from "./Dashboard.module.css";
 
-function Gauge({ pct = 0, size = 56, stroke = 5, color = '#0b7b7b', textColor }) {
-  const r    = (size - stroke) / 2;
-  const cx   = size / 2;
-  const dash = 2 * Math.PI * r;
+// Slim progress bar for a stat tile (0–100).
+function StatBar({ pct = 0, accent = false }) {
+  const v = Math.max(0, Math.min(100, Math.round(pct)));
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ flexShrink: 0 }}>
-      <circle cx={cx} cy={cx} r={r} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth={stroke}/>
-      <circle cx={cx} cy={cx} r={r} fill="none" stroke={color} strokeWidth={stroke}
-        strokeLinecap="round"
-        strokeDasharray={`${(pct / 100) * dash} ${dash - (pct / 100) * dash}`}
-        transform={`rotate(-90 ${cx} ${cx})`}/>
-      <text x={cx} y={cx + 1} textAnchor="middle" dominantBaseline="middle"
-        fontSize={size * 0.22} fontWeight="800" fill={textColor || color}>
-        {pct}
-      </text>
-    </svg>
+    <div className={`${s.statBar} ${accent ? s.statBarAccent : ''}`} aria-hidden="true">
+      {v > 0 && <span style={{ width: `${v}%` }} />}
+    </div>
   );
+}
+
+// Activity badges ("FAILED", "PASSED", …) take the colour of what they mean.
+function badgeTone(badge) {
+  const b = String(badge || '').toLowerCase();
+  if (/fail|not pass|reject/.test(b)) return s.badgeBad;
+  if (/re-?upload/.test(b)) return s.badgeWarn;
+  if (/pass|complet|certif|success|approv/.test(b)) return s.badgeGood;
+  return '';
 }
 
 const Icon = {
@@ -34,7 +37,6 @@ const Icon = {
   video:   <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z"/></svg>,
   book:    <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4 7.962 7.962 0 009 5.189V4.804z"/></svg>,
   cert:    <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd"/><path d="M2 13.692V16a2 2 0 002 2h12a2 2 0 002-2v-2.308A24.974 24.974 0 0110 15c-2.796 0-5.487-.46-8-1.308z"/></svg>,
-  chevron: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd"/></svg>,
 };
 
 function fmtDate(d) {
@@ -54,6 +56,30 @@ function timeAgo(d) {
   return h < 24 ? `${h} hr${h > 1 ? 's' : ''} ago` : `${Math.floor(h / 24)}d ago`;
 }
 
+const COURSES_PER_PAGE  = 4; // one row of cards on a desktop screen
+const ACTIVITY_PER_PAGE = 5;
+
+/** "Showing x–y of n" + Previous / page numbers / Next (same look as the Courses page). */
+function Pager({ page, pageSize, total, onPage, label }) {
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  if (total === 0) return null;
+  const from = (page - 1) * pageSize + 1;
+  const to = Math.min(page * pageSize, total);
+  return (
+    <nav className={s.pagination} aria-label={`${label} pages`}>
+      <span className={s.paginationInfo} aria-live="polite">Showing {from}–{to} of {total}</span>
+      <div className={s.paginationBtns}>
+        <button type="button" className={s.pageBtn} onClick={() => onPage(page - 1)} disabled={page === 1}>Previous</button>
+        {Array.from({ length: pages }, (_, i) => i + 1).map(n => (
+          <button key={n} type="button" className={`${s.pageBtn} ${n === page ? s.pageBtnActive : ''}`}
+            onClick={() => onPage(n)} aria-current={n === page ? 'page' : undefined}>{n}</button>
+        ))}
+        <button type="button" className={s.pageBtn} onClick={() => onPage(page + 1)} disabled={page === pages}>Next</button>
+      </div>
+    </nav>
+  );
+}
+
 export default function LearnerDashboardPage() {
   const user      = useSelector(selectUser);
   const authReady = useSelector(selectAuthReady);
@@ -62,8 +88,13 @@ export default function LearnerDashboardPage() {
   const [courses,    setCourses]    = useState([]);
   const [sessions,   setSessions]   = useState([]);
   const [activities, setActivities] = useState([]);
-  const [stats,      setStats]      = useState({ progress: 0, hours: 0, pass: 0, score: 0, quizTotal: 0 });
+  const [stats,      setStats]      = useState(null);
   const [loading,    setLoading]    = useState(true);
+  const [courseFilter, setCourseFilter] = useState('all');
+  const [coursePage,   setCoursePage]   = useState(1);
+  const [activityPage, setActivityPage] = useState(1);
+  // A new filter starts the course list again at page 1.
+  const changeCourseFilter = (key) => { setCourseFilter(key); setCoursePage(1); };
 
   const load = useCallback(async () => {
     const userId = user?._id ? String(user._id) : '';
@@ -80,13 +111,16 @@ export default function LearnerDashboardPage() {
     }
     setLoading(true);
     try {
-      const [caRes, courseRes, ocRes, sessRes, actRes] = await Promise.all([
+      const [caRes, courseRes, ocRes, sessRes, actRes, myProgRes] = await Promise.all([
         apiServiceHandler('GET', `course-assignment/list?userId=${userId}`).catch(() => null),
         apiServiceHandler('GET', 'course/list').catch(() => null),
         orgId ? apiServiceHandler('GET', `organization-course/list?orgId=${orgId}`).catch(() => null) : Promise.resolve(null),
         apiServiceHandler('GET', 'live-session/list').catch(() => null),
         apiServiceHandler('GET', `activity-log/list?userId=${userId}`).catch(() => null),
+        apiServiceHandler('GET', `my-report/progress?t=${Date.now()}`).catch(() => null),
       ]);
+      // Real progress per course (lessons watched + quizzes passed), to show Start vs Resume.
+      const myProgress = new Map((myProgRes?.data?.courses || []).map(c => [String(c.courseId), c]));
 
       const toArr = res => {
         if (Array.isArray(res))                  return res;
@@ -138,7 +172,10 @@ export default function LearnerDashboardPage() {
       let assignments = Array.from(seen.entries()).map(([cid, a]) => {
         const course = courseMap[cid]
           || (typeof a.courseId === 'object' ? a.courseId : {});
-        return { _id: a._id, cid, courseId: course, courseName: course?.title, score: a.score, progress: a.progress, status: a.status };
+        return {
+          _id: a._id, cid, courseId: course, courseName: course?.title, score: a.score, status: a.status,
+          ...courseState(myProgress.get(cid)),
+        };
       }).filter(a => a.courseId && (a.courseId._id || a.courseId.title));
 
       // Per-course fallback for any still missing course_image
@@ -161,23 +198,12 @@ export default function LearnerDashboardPage() {
         }));
       }
 
-      setCourses(assignments);
+      setCourses([...assignments].sort((x, y) => STAGE_RANK[x.stage] - STAGE_RANK[y.stage] || Number(y.progress || 0) - Number(x.progress || 0)));
       setSessions(liveSessions.slice(0, 3));
-      setActivities(activityList.slice(0, 5));
+      setActivities(activityList);
 
-      if (assignments.length > 0) {
-        const total    = assignments.length;
-        const progs    = assignments.map(a => Number(a.progress || a.completionPercent || 0));
-        const avgProg  = Math.round(progs.reduce((acc, v) => acc + v, 0) / total);
-        const passed   = assignments.filter(a => {
-          const s = (a.status || '').toLowerCase();
-          return s === 'completed' || s === 'passed' || a.isPassed;
-        }).length;
-        const scores   = assignments.map(a => Number(a.score || a.quizScore || 0)).filter(v => v > 0);
-        const avgScore = scores.length ? Math.round(scores.reduce((acc, v) => acc + v, 0) / scores.length) : 0;
-        const hrs      = assignments.reduce((acc, a) => acc + Number(a.totalHours || a.hoursSpent || 0), 0);
-        setStats({ progress: avgProg, hours: Math.round(hrs * 10) / 10, pass: Math.round((passed / total) * 100), score: avgScore, quizTotal: total });
-      }
+      // Headline numbers come from the same report as My Progress, so the two pages agree.
+      setStats(myProgRes?.data?.totals || null);
     } finally {
       setLoading(false);
     }
@@ -185,20 +211,30 @@ export default function LearnerDashboardPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  const tot = stats || {};
+  const pctOf = (n, d) => (d ? (n / d) * 100 : 0);
+  const testsTaken = (tot.testsPassed || 0) + (tot.testsFailed || 0);
   const STATS = [
-    { key: 'progress', label: 'Progress',  caption: 'Course Completion', icon: Icon.trend,  value: `${stats.progress}%`, pct: stats.progress, accent: true  },
-    { key: 'time',     label: 'Time',       caption: 'Hours Learned',     icon: Icon.clock,  value: `${stats.hours} Hrs`, pct: Math.min(100, stats.hours * 5) },
-    { key: 'pass',     label: 'Pass',       caption: 'Quiz Attempts',     icon: Icon.check,  value: `${stats.pass}%`, sub: `/${stats.quizTotal}`, pct: stats.pass },
-    { key: 'score',    label: 'Score',      caption: 'Overall Score',     icon: Icon.score,  value: `${stats.score}%`, pct: stats.score },
+    { key: 'progress', label: 'Overall progress', icon: Icon.trend, value: `${tot.overall ?? 0}%`,
+      caption: `${tot.completedCourses ?? 0} of ${tot.courses ?? 0} courses completed`, pct: tot.overall, accent: true },
+    { key: 'chapters', label: 'Chapters', icon: Icon.book, value: `${tot.chaptersDone ?? 0}`, sub: ` / ${tot.chapters ?? 0}`,
+      caption: `${tot.chaptersPending ?? 0} still to finish`, pct: pctOf(tot.chaptersDone, tot.chapters) },
+    { key: 'tests', label: 'Tests passed', icon: Icon.check, value: `${tot.testsPassed ?? 0}`, sub: ` / ${testsTaken}`,
+      caption: testsTaken ? `${tot.testsFailed} not passed yet` : 'No tests taken yet', pct: pctOf(tot.testsPassed, testsTaken) },
+    { key: 'score', label: 'My score', icon: Icon.score, value: `${tot.myScore ?? 0}%`,
+      caption: `Average best quiz score · ${tot.certificates ?? 0} certificate${tot.certificates === 1 ? '' : 's'}`, pct: tot.myScore },
   ];
 
   return (
     <div className={s.page}>
       {/* ── Section title ── */}
-      <h2 className={s.sectionHeading}>Overview</h2>
+      <header className={s.pageHead}>
+        <h1 className={s.sectionHeading}>Welcome back{user?.name ? `, ${String(user.name).split(' ')[0]}` : ''}</h1>
+        <p className={s.pageSub}>Pick up where you left off.</p>
+      </header>
 
       {/* ── Stats ── */}
-      <div className={s.statsRow}>
+      <section className={s.statsRow} aria-label="Overview">
         {STATS.map(st => (
           <div key={st.key} className={`${s.statCard} ${st.accent ? s.statCardAccent : ''}`}>
             <div className={s.statTop}>
@@ -207,85 +243,86 @@ export default function LearnerDashboardPage() {
               </div>
               <span className={s.statLabel}>{st.label}</span>
             </div>
-            <div className={s.statBottom}>
-              <div>
-                <div className={s.statValue}>
-                  {loading ? '—' : st.value}
-                  {!loading && st.sub && <span className={s.statSub}>{st.sub}</span>}
-                </div>
-                <div className={s.statCaption}>{st.caption}</div>
-              </div>
-              <Gauge
-                pct={loading ? 0 : st.pct}
-                color={st.accent ? 'rgba(255,255,255,0.9)' : '#0b7b7b'}
-                textColor={st.accent ? '#fff' : '#0b7b7b'}
-              />
+            <div className={s.statValue}>
+              {loading ? '—' : st.value}
+              {!loading && st.sub && <span className={s.statSub}>{st.sub}</span>}
             </div>
+            <StatBar pct={loading ? 0 : st.pct} accent={st.accent} />
+            <div className={s.statCaption}>{loading ? ' ' : st.caption}</div>
           </div>
         ))}
-      </div>
+      </section>
 
-      {/* ── Mid row: My Courses + Sessions ── */}
+      {/* ── My Courses: every course ── */}
+      <section className={s.coursesPanel} aria-labelledby="my-courses-h">
+        <CourseFilters id="my-courses-h" title="My Courses" courses={courses} value={courseFilter} onChange={changeCourseFilter} showControls={!loading} />
+
+        {loading ? (
+          <div className={s.courseGrid}>{[0, 1, 2, 3].map(i => <div key={i} className={s.skelCard}/>)}</div>
+        ) : courses.length === 0 ? (
+          <div className={s.empty}><span>{Icon.book}</span><p>No courses enrolled yet.</p></div>
+        ) : (() => {
+          const shown = courses.filter(c => courseFilter === 'all' || c.stage === courseFilter);
+          if (!shown.length) return <div className={s.empty}><span>{Icon.book}</span><p>No {STAGE_LABEL[courseFilter].toLowerCase()} courses.</p></div>;
+          return (
+            <>
+              <div className={s.courseGrid} role="list" aria-label="My courses">
+                {shown.slice((coursePage - 1) * COURSES_PER_PAGE, coursePage * COURSES_PER_PAGE).map((ca, i) => {
+                  const c = ca.courseId || ca.course || {};
+                  const cId = c._id ? String(c._id) : null;
+                  return (
+                    <CourseCard key={ca._id || i}
+                      title={c.title || ca.courseName || 'Untitled Course'}
+                      category={c.catId?.title || c.category || ''}
+                      desc={c.desc || c.description || ''}
+                      stage={ca.stage} started={ca.started} progress={ca.progress}
+                      chapters={ca.chapters} chaptersDone={ca.chaptersDone} currentChapter={ca.currentChapter} certificate={ca.certificate}
+                      onOpen={() => cId && router.push(`/learner/courses/${cId}`)} />
+                  );
+                })}
+              </div>
+              <Pager page={coursePage} pageSize={COURSES_PER_PAGE} total={shown.length} onPage={setCoursePage} label="My courses" />
+            </>
+          );
+        })()}
+      </section>
+
+      {/* ── Activity + Sessions ── */}
       <div className={s.midRow}>
-        {/* My Courses */}
-        <div className={s.coursesPanel}>
+        {/* Activity Log */}
+        <div className={s.activitySection}>
           <div className={s.panelHead}>
-            <h2 className={s.panelTitle}>My Courses</h2>
-            <button className={s.viewAllBtn} onClick={() => router.push('/learner/courses')}>
-              View all <span className={s.chevIcon}>{Icon.chevron}</span>
-            </button>
+            <h2 className={s.panelTitle}>Recent Activity Log</h2>
           </div>
 
           {loading ? (
-            <div className={s.courseGrid}>{[0,1].map(i => <div key={i} className={s.skelCard}/>)}</div>
-          ) : courses.length === 0 ? (
-            <div className={s.empty}><span>{Icon.book}</span><p>No courses enrolled yet.</p></div>
+            <div className={s.activityList}>{[0,1,2].map(i => <div key={i} className={s.skelActivity}/>)}</div>
+          ) : activities.length === 0 ? (
+            <div className={s.empty}><span>{Icon.cert}</span><p>No recent activity.</p></div>
           ) : (
-            <div className={s.courseGrid}>
-              {courses.slice(0, 2).map((ca, i) => {
-                const c     = ca.courseId || ca.course || {};
-                const title = c.title || ca.courseName || 'Untitled Course';
-                const desc  = c.desc || c.description || '';
-                const cat   = c.catId?.title || c.category || '';
-                const img   = c.course_image ? `${API_URL}${c.course_image}` : null;
-                const pct   = Number(ca.progress || ca.completionPercent || 0);
-                const cId   = c._id ? String(c._id) : null;
-                return (
-                  <div key={ca._id || i} className={s.courseCard}>
-                    <div className={s.courseThumb}>
-                      {img
-                        ? <img src={img} alt={title} className={s.courseImg}/>
-                        : <div className={s.courseImgPlaceholder}>{Icon.book}</div>
-                      }
-                      <div className={s.progressTrack}>
-                        <div className={s.progressFill} style={{ width: `${pct}%` }}/>
-                        <span className={s.progressLabel}>{pct}%</span>
-                      </div>
-                    </div>
-                    <div className={s.courseBody}>
-                      <div className={s.courseTopRow}>
-                        {cat && <p className={s.courseCategory}>{cat}</p>}
-                        <button className={s.courseMenuBtn} aria-label="More options">⋯</button>
-                      </div>
-                      <h3 className={s.courseTitle}>{title}</h3>
-                      {desc && <p className={s.courseDesc}>{desc}</p>}
-                      <div className={s.courseBtns}>
-                        <button className={s.btnExplore} onClick={() => cId && router.push(`/learner/courses/${cId}`)}>Explore</button>
-                        <button className={s.btnResume}  onClick={() => cId && router.push(`/learner/courses/${cId}`)}>Resume</button>
-                      </div>
-                    </div>
+            <div className={s.activityList}>
+              {activities.slice((activityPage - 1) * ACTIVITY_PER_PAGE, activityPage * ACTIVITY_PER_PAGE).map((act, i) => (
+                <div key={act._id || i} className={s.activityItem}>
+                  <span className={s.activityNum}>{(activityPage - 1) * ACTIVITY_PER_PAGE + i + 1}</span>
+                  <div className={s.activityBody}>
+                    <p className={s.activityTitle}>{act.title || act.action || 'Activity'}</p>
+                    {act.description && <p className={s.activityDesc}>{act.description}</p>}
                   </div>
-                );
-              })}
+                  <div className={s.activityMeta}>
+                    {act.badge && <span className={`${s.activityBadge} ${badgeTone(act.badge)}`}>{act.badge}</span>}
+                    <span className={s.activityTime}>{timeAgo(act.createdAt || act.timestamp)}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
+          {!loading && <Pager page={activityPage} pageSize={ACTIVITY_PER_PAGE} total={activities.length} onPage={setActivityPage} label="Recent activity" />}
         </div>
 
         {/* Live Sessions */}
         <div className={s.sessionsPanel}>
           <div className={s.panelHead}>
             <h2 className={s.panelTitle}>Upcoming Live Sessions</h2>
-            <button className={s.viewAllBtn}>View all <span className={s.chevIcon}>{Icon.chevron}</span></button>
           </div>
 
           {loading ? (
@@ -315,36 +352,6 @@ export default function LearnerDashboardPage() {
             </div>
           )}
         </div>
-      </div>
-
-      {/* ── Activity Log ── */}
-      <div className={s.activitySection}>
-        <div className={s.panelHead}>
-          <h2 className={s.panelTitle}>Recent Activity Log</h2>
-          <button className={s.viewAllBtn}>View all <span className={s.chevIcon}>{Icon.chevron}</span></button>
-        </div>
-
-        {loading ? (
-          <div className={s.activityList}>{[0,1,2].map(i => <div key={i} className={s.skelActivity}/>)}</div>
-        ) : activities.length === 0 ? (
-          <div className={s.empty}><span>{Icon.cert}</span><p>No recent activity.</p></div>
-        ) : (
-          <div className={s.activityList}>
-            {activities.map((act, i) => (
-              <div key={act._id || i} className={s.activityItem}>
-                <span className={s.activityNum}>{i + 1}</span>
-                <div className={s.activityBody}>
-                  <p className={s.activityTitle}>{act.title || act.action || 'Activity'}</p>
-                  {act.description && <p className={s.activityDesc}>{act.description}</p>}
-                </div>
-                <div className={s.activityMeta}>
-                  {act.badge && <span className={s.activityBadge}>{act.badge}</span>}
-                  <span className={s.activityTime}>{timeAgo(act.createdAt || act.timestamp)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

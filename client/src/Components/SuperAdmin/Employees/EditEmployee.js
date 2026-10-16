@@ -8,7 +8,11 @@ import SuperAdminShell from '../SuperAdminShell';
 import LearnerFields, {
   EMPTY_LEARNER, learnerFromUser, learnerPayload, validateLearner, findDuplicateLearnerFields,
 } from './LearnerFields';
-import s from "./EditEmployee.module.css";
+import sPage from "./EditEmployee.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const BackArrow = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -33,7 +37,7 @@ export default function EditEmployee() {
         const u = res?.data ?? res;
         if (u) setForm(learnerFromUser(u));
       })
-      .catch(() => toast.error('Failed to load user.'))
+      .catch(() => toast.warning('Failed to load user.'))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -54,7 +58,7 @@ export default function EditEmployee() {
       toast.success('User updated successfully.');
       router.push('/superadmin/employees');
     } catch (err) {
-      toast.error(err?.message || 'Failed to update user. Please try again.');
+      toast.warning(err?.message || 'Failed to update user. Please try again.');
     } finally {
       setSubmitting(false);
     }

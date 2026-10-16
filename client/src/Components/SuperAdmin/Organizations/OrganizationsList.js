@@ -6,9 +6,29 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from "./OrganizationsList.module.css";
+import sPage from "./OrganizationsList.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const Icon = {
+  login: (
+    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path fillRule="evenodd" d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" />
+    </svg>
+  ),
+  quiz: (
+    <svg viewBox="0 0 20 20" fill="currentColor">
+      <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+      <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+    </svg>
+  ),
+  assignment: (
+    <svg viewBox="0 0 20 20" fill="currentColor">
+      <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+    </svg>
+  ),
   search: (
     <svg viewBox="0 0 20 20" fill="currentColor">
       <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
@@ -110,16 +130,16 @@ export default function OrganizationsList() {
     const id = confirm.id;
     setConfirm({ show: false, id: null });
     apiServiceHandler('GET', `organization/delete/${id}`)
-      .then(() => { toast.success('Organization deleted.'); setSelected(prev => prev.filter(x => x !== id)); fetchOrgs(); })
-      .catch(() => toast.error('Delete failed'));
+      .then(() => { toast.error('Organization deleted.'); setSelected(prev => prev.filter(x => x !== id)); fetchOrgs(); })
+      .catch(() => toast.warning('Delete failed'));
   }
 
   function handleBulkDelete() { if (selected.length > 0) setBulkConfirm(true); }
   function doBulkDelete() {
     setBulkConfirm(false);
     Promise.all(selected.map(id => apiServiceHandler('GET', `organization/delete/${id}`)))
-      .then(() => { toast.success('Organizations deleted.'); setSelected([]); fetchOrgs(); })
-      .catch(() => toast.error('Some deletes failed'));
+      .then(() => { toast.error('Organizations deleted.'); setSelected([]); fetchOrgs(); })
+      .catch(() => toast.warning('Some deletes failed'));
   }
 
   const allIds = orgs.map(o => o._id);
@@ -237,7 +257,6 @@ export default function OrganizationsList() {
                   </td>
                   <td>
                     <div className={s.nameCell}>
-                      <div className={s.orgIcon}>{Icon.orgTable}</div>
                       <span className={s.orgName}>{org.org_name || '—'}</span>
                     </div>
                   </td>
@@ -252,22 +271,37 @@ export default function OrganizationsList() {
                   <td>{fmtDate(org.createdAt)}</td>
                   <td>
                     <div className={s.actions} onClick={e => e.stopPropagation()}>
-                      <button className={s.btnView} title="View"
+                      <button data-action="view" className={s.btnView} title="View"
                         onClick={() => router.push(`/superadmin/organizations/${org._id}`)}
                       >
                         {Icon.eye}
                       </button>
-                      <button className={s.btnEdit} title="Edit"
+                      <button data-action="edit" className={s.btnEdit} title="Edit"
                         onClick={() => router.push(`/superadmin/organizations/${org._id}/edit`)}
                       >
                         {Icon.edit}
                       </button>
-                      <button className={s.btnDelete} title="Delete"
+                      <button data-action="delete" className={s.btnDelete} title="Delete"
                         onClick={() => handleDelete(org._id)}
                       >
                         {Icon.trash}
                       </button>
-                      <button className={s.btnCourses} title="Courses"
+                      {/* <button className={s.btnView} title="Quiz Result" aria-label={`Quiz results for ${org.org_name || 'organization'}`}
+                        onClick={() => router.push(`/superadmin/organizations/${org._id}/quiz-result`)}
+                      >
+                        {Icon.quiz}
+                      </button>
+                      <button className={s.btnView} title="Assignment" aria-label={`Assignment submissions for ${org.org_name || 'organization'}`}
+                        onClick={() => router.push(`/superadmin/organizations/${org._id}/assignments`)}
+                      >
+                        {Icon.assignment}
+                      </button> */}
+                      <button data-action="login" className={s.btnView} title="Log in" aria-label={`Log in as the store owner of ${org.org_name || 'this organization'} (opens a new tab)`}
+                        onClick={() => window.open(`/impersonate?orgId=${org._id}`, '_blank', 'noopener')}
+                      >
+                        {Icon.login}
+                      </button>
+                      {/* <button className={s.btnCourses} title="Courses"
                         onClick={() => router.push(`/superadmin/organization-course-assignment?orgId=${org._id}`)}
                       >
                         {Icon.courses}
@@ -281,7 +315,7 @@ export default function OrganizationsList() {
                         onClick={() => router.push(`/superadmin/organization-admins?orgId=${org._id}`)}
                       >
                         {Icon.admins}
-                      </button>
+                      </button> */}
                     </div>
                   </td>
                 </tr>

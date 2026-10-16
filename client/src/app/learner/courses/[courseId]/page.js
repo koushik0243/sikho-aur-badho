@@ -12,6 +12,7 @@ import { fetchCourseCompletion, recordCourseCompletion, completedChapterIdSet } 
 import {
   unansweredIndexes, nextUnansweredCycling, prevUnansweredCycling, answersForTimeUp,
 } from '../../../../Components/Learner/QuestionFlow';
+import { uploadAssignmentVideo, checkSubmissionFile, formatBytes, formatDayDate, videoComments, loadSubmissionVideo, pauseOtherVideos, SUBMISSION_ACCEPT, videoLimitOf } from '../../../../lib/assignmentSubmission';
 import s from "./CourseView.module.css";
 
 const BackArrow = (
@@ -819,8 +820,14 @@ function getTopicIcon(topic, isActive) {
   return isActive ? Icon.pause : Icon.play;
 }
 
+/** Tells the server the learner joined a Zoom session / finished homework (used by reports). */
+function recordTopicActivity(kind, courseId, topicId) {
+  if (!courseId || !topicId) return;
+  apiServiceHandler('POST', `topic-activity/${kind}`, { courseId, topicId: String(topicId) }).catch(() => {});
+}
+
 // ── ZoomPanel ─────────────────────────────────────────────────────────────────
-function ZoomPanel({ topic, onContinue }) {
+function ZoomPanel({ topic, courseId, onContinue }) {
   const link = topic.videoUrl || topic.zoom_link || topic.zoomUrl || topic.link || '';
   const rawTime = topic.zoom_time || topic.scheduled_at || topic.start_time || null;
 
@@ -849,7 +856,8 @@ function ZoomPanel({ topic, onContinue }) {
         )}
       </div>
       {link ? (
-        <a href={link} target="_blank" rel="noopener noreferrer" className={s.zoomJoinBtn}>
+        <a href={link} target="_blank" rel="noopener noreferrer" className={s.zoomJoinBtn}
+          onClick={() => recordTopicActivity('zoom-join', courseId, topic._id)}>
           <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15" style={{flexShrink:0}}>
             <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm12.553 1.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z"/>
           </svg>
@@ -1164,6 +1172,7 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
           userAnswer:   allAnswers[String(q._id)]?.transcript || '',
           status:       allAnswers[String(q._id)]?.status     || 'skipped',
         })),
+        timeTakenSec: quizElapsed,
       };
       const res    = await apiServiceHandler('POST', 'quiz-attempt/submit', payload);
       const result = res?.data || res;
@@ -1538,12 +1547,157 @@ function QuizPanel({ topic, chapterTitle, onQuizPass, onQuizAttempt, attemptCoun
   );
 }
 
+/** Homework is done only once a reviewer approved it (or it was marked done before videos were required). */
+const isAssignmentDone = rec => Boolean(rec) && (rec.review?.status === 'approved' || (!rec.submission && !rec.review));
+
 // ── AssignmentPanel ───────────────────────────────────────────────────────────
-function AssignmentPanel({ topic, isDone, onDone }) {
+// 1. Download the assignment. 2. Upload videos of the finished work — one at a time,
+//    each ≤ 25 MB; "add more" by uploading again. 3. A super admin or the learner's store
+//    owner reviews them: "complete" finishes the homework (the chapter can then complete),
+//    "re-upload" asks for another video. Until it is approved the chapter stays open.
+const fmtShortDate = d => (d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '');
+
+/** One uploaded video: details, the reviewer's comment, and Play (loads and plays inline). */
+function SubmittedVideoTile({ recordId, video, latest }) {
+  const [url, setUrl] = useState('');
+  const [state, setState] = useState('idle'); // idle | loading | ready | error
+  const [error, setError] = useState('');
+  useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
+  async function play() {
+    setState('loading'); setError('');
+    try { setUrl(await loadSubmissionVideo(recordId, video.n)); setState('ready'); }
+    catch (err) { setError(err.message); setState('error'); }
+  }
+  // Newest comment first, oldest last
+  const comments = videoComments(video).filter(cm => cm.note).reverse();
+  return (
+    <li className={s.vidTile}>
+      <div className={s.vidStage}>
+        {state === 'ready'
+          ? <video className={s.vidPlayer} src={url} controls autoPlay playsInline controlsList="nodownload noplaybackrate noremoteplayback" disablePictureInPicture onPlay={pauseOtherVideos} />
+          : (
+            <button type="button" className={s.vidPlay} onClick={play} disabled={state === 'loading'} aria-label={`Play video ${video.n}`}>
+              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" clipRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" /></svg>
+              <span>{state === 'loading' ? 'Loading…' : 'Play'}</span>
+            </button>
+          )}
+      </div>
+      <div className={s.vidInfo}>
+        <div className={s.vidTop}>
+          <span className={s.vidLabel}>Video {video.n}{latest ? ' · latest' : ''}</span>
+          <span className={s.vidMeta}>{formatBytes(video.size)} · {fmtShortDate(video.uploadedAt)}</span>
+        </div>
+        <span className={s.vidName} title={video.originalName}>{video.originalName || `Video ${video.n}`}</span>
+        {error && <span className={s.vidError}>{error}</span>}
+        {comments.length > 0 && (
+          <ul className={s.vidComments} aria-label="Comments">
+            {comments.map((cm, i) => (
+              <li key={i} className={s.vidCommentsItem}>
+                <span className={s.vidCommentsHead}>
+                  Comment <em>by</em> <strong>{cm.reviewerName || 'Reviewer'}</strong>{cm.reviewedAt && <> <em>on</em> {formatDayDate(cm.reviewedAt)}</>}
+                </span>
+                <p className={s.vidCommentsText}>{cm.note}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </li>
+  );
+}
+
+/** One "choose a video → Upload" row. After a successful upload it shows the file with a tick. */
+function UploadRow({ courseId, topicId, onUploaded }) {
+  const [file,      setFile]      = useState(null);
+  const [error,     setError]     = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [progress,  setProgress]  = useState(0);
+  const [doneName,  setDoneName]  = useState('');
+  const inputRef = useRef(null);
+
+  function pickFile(e) {
+    const f = e.target.files?.[0] || null;
+    e.target.value = '';
+    if (!f) return;
+    const problem = checkSubmissionFile(f);
+    setFile(problem ? null : f);
+    setError(problem);
+  }
+
+  async function upload() {
+    if (!file || uploading) return;
+    setUploading(true); setProgress(0); setError('');
+    try {
+      const saved = await uploadAssignmentVideo({ courseId, topicId, file, onProgress: setProgress });
+      setDoneName(`${file.name} · ${formatBytes(file.size)}`);
+      setFile(null);
+      onUploaded(saved);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  if (doneName) {
+    return (
+      <li className={s.upItem}>
+        <div className={s.upDoneRow}>
+          <span className={s.upTick} aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" clipRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" /></svg>
+          </span>
+          <span className={s.upDoneName} title={doneName}>{doneName}</span>
+          <span className={s.upDoneTag}>Uploaded</span>
+        </div>
+      </li>
+    );
+  }
+  return (
+    <li className={s.upItem}>
+      <input ref={inputRef} type="file" accept={SUBMISSION_ACCEPT} className={s.subInput} onChange={pickFile} disabled={uploading} />
+      <div className={s.upRow}>
+        <button type="button" className={s.upPick} onClick={() => inputRef.current?.click()} disabled={uploading}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+          <span className={s.upPickText} title={file?.name || ''}>{file ? `${file.name} · ${formatBytes(file.size)}` : 'Choose a video (max 25 MB)…'}</span>
+        </button>
+        <button type="button" className={`${s.panelBtn} ${s.upBtn}${(!file || uploading) ? ` ${s.panelBtnDisabled}` : ''}`} onClick={upload} disabled={!file || uploading}>
+          {uploading ? `Uploading… ${progress}%` : 'Upload'}
+        </button>
+      </div>
+      {uploading && (
+        <div className={s.subProgress} role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label="Upload progress">
+          <span style={{ width: `${progress}%` }} />
+        </div>
+      )}
+      {error && <p className={s.subError} role="alert">{error}</p>}
+    </li>
+  );
+}
+
+function AssignmentPanel({ topic, courseId, record, onSubmitted, continueLabel, onContinue }) {
   const [downloading, setDownloading] = useState(false);
+  // Upload rows: one "choose → Upload" row; "+ Add More" adds the next once it is uploaded.
+  const [rows, setRows] = useState([{ id: 1, uploaded: false }]);
   const attachment = Array.isArray(topic.attachments) && topic.attachments.length > 0 ? topic.attachments[0] : null;
   const fileUrl  = attachment?.url || topic.videoUrl || topic.file_url || topic.fileUrl || '';
   const fileName = attachment?.name || (fileUrl ? fileUrl.split('/').pop() : 'assignment');
+  const reviewStatus = record?.review?.status || '';
+  const needsReupload = reviewStatus === 'reupload';
+  const isDone   = isAssignmentDone(record);
+  const videos   = Array.isArray(record?.videos) ? record.videos : (record?.submission ? [{ n: 1, ...record.submission }] : []);
+  const waiting  = videos.length > 0 && !isDone && !needsReupload; // sent, not reviewed yet
+  // "How many videos can upload?" — a hard total for this assignment (rejections don't reset it)
+  const limit    = videoLimitOf(topic);
+  const left     = Math.max(0, limit - videos.length);
+  const atLimit  = left === 0;
+  const allRowsUploaded = rows.every(r => r.uploaded);
+  const addRow = () => setRows(prev => [...prev, { id: (prev[prev.length - 1]?.id || 0) + 1, uploaded: false }]);
+  const rowUploaded = (id, saved) => {
+    setRows(prev => prev.map(r => (r.id === id ? { ...r, uploaded: true } : r)));
+    onSubmitted?.(String(topic._id), saved);
+  };
 
   async function handleDownload() {
     if (!fileUrl || downloading) return;
@@ -1567,12 +1721,18 @@ function AssignmentPanel({ topic, isDone, onDone }) {
     }
   }
 
+  const tone = isDone ? { bg: '#f0fdf4', fg: '#16a34a' } : waiting ? { bg: '#fff7ed', fg: '#d97706' } : { bg: '#eff6ff', fg: '#2563eb' };
+
   return (
-    <div className={s.panelInner}>
-      <div className={s.panelIcon} style={{ background: isDone ? '#f0fdf4' : '#eff6ff', color: isDone ? '#16a34a' : '#2563eb' }}>
+    <div className={`${s.panelInner} ${s.assignPanel}`}>
+      <div className={s.panelIcon} style={{ background: tone.bg, color: tone.fg }}>
         {isDone ? (
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="32" height="32">
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        ) : waiting ? (
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="32" height="32">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
         ) : (
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="32" height="32">
@@ -1582,37 +1742,100 @@ function AssignmentPanel({ topic, isDone, onDone }) {
       </div>
       <h3 className={s.panelTitle}>{topic.title}</h3>
 
-      {isDone ? (
-        <>
-          <div className={s.assignDoneBadge}>
-            <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-            </svg>
-            Assignment Completed
-          </div>
-          {fileUrl && (
-            <button className={s.panelBtn} onClick={handleDownload} disabled={downloading} style={{ marginTop: 12 }}>
-              {downloading ? 'Downloading…' : 'Download Again'}
-            </button>
+      {/* ── Status ── */}
+      {isDone && (
+        <div className={s.assignComplete} role="status">
+          <strong>Assignment complete</strong>
+          <span>
+            {reviewStatus === 'approved'
+              ? `Your instructor approved this assignment — this ${continueLabel === 'Continue' ? 'topic' : 'chapter'} is now complete.`
+              : 'This assignment is complete.'}
+          </span>
+          {reviewStatus === 'approved' && record.review.note && <span className={s.assignCompleteNote}>“{record.review.note}”{record.review.reviewerName ? ` — ${record.review.reviewerName}` : ''}</span>}
+        </div>
+      )}
+      {waiting && (
+        <div className={s.assignWaiting} role="status">
+          <strong>Waiting for review</strong>
+          <span>Your {videos.length === 1 ? 'video has' : `${videos.length} videos have`} been sent. The chapter will be completed once your instructor marks the assignment as complete{atLimit ? '.' : ' — you can still upload more videos below.'}</span>
+        </div>
+      )}
+      {needsReupload && (
+        <div className={s.reuploadNote} role="alert">
+          <strong>Assignment rejected — please upload your video again</strong>
+          {record.review.note ? <span>“{record.review.note}”</span> : <span>Your reviewer asked for a new video of this assignment. Check the comments on your videos below.</span>}
+          {record.review.reviewerName && <small>— {record.review.reviewerName}</small>}
+        </div>
+      )}
+      {!isDone && !waiting && !needsReupload && (
+        <p className={s.panelSub}>Download the assignment, complete it, then upload videos of your finished work. Your instructor reviews them before the chapter is completed.</p>
+      )}
+
+      {/* ── Download the assignment: text left, button right ── */}
+      <div className={s.dlCard}>
+        <span className={s.dlIcon} aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 11v6m0 0l-3-3m3 3l3-3" /></svg>
+        </span>
+        <div className={s.dlText}>
+          <span className={s.dlTitle}>Download the assignment</span>
+          <span className={s.dlFile} title={fileUrl ? fileName : ''}>{fileUrl ? fileName : 'Your instructor has not added the assignment file yet.'}</span>
+        </div>
+        <button type="button" className={`${s.dlBtn}${(!fileUrl || downloading) ? ` ${s.panelBtnDisabled}` : ''}`} onClick={handleDownload} disabled={!fileUrl || downloading}>
+          <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" clipRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" /></svg>
+          {downloading ? 'Downloading…' : 'Download'}
+        </button>
+      </div>
+
+      {/* ── Upload Assignment Videos: one video per row; "+ Add More" for the next ── */}
+      {!isDone && (
+        <section className={s.asgSection} aria-labelledby={`up-h-${topic._id}`}>
+          <h4 id={`up-h-${topic._id}`} className={s.asgHeading}>Upload Assignment Videos</h4>
+          {!atLimit && (
+            <p className={s.asgHint}>
+              Choose one video (MP4, WebM or MOV, max 25 MB) and click Upload.
+              {limit > 1 ? ' Use “+ Add More” to upload the next one.' : ''}
+              {' '}You can upload <strong>{limit} video{limit === 1 ? '' : 's'}</strong> for this assignment{left < limit ? ` — ${left} left` : ''}.
+            </p>
           )}
-        </>
-      ) : (
-        <>
-          <p className={s.panelSub}>Download and complete the assignment, then mark it as done</p>
-          <div className={s.assignBtnRow}>
-            <button
-              className={`${s.panelBtn}${(!fileUrl || downloading) ? ` ${s.panelBtnDisabled}` : ''}`}
-              onClick={handleDownload}
-              disabled={!fileUrl || downloading}
-            >
-              {downloading ? 'Downloading…' : 'Download'}
-            </button>
-            <button className={s.assignDoneBtn} onClick={() => onDone?.(String(topic._id))}>
-              Mark as Done
-            </button>
-          </div>
-          {!fileUrl && <p className={s.panelNote}>Assignment file will be uploaded by your instructor.</p>}
-        </>
+          {atLimit ? (
+            <p className={s.panelNote}>
+              You have uploaded {limit === 1 ? 'the video' : `all ${limit} videos`} allowed for this assignment
+              {needsReupload ? ', so no more can be uploaded. Please contact your instructor.' : '.'}
+            </p>
+          ) : (
+            <>
+              <ul className={s.upList}>
+                {rows.map(r => (
+                  <UploadRow key={r.id} courseId={courseId} topicId={String(topic._id)} onUploaded={saved => rowUploaded(r.id, saved)} />
+                ))}
+              </ul>
+              {left > 1 && (
+                <button type="button" className={s.addMoreBtn} onClick={addRow} disabled={!allRowsUploaded}
+                  title={allRowsUploaded ? 'Add another video' : 'Upload the chosen video first'}>
+                  + Add More
+                </button>
+              )}
+            </>
+          )}
+        </section>
+      )}
+
+      {/* ── Section 2: the videos already uploaded (two columns) ── */}
+      {videos.length > 0 && (
+        <section className={`${s.vidSection} ${s.asgSection}`} aria-labelledby={`vid-h-${topic._id}`}>
+          <h4 id={`vid-h-${topic._id}`} className={`${s.asgHeading} ${s.vidSectionTitle}`}>Your uploaded videos <span className={s.vidCount}>{videos.length}</span></h4>
+          <ul className={s.vidGrid}>
+            {[...videos].reverse().map(v => (
+              <SubmittedVideoTile key={v.n} recordId={String(record._id)} video={v} latest={v.n === videos.length} />
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {isDone && continueLabel && (
+        <div className={s.assignBtnRow}>
+          <button type="button" className={s.panelBtn} onClick={onContinue}>{continueLabel}</button>
+        </div>
       )}
     </div>
   );
@@ -1638,7 +1861,7 @@ export default function CourseDetailPage({ params }) {
   const [progressMap,     setProgressMap]     = useState({}); // topicId -> progress record
   const [quizPassedMap,   setQuizPassedMap]   = useState({}); // topicId -> true if any attempt passed
   const [quizAttemptCounts, setQuizAttemptCounts] = useState({}); // topicId -> number of attempts made
-  const [assignDoneMap,   setAssignDoneMap]   = useState({}); // topicId -> true if marked done
+  const [assignDoneMap,   setAssignDoneMap]   = useState({}); // topicId -> submission record once the homework is done
   const [pendingAdvanceFrom, setPendingAdvanceFrom] = useState(null); // topicId just completed
   const [completion, setCompletion] = useState(null); // permanent certificate record (server), or null
   const [returnToQuiz, setReturnToQuiz] = useState(null); // { chIdx, chId, topId } — quiz to reopen after "Watch Lesson"
@@ -1746,12 +1969,10 @@ export default function CourseDetailPage({ params }) {
           setQuizAttemptCounts(counts);
         }
 
-        // Load assignment-done state from localStorage
-        try {
-          const uid = String((user?._id || user?.id) ?? '');
-          const raw = localStorage.getItem(`lms_assign_${uid}_${courseId}`);
-          if (raw) setAssignDoneMap(JSON.parse(raw));
-        } catch { /* ignore */ }
+        // Homework is done once the server has the learner's submission (a video; older records may have none)
+        const activityRes = await apiServiceHandler('GET', `topic-activity/mine?courseId=${courseId}&t=${Date.now()}`).catch(() => null);
+        setAssignDoneMap(Object.fromEntries((activityRes?.data || [])
+          .filter(a => a.type === 'assignment_done').map(a => [String(a.topicId), a])));
 
         if (chapterList.length > 0) {
           // Always start on the first chapter (it is always unlocked)
@@ -1880,7 +2101,7 @@ export default function CourseDetailPage({ params }) {
     const tType = getTopicType(topic);
     if (tType === 'zoom')       return true;
     if (tType === 'quiz')       return quizPassedMap[topId] === true;
-    if (tType === 'assignment') return assignDoneMap[topId] === true;
+    if (tType === 'assignment') return isAssignmentDone(assignDoneMap[topId]);
     if (!topic.videoUrl)        return true;
     return progressMap[topId]?.completed === true;
   }
@@ -1902,17 +2123,38 @@ export default function CourseDetailPage({ params }) {
     setQuizAttemptCounts(prev => ({ ...prev, [topicId]: (prev[topicId] || 0) + 1 }));
   }
 
-  function handleAssignmentDone(topicId) {
-    setAssignDoneMap(prev => {
-      const next = { ...prev, [topicId]: true };
-      try {
-        const uid = String((user?._id || user?.id) ?? '');
-        localStorage.setItem(`lms_assign_${uid}_${courseId}`, JSON.stringify(next));
-      } catch { /* ignore */ }
-      return next;
-    });
-    setPendingAdvanceFrom(topicId);
+  // After the learner's video upload: it now waits for review — nothing completes or moves on yet.
+  function handleAssignmentSubmitted(topicId, saved) {
+    setAssignDoneMap(prev => ({ ...prev, [topicId]: saved || prev[topicId] || { topicId } }));
   }
+
+  // What comes after this topic: another topic in the chapter, the next chapter, or nothing.
+  function nextStepLabel(topicId) {
+    const chIdx = chapters.findIndex(c => String(c._id) === activeChId);
+    if (chIdx === -1) return null;
+    const chTopics = topicsByChapter[String(chapters[chIdx]._id)] || [];
+    const idx = chTopics.findIndex(t => String(t._id) === String(topicId));
+    if (idx !== -1 && idx + 1 < chTopics.length) return 'Continue';
+    return chIdx + 1 < chapters.length ? 'Continue Next Chapter' : null;
+  }
+
+  // While the open assignment waits for review, check back for the reviewer's decision
+  // (every 20 s and when the learner returns to the tab) so it updates without a reload.
+  const openAssignRec = activeTopic && getTopicType(activeTopic) === 'assignment' ? assignDoneMap[String(activeTopic._id)] : null;
+  const awaitingReview = Boolean(openAssignRec?.submission || openAssignRec?.videos?.length) && !isAssignmentDone(openAssignRec) && openAssignRec?.review?.status !== 'reupload';
+  useEffect(() => {
+    if (!awaitingReview || !courseId) return undefined;
+    let stopped = false;
+    const refresh = () => apiServiceHandler('GET', `topic-activity/mine?courseId=${courseId}&t=${Date.now()}`)
+      .then(res => {
+        if (stopped || !Array.isArray(res?.data)) return;
+        setAssignDoneMap(Object.fromEntries(res.data.filter(a => a.type === 'assignment_done').map(a => [String(a.topicId), a])));
+      })
+      .catch(() => {});
+    const timer = setInterval(refresh, 20000);
+    window.addEventListener('focus', refresh);
+    return () => { stopped = true; clearInterval(timer); window.removeEventListener('focus', refresh); };
+  }, [awaitingReview, courseId]);
 
   function handleVideoEnded(topicId) {
     // Mark the lesson done locally right away so the next topic unlocks
@@ -2158,7 +2400,8 @@ export default function CourseDetailPage({ params }) {
   const overallPercent = courseFullyComplete ? 100
     : totalProgDur > 0 ? Math.min(100, Math.round((totalWatched / totalProgDur) * 100)) : 0;
   const topicType = getTopicType(activeTopic);
-  const watchTitle = `Watch — ${activeTopic ? activeTopic.title : course.title}`;
+  const watchTitle = activeTopic ? activeTopic.title : course.title;
+  const watchKind = topicType === 'quiz' ? 'Quiz' : topicType === 'lesson' ? 'Lesson' : activeTopic ? 'Topic' : 'Course';
   return (
     <div className={s.page}>
       <button className={s.backBtn} onClick={() => router.push('/learner/courses')}>
@@ -2197,7 +2440,10 @@ export default function CourseDetailPage({ params }) {
         <div className={s.mainCol}>
 
           {/* Header — no background div */}
-          <h1 className={s.watchTitle}>{watchTitle}</h1>
+          <div className={s.watchHead}>
+            <span className={s.watchKind}>{watchKind}{activeChapter?.title ? ` · ${activeChapter.title}` : ''}</span>
+            <h1 className={s.watchTitle}>{watchTitle}</h1>
+          </div>
 
           {/* Stats — no outer background div; individual stat items keep their own boxes */}
           <div className={s.statsRow}>
@@ -2229,7 +2475,7 @@ export default function CourseDetailPage({ params }) {
           <div className={`${s.contentCard} ${courseFullyComplete ? s.readOnly : ''}`}
             aria-disabled={courseFullyComplete || undefined}>
             {topicType === 'zoom'       && activeTopic && (
-              <ZoomPanel topic={activeTopic} onContinue={() => advanceToNextTopic(activeTopId)}/>
+              <ZoomPanel topic={activeTopic} courseId={courseId} onContinue={() => advanceToNextTopic(activeTopId)}/>
             )}
             {topicType === 'quiz'       && activeTopic && (
               <QuizPanel
@@ -2249,9 +2495,13 @@ export default function CourseDetailPage({ params }) {
             )}
             {topicType === 'assignment' && activeTopic && (
               <AssignmentPanel
+                key={String(activeTopic._id)}
                 topic={activeTopic}
-                isDone={assignDoneMap[String(activeTopic._id)] === true}
-                onDone={handleAssignmentDone}
+                courseId={courseId}
+                record={assignDoneMap[String(activeTopic._id)] || null}
+                onSubmitted={handleAssignmentSubmitted}
+                continueLabel={nextStepLabel(activeTopic._id)}
+                onContinue={() => advanceToNextTopic(String(activeTopic._id))}
               />
             )}
             {(topicType === 'lesson' || !activeTopic) && (() => {
@@ -2370,7 +2620,7 @@ export default function CourseDetailPage({ params }) {
                     </div>
                     {chLocked ? (
                       <button className={s.chActiveBtn} disabled onClick={e => e.stopPropagation()}>
-                        {addedLater ? 'Inactive' : 'Active'}
+                        {addedLater ? 'Inactive' : (chDone || courseFullyComplete || isChapterClosed(idx)) ? 'Completed' : 'Locked'}
                       </button>
                     ) : (
                       <span className={s.chevronBox}>

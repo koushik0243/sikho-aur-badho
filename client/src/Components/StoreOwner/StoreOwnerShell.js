@@ -34,6 +34,7 @@ const SECTIONS = [
       { id: 'all-courses', label: 'All Courses', path: '/storeowner/all-courses', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg> },
       { id: 'my-courses', label: 'My Courses', path: '/storeowner/my-courses', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4 7.962 7.962 0 009 5.189V4.804z" /></svg> },
       { id: 'quiz-result', label: 'Quiz Result', path: '/storeowner/quiz-result', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg> },
+      { id: 'assignment-result', label: 'Assignment Result', path: '/storeowner/assignment-result', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" /></svg> },
       { id: 'course-certificate', label: 'Course Certificate', path: '/storeowner/course-certificate', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V6.414A2 2 0 0015.414 5L13 2.586A2 2 0 0011.586 2H6zm4 12a2 2 0 100-4 2 2 0 000 4zm-1 1.5v3.5l1-1 1 1v-3.5a3.5 3.5 0 01-2 0z" clipRule="evenodd" /></svg> },
     ],
   },
@@ -43,6 +44,18 @@ const SECTIONS = [
     items: [
       { id: 'track-analysis', label: 'Track & Analysis', path: '/storeowner/track-analysis', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-4a1 1 0 011-1h2a1 1 0 011 1v13a1 1 0 01-1 1h-2a1 1 0 01-1-1V3z" /></svg> },
       { id: 'reports',        label: 'Reports',          path: '/storeowner/reports',        icon: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm2 10a1 1 0 10-2 0v3a1 1 0 102 0v-3zm2-3a1 1 0 011 1v5a1 1 0 11-2 0v-5a1 1 0 011-1zm4-1a1 1 0 10-2 0v7a1 1 0 102 0V8z" clipRule="evenodd" /></svg> },
+    ],
+  },
+  {
+    id: 'report', label: 'Report',
+    icon: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm2 10a1 1 0 10-2 0v3a1 1 0 102 0v-3zm2-3a1 1 0 011 1v5a1 1 0 11-2 0v-5a1 1 0 011-1zm4-1a1 1 0 10-2 0v7a1 1 0 102 0V8z" clipRule="evenodd" /></svg>,
+    // Report pages aren't built yet — these items have no path (no navigation).
+    items: [
+      { id: 'report-employees', label: 'My Organization Employees', path: '/storeowner/reports/my-organization-employees', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" /></svg> },
+      { id: 'report-employee-progress', label: 'Employee Progress', path: '/storeowner/reports/employee-progress', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clipRule="evenodd" /></svg> },
+      { id: 'report-test-results', label: 'Test Results', path: '/storeowner/reports/test-results', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg> },
+      { id: 'report-purchases', label: 'Purchases', path: '/storeowner/reports/purchases', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zm12 16a1 1 0 100-2 1 1 0 000 2zM7 17a1 1 0 100-2 1 1 0 000 2z" /></svg> },
+      { id: 'report-summary', label: 'Summary', path: '/storeowner/reports/summary', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" /></svg> },
     ],
   },
   {
@@ -58,16 +71,23 @@ const SECTIONS = [
   },
 ];
 
-const ALL_ITEMS = SECTIONS.flatMap(sec => sec.items);
+const ALL_ITEMS = SECTIONS.flatMap(sec => sec.items).filter(i => i.path); // pages only
+
+/** The menu item for a URL — the most specific path wins (/storeowner/reports/x over /storeowner/reports). */
+function itemForPath(pathname) {
+  return ALL_ITEMS
+    .filter(i => pathname === i.path || pathname.startsWith(i.path + '/'))
+    .sort((a, b) => b.path.length - a.path.length)[0];
+}
 
 function getActiveSectionFromPath(pathname) {
-  const item = ALL_ITEMS.find(i => pathname === i.path || pathname.startsWith(i.path + '/'));
+  const item = itemForPath(pathname);
   if (!item) return SECTIONS[0];
   return SECTIONS.find(sec => sec.items.some(i => i.id === item.id)) || SECTIONS[0];
 }
 
 function getActiveLabelFromPath(pathname) {
-  const item = ALL_ITEMS.find(i => pathname === i.path || pathname.startsWith(i.path + '/'));
+  const item = itemForPath(pathname);
   return item?.label || 'Dashboard';
 }
 
@@ -99,7 +119,7 @@ export default function StoreOwnerShell({ children }) {
   }, [authReady, isAuthed, router]);
 
   const activeSection  = getActiveSectionFromPath(pathname);
-  const activeItemId   = ALL_ITEMS.find(i => pathname === i.path || pathname.startsWith(i.path + '/'))?.id || 'dashboard';
+  const activeItemId   = itemForPath(pathname)?.id || 'dashboard';
   const pageLabel      = getActiveLabelFromPath(pathname);
 
   const [openSection, setOpenSection] = useState(() => activeSection);
@@ -145,6 +165,14 @@ export default function StoreOwnerShell({ children }) {
     if (userMenuOpen) document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [userMenuOpen]);
+
+  // A super admin opened this tab with "Log in" (public/tab-session.js keeps it per tab).
+  const impersonation = mounted && typeof window !== 'undefined' ? window.__tabSession?.info() : null;
+  function exitImpersonation() {
+    window.__tabSession?.exit();
+    window.close(); // tabs opened by the Log in icon can close themselves
+    window.location.href = '/superadmin/organizations'; // if the browser kept it open
+  }
 
   function handleLogout() {
     dispatch(clearAuth());
@@ -220,7 +248,9 @@ export default function StoreOwnerShell({ children }) {
             {openSection.items.map(item => (
               <button key={item.id}
                       className={`${s.navItem} ${activeItemId === item.id ? s.navItemActive : ''}`}
-                      onClick={() => { router.push(item.path); setMobileMenuOpen(false); }}>
+                      // Items without a path (Report) are placeholders: no navigation.
+                      onClick={() => { if (!item.path) return; router.push(item.path); setMobileMenuOpen(false); }}
+                      title={item.path ? undefined : 'Coming soon'}>
                 <span className={s.navItemIcon}>{item.icon}</span>
                 {item.label}
               </button>
@@ -232,6 +262,15 @@ export default function StoreOwnerShell({ children }) {
       {/* ── Mobile nav-panel backdrop ── */}
       {mobileMenuOpen && (
         <div className={s.backdrop} onClick={closeMobileMenu} />
+      )}
+
+      {/* Logged in from super admin (this tab only) */}
+      {impersonation && !impersonation.pending && (
+        <div className={s.impBar} role="status">
+          <span className={s.impDot} aria-hidden="true" />
+          <span>Logged in as <strong>{impersonation.orgName || userName}</strong> (store owner) from super admin</span>
+          <button type="button" className={s.impExit} onClick={exitImpersonation}>Exit</button>
+        </div>
       )}
 
       {/* ── Topbar ── */}

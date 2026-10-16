@@ -15,4 +15,4 @@ const courseCompletionSchema = new mongoose.Schema({
 
 courseCompletionSchema.index({ userId: 1, courseId: 1 }, { unique: true });
 
-export default mongoose.model('CourseCompletion', courseCompletionSchema);
+export default mongoose.model('CourseCompletion', courseCompletionSchema, 'course_completions');

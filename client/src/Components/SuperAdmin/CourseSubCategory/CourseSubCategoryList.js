@@ -6,7 +6,11 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from "./CourseSubCategoryList.module.css";
+import sPage from "./CourseSubCategoryList.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const Icon = {
   search: (
@@ -80,12 +84,12 @@ export default function CourseSubCategoryList() {
     setConfirm({ show: false, id: null, bulk: false });
     if (bulk) {
       Promise.all(chipSel.map(sid => apiServiceHandler('GET', `course-subcategory/delete/${sid}`)))
-        .then(() => { toast.success('Sub-categories deleted.'); setChipSel([]); setSelected([]); fetchRows(); })
-        .catch(() => toast.error('One or more deletes failed'));
+        .then(() => { toast.error('Sub-categories deleted.'); setChipSel([]); setSelected([]); fetchRows(); })
+        .catch(() => toast.warning('One or more deletes failed'));
     } else {
       apiServiceHandler('GET', `course-subcategory/delete/${id}`)
-        .then(() => { toast.success('Sub-category deleted.'); fetchRows(); })
-        .catch(() => toast.error('Delete failed'));
+        .then(() => { toast.error('Sub-category deleted.'); fetchRows(); })
+        .catch(() => toast.warning('Delete failed'));
     }
   }
 
@@ -215,15 +219,15 @@ export default function CourseSubCategoryList() {
                           />
                           <span className={s.chipName}>{sub.name}</span>
                           <div className={s.chipActions}>
-                            <button className={s.btnView} title="View"
+                            <button data-action="view" className={s.btnView} title="View"
                               onClick={() => router.push(`/superadmin/course-subcategory/${sub._id}`)}>
                               {Icon.eye}
                             </button>
-                            <button className={s.btnEdit} title="Edit"
+                            <button data-action="edit" className={s.btnEdit} title="Edit"
                               onClick={() => router.push(`/superadmin/course-subcategory/${sub._id}/edit`)}>
                               {Icon.edit}
                             </button>
-                            <button className={s.btnDelete} title="Delete"
+                            <button data-action="delete" className={s.btnDelete} title="Delete"
                               onClick={() => handleDelete(sub._id)}>
                               {Icon.trash}
                             </button>

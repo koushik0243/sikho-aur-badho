@@ -286,6 +286,15 @@ export const listQuestionsForLearner = async ({ quizId, userId }) => {
       : [];
 
     let pool = pool0;
+    // The Final Course Assignment has no questions of its own: its selection is picked
+    // from the course's other chapter quizzes, so load those questions by id instead.
+    if (topic?.quizSettings?.isFinalAssignment) {
+      const ids = selectedIds.filter(id => ObjectId.isValid(id)).map(id => new ObjectId(id));
+      pool = ids.length
+        ? await QuizQuestion.find({ ...buildQuery({ courseId: String(topic.courseId) }), _id: { $in: ids } })
+          .sort({ batchNumber: 1, createdAt: 1 }).lean()
+        : [];
+    }
     if (selectedIds.length > 0) {
       const selectedSet = new Set(selectedIds);
       pool = pool.filter(q => selectedSet.has(String(q._id)));

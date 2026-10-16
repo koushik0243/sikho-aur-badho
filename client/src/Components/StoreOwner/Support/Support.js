@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { selectUser } from '../../../redux/slices/authSlice';
 import s from "./Support.module.css";
 import apiServiceHandler from '../../../service/apiService';
+import { ISSUE_TYPES, PRIORITIES } from '../../../lib/supportTickets';
+import { kit as k, PageHeader, KpiTiles, Card, Pill, Pager, SkeletonRows, KitIcon } from '../PageKit/PageKit';
 
 // ── Helpers ──────────────────────────────────────────────────────
 function getTokenUserId() {
@@ -27,19 +29,6 @@ function formatDate(iso) {
 
 
 // ── Icons ─────────────────────────────────────────────────────────
-const TrashIcon = () => (
-  <svg viewBox="0 0 20 20" fill="currentColor">
-    <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-  </svg>
-);
-
-const EyeIcon = () => (
-  <svg viewBox="0 0 20 20" fill="currentColor">
-    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-    <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-  </svg>
-);
-
 const ChevronDown = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
     <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -47,10 +36,11 @@ const ChevronDown = () => (
 );
 
 // ── Constants ─────────────────────────────────────────────────────
-const ISSUE_TYPES = ['Technical Issue', 'Billing', 'Course Access', 'Zoom Integration', 'Other'];
-const PRIORITIES  = ['Low', 'Normal', 'High', 'Urgent'];
 const EMPTY_FORM  = { issueType: '', subject: '', description: '', priority: 'Normal' };
 const PER_PAGE    = 50;
+
+const STATUS_TONE   = { open: 'info', in_progress: 'warn', resolved: 'good', close: 'neutral', not_possible: 'bad', deleted: 'neutral' };
+const PRIORITY_TONE = { Low: 'neutral', Normal: 'info', High: 'warn', Urgent: 'bad' };
 
 const STATUS_CFG = {
   open:         { label: 'Open',         cls: 'statusOpen',        progress: 12 },
@@ -308,74 +298,69 @@ export default function SupportPage() {
   // ════════════════════════════════════════════════════════════════
   // LIST VIEW
   // ════════════════════════════════════════════════════════════════
+  const countBy = st => tickets.filter(tk => st.includes(tk.status)).length;
+  const openCount = countBy(['open']);
+  const progressCount = countBy(['in_progress']);
+  const doneCount = countBy(['resolved', 'close']);
+
   return (
-    <>
+    <div className={k.page}>
       <Toast toast={toast} />
 
-      {/* ── Page header ── */}
-      <div className={s.pageHeader} style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '12px' }}>
-        <div>
-          <h1 className={s.pageTitle}>Support Tickets</h1>
-          <p className={s.pageSubtitle}>Manage your support requests</p>
-        </div>
-        <button className={s.btnAdd} onClick={() => setView('add')}>+ New Ticket</button>
-      </div>
+      <PageHeader
+        title="Support Tickets"
+        sub="Raise an issue with the platform team and follow its progress here."
+        actions={<button className={k.btnPrimary} onClick={() => setView('add')}>+ New Ticket</button>}
+      />
 
-      {/* ── Table card ── */}
-      <div className={s.tableCard}>
+      <KpiTiles items={[
+        { label: 'Total tickets', value: loading ? '—' : tickets.length, icon: KitIcon.ticket },
+        { label: 'Open',          value: loading ? '—' : openCount,      icon: KitIcon.clock, tone: openCount ? 'info' : '', hint: 'Waiting for a reply' },
+        { label: 'In progress',   value: loading ? '—' : progressCount,  icon: KitIcon.spark, tone: progressCount ? 'warn' : '', hint: 'Being worked on' },
+        { label: 'Resolved',      value: loading ? '—' : doneCount,      icon: KitIcon.check, tone: doneCount ? 'good' : '', hint: 'Resolved or closed' },
+      ]} />
 
-        {/* Toolbar */}
-        <div className={s.toolbar}>
-          <div className={s.searchWrap}>
-            <svg viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-            </svg>
+      <Card title="All tickets" meta={!loading && <Pill tone="neutral">{filteredTickets.length} ticket{filteredTickets.length !== 1 ? 's' : ''}</Pill>} flush>
+        <div className={k.toolbar} role="search" aria-label="Filter tickets">
+          <label className={k.search}>
+            <span className={k.srOnly}>Search tickets</span>
+            {KitIcon.search}
             <input
-              className={s.searchInput}
+              className={k.input}
               type="text"
               placeholder="Search by subject, type or ticket ID…"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
-          </div>
-          <select
-            className={s.statusSelect}
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-          >
-            <option value="">All Statuses</option>
-            {Object.entries(STATUS_CFG).filter(([k]) => k !== 'deleted').map(([k, v]) => (
-              <option key={k} value={k}>{v.label}</option>
+          </label>
+          <select className={k.select} aria-label="Status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+            <option value="">All statuses</option>
+            {Object.entries(STATUS_CFG).filter(([key]) => key !== 'deleted').map(([key, v]) => (
+              <option key={key} value={key}>{v.label}</option>
             ))}
           </select>
         </div>
 
-        {/* Table */}
-        <div className={s.tableWrap}>
-          <table className={s.table}>
+        <div className={k.tableWrap}>
+          <table className={k.table}>
             <thead>
               <tr>
-                <th className={s.th}>
-                  <input type="checkbox" className={s.checkInput} checked={allPageChecked} onChange={toggleAll} />
+                <th style={{ width: 40 }}>
+                  <input type="checkbox" aria-label="Select all tickets on this page" checked={allPageChecked} onChange={toggleAll} />
                 </th>
-                <th className={s.th}>#</th>
-                <th className={s.th}>Ticket ID</th>
-                <th className={s.th}>Subject</th>
-                <th className={s.th}>Type</th>
-                <th className={s.th}>Priority</th>
-                <th className={s.th}>Status</th>
-                <th className={s.th}>Raised On</th>
-                <th className={s.th}>Actions</th>
+                <th>Ticket</th>
+                <th>Subject</th>
+                <th>Type</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Raised on</th>
+                <th className={k.num}><span className={k.srOnly}>Actions</span></th>
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                Array.from({ length: 4 }).map((_, i) => (
-                  <tr key={i}><td colSpan={9}><div className={s.skeletonRow} /></td></tr>
-                ))
-              ) : filteredTickets.length === 0 ? (
+              {loading ? <SkeletonRows cols={8} /> : filteredTickets.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className={s.tdEmpty}>
+                  <td colSpan={8} className={k.empty}>
                     {tickets.length === 0 ? (
                       <>No tickets yet.{' '}
                         <button className={s.emptyLink} onClick={() => setView('add')}>Raise your first ticket →</button>
@@ -383,37 +368,29 @@ export default function SupportPage() {
                     ) : 'No tickets match your filters.'}
                   </td>
                 </tr>
-              ) : pagedTickets.map((ticket, idx) => {
+              ) : pagedTickets.map(ticket => {
                 const sc     = STATUS_CFG[ticket.status] ?? STATUS_CFG.open;
                 const isChkd = checked.has(ticket._id);
+                const open   = () => router.push(`/storeowner/support/${ticket._id}`);
                 return (
-                  <tr
-                    key={ticket._id}
-                    className={`${s.tr} ${isChkd ? s.trChecked : ''}`}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => router.push(`/storeowner/support/${ticket._id}`)}
-                  >
-                    <td className={s.td} onClick={e => e.stopPropagation()}>
-                      <input type="checkbox" className={s.checkInput} checked={isChkd} onChange={() => toggleCheck(ticket._id)} />
+                  <tr key={ticket._id} className={`${k.rowLink} ${isChkd ? k.rowChecked : ''}`} onClick={open}>
+                    <td onClick={e => e.stopPropagation()}>
+                      <input type="checkbox" aria-label={`Select ticket ${ticket.ticket_id}`} checked={isChkd} onChange={() => toggleCheck(ticket._id)} />
                     </td>
-                    <td className={s.td}>{(page - 1) * PER_PAGE + idx + 1}</td>
-                    <td className={s.td}><span className={s.ticketIdBadge}>#{ticket.ticket_id}</span></td>
-                    <td className={s.tdSubject}>{ticket.subject}</td>
-                    <td className={s.td}>{ticket.issue_type || '—'}</td>
-                    <td className={s.td}>{ticket.priority || '—'}</td>
-                    <td className={s.td}>
-                      <span className={`${s.statusBadge} ${s[sc.cls]}`}>{sc.label}</span>
-                    </td>
-                    <td className={s.td}>{formatDate(ticket.createdAt)}</td>
-                    <td className={s.td} onClick={e => e.stopPropagation()}>
-                      <div className={s.actions}>
-                        <button className={s.btnRowView} title="View"
-                          onClick={() => router.push(`/storeowner/support/${ticket._id}`)}>
-                          <EyeIcon />
+                    <td><span className={`${k.mono} ${k.strong}`}>#{ticket.ticket_id}</span></td>
+                    <td className={k.strong}>{ticket.subject}</td>
+                    <td>{ticket.issue_type || '—'}</td>
+                    <td>{ticket.priority ? <Pill tone={PRIORITY_TONE[ticket.priority] || 'neutral'}>{ticket.priority}</Pill> : '—'}</td>
+                    <td><Pill tone={STATUS_TONE[ticket.status] || 'neutral'}>{sc.label}</Pill></td>
+                    <td className={k.muted}>{formatDate(ticket.createdAt)}</td>
+                    <td onClick={e => e.stopPropagation()}>
+                      <div className={k.actions}>
+                        <button data-action="view" className={k.iconBtn} title="View ticket" aria-label={`View ticket ${ticket.ticket_id}`} onClick={open}>
+                          {KitIcon.eye}
                         </button>
-                        <button className={s.btnRowDelete} title="Delete"
+                        <button data-action="delete" className={`${k.iconBtn} ${k.iconBtnDanger}`} title="Delete ticket" aria-label={`Delete ticket ${ticket.ticket_id}`}
                           onClick={() => setDeleteModal([ticket._id])}>
-                          <TrashIcon />
+                          {KitIcon.trash}
                         </button>
                       </div>
                     </td>
@@ -424,32 +401,24 @@ export default function SupportPage() {
           </table>
         </div>
 
-        {/* Pagination */}
-        <div className={s.pagination}>
-          <div className={s.footerLeft}>
-            {checked.size > 0 && (
-              <button className={s.btnBulkDelete} onClick={() => setDeleteModal([...checked])}>
-                Delete Selected ({checked.size})
+        {!loading && (
+          <Pager
+            page={page}
+            pageSize={PER_PAGE}
+            total={filteredTickets.length}
+            onPage={setPage}
+            left={checked.size > 0 && (
+              <button className={k.btnDanger} onClick={() => setDeleteModal([...checked])}>
+                Delete selected ({checked.size})
               </button>
             )}
-            <span>
-              Showing {filteredTickets.length === 0 ? 0 : (page - 1) * PER_PAGE + 1}–{Math.min(page * PER_PAGE, filteredTickets.length)} of {filteredTickets.length}
-            </span>
-          </div>
-          <div className={s.paginationBtns}>
-            <button className={s.pageBtn} disabled={page <= 1} onClick={() => setPage(p => p - 1)}>‹</button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
-              <button key={n} className={`${s.pageBtn} ${n === page ? s.pageBtnActive : ''}`} onClick={() => setPage(n)}>{n}</button>
-            ))}
-            <button className={s.pageBtn} disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>›</button>
-          </div>
-        </div>
-
-      </div>
+          />
+        )}
+      </Card>
 
       {deleteModal && (
         <DeleteModal count={deleteModal.length} onCancel={() => setDeleteModal(null)} onConfirm={confirmDelete} deleting={deleting} />
       )}
-    </>
+    </div>
   );
 }

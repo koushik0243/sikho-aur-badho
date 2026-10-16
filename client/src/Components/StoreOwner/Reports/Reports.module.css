@@ -1,232 +1,85 @@
+/* Store owner → Reports.
+   globals.css forces 15px text, so other sizes use doubled selectors + !important. */
 
+.page { display: flex; flex-direction: column; gap: 18px; }
 
+/* ── Page header ─────────────────────────────────────────── */
+.pageHead { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.pageTitle { margin: 0; font-weight: 700; color: #12302f; letter-spacing: -0.01em; }
+.pageTitle.pageTitle { font-size: 24px !important; }
+.pageSub { margin: 4px 0 0; color: #5f7272; max-width: 640px; }
+.pageSub.pageSub { font-size: 14px !important; }
+.loadingNote { color: #6b7d7d; padding: 4px 12px; border-radius: 999px; background: #f1f6f6; font-weight: 600; }
+.loadingNote.loadingNote { font-size: 12.5px !important; }
 
-/* ─── Card ────────────────────────────────────────────────────── */
-.card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-left: 3px solid #0b7b7b;
-  border-radius: 8px;
-  overflow: hidden;
+/* ── KPI tiles ───────────────────────────────────────────── */
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.kpi {
+  display: flex; align-items: center; gap: 14px;
+  background: #fff; border: 1px solid #e6eded; border-radius: 14px;
+  padding: 16px 18px; box-shadow: 0 1px 2px rgba(15, 60, 60, 0.04);
 }
+.kpiIcon { width: 42px; height: 42px; border-radius: 11px; flex-shrink: 0; display: grid; place-items: center; background: #e9f6f5; color: #0b7b7b; }
+.kpiIcon svg { width: 20px; height: 20px; }
+.kpiValue { font-weight: 800; color: #12302f; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.kpiValue.kpiValue { font-size: 24px !important; }
+.kpiLabel { color: #6b7d7d; font-weight: 500; }
+.kpiLabel.kpiLabel { font-size: 12.5px !important; }
 
+/* ── Report cards ────────────────────────────────────────── */
+.sectionTitle { margin: 4px 0 12px; font-weight: 700; color: #12302f; }
+.sectionTitle.sectionTitle { font-size: 16px !important; }
 
-
-/* ─── Card ───────────────────────────────────────────────────── */
-.card {
-  background: #fff;
-  border-radius: 14px;
-  border: 1px solid #e8edf0;
-  padding: 0px;
-  margin-bottom: 18px;
+.reportGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.reportCard {
+  display: flex; flex-direction: column; gap: 12px;
+  background: #fff; border: 1px solid #e6eded; border-radius: 14px;
+  padding: 18px 20px; box-shadow: 0 1px 2px rgba(15, 60, 60, 0.04);
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
-
-
-
-.card {
-  background: #fff;
-  border-radius: 8px;
-  border: 1px solid #e8edf0;
-  overflow: hidden;
+.reportCard:hover { border-color: #bfdede; box-shadow: 0 10px 24px rgba(11, 123, 123, 0.10); transform: translateY(-2px); }
+.reportCard:focus-within { border-color: #0b7b7b; }
+.reportHead { display: flex; align-items: center; gap: 12px; }
+.reportIcon {
+  width: 42px; height: 42px; border-radius: 11px; flex-shrink: 0;
+  display: grid; place-items: center; color: #fff;
+  background: linear-gradient(135deg, #047279 0%, #14b8a6 100%);
+  box-shadow: 0 4px 10px rgba(4, 114, 121, 0.22);
 }
+.reportIcon svg { width: 20px; height: 20px; }
+.reportText { min-width: 0; }
+.reportTitle { margin: 0; font-weight: 700; color: #12302f; }
+.reportTitle.reportTitle { font-size: 15px !important; }
+.reportSub { margin: 2px 0 0; color: #0b6767; font-weight: 600; }
+.reportSub.reportSub { font-size: 12.5px !important; }
+.reportDesc { margin: 0; color: #5f7272; line-height: 1.5; flex: 1; }
+.reportDesc.reportDesc { font-size: 13.5px !important; }
 
-
-
-.cardHead {
-  display: flex;
-  align-items: center;
-  padding: 8px 20px;
-  background: #f8fafa;
-  border-bottom: 1px solid #edf0f3;
+.reportActions { display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid #eef3f3; }
+.btnCsv, .btnPdf {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 14px; border-radius: 9px; font-weight: 600; cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s, border-color 0.15s;
 }
+.btnCsv.btnCsv, .btnPdf.btnPdf { font-size: 13.5px !important; }
+.btnCsv svg, .btnPdf svg { width: 15px; height: 15px; }
+.btnCsv { background: #fff; color: #0b6767; border: 1px solid #b9dcdc; }
+.btnCsv:hover:not(:disabled) { background: #eef8f8; border-color: #0b7b7b; }
+.btnPdf { background: linear-gradient(180deg, #047279 0%, #299c8f 100%); color: #fff; border: 1px solid #047279; }
+.btnPdf:hover:not(:disabled) { box-shadow: 0 6px 14px rgba(4, 114, 121, 0.25); }
+.btnCsv:focus-visible, .btnPdf:focus-visible { outline: 2px solid #0b7b7b; outline-offset: 2px; }
+.btnCsv:disabled, .btnPdf:disabled { opacity: 0.55; cursor: not-allowed; }
 
-
-
-/* ─── Card header ─────────────────────────────────────────────── */
-.cardHead {
-  padding: 8px 20px;
-  background: #f8fafa;
-  border-bottom: 1px solid #edf0f3;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 1100px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) {
+  .kpis { gap: 10px; }
+  .kpi { padding: 12px; gap: 10px; }
+  .kpiIcon { width: 36px; height: 36px; }
+  .reportGrid { grid-template-columns: 1fr; }
+  .reportCard { padding: 16px; }
 }
-
-
-
-/* ─── Card head ──────────────────────────────────────────────── */
-.cardHead {
-  padding: 8px 20px;
-  background: #f8fafa;
-  border-bottom: 1px solid #edf0f3;
-}
-
-
-
-.cardTitle {
-  font-size: 10.5px;
-  font-weight: 700;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  padding: 8px 14px;
-  background: #f8fafa;
-  border-bottom: 1px solid #edf0f3;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-
-
-.loadingNote {
-  font-size: 11px;
-  color: #9aadad;
-  font-style: italic;
-}
-
-
-
-/* ─── Report list ─────────────────────────────────────────────── */
-.reportList {
-  display: flex;
-  flex-direction: column;
-}
-
-
-
-.reportRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 20px;
-  border-bottom: 1px solid #f3f4f6;
-  transition: background 0.12s;
-}
-
-
-.reportRow:last-child { border-bottom: none; }
-
-
-.reportRow:hover { background: #fafcfc; }
-
-
-
-.reportLeft {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-
-
-.reportNum {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  border: 1px solid #b2ddd4;
-  color: #0b7b7b;
-  font-size: 11px;
-  font-weight: 700;
-  flex-shrink: 0;
-  background: #f0fafa;
-  letter-spacing: 0;
-}
-
-
-
-.reportTitle {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: #111827;
-  margin-bottom: 2px;
-}
-
-
-
-.reportSub {
-  font-size: 11.5px;
-  color: #6b7280;
-}
-
-
-
-/* ─── Export buttons ──────────────────────────────────────────── */
-.reportActions {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  flex-shrink: 0;
-}
-
-
-
-.btnCsv,
-.btnPdf {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-
-.btnCsv svg,
-.btnPdf svg { width: 14px; height: 14px; }
-
-
-.btnCsv {
-  padding: 8px 20px;
-  border: none;
-  border-radius: 7px;
-  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-
-.btnCsv:hover { background: linear-gradient(180deg, #036067 0%, #23897d 100%); }
-
-
-.btnCsv:disabled,
-.btnPdf:disabled { opacity: 0.45; cursor: not-allowed; }
-
-
-
-.btnPdf {
-  padding: 8px 20px;
-  border: none;
-  border-radius: 7px;
-  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-
-.btnPdf:hover { opacity: 0.88; }
-
-
-.btnPdf:disabled:hover { opacity: 0.45; }
-
-
-/* ─── Mobile responsive ───────────────────────────────────────── */
-@media (max-width: 480px) {
-  .reportRow {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  .reportActions {
-    width: 100%;
-  }
+@media (prefers-reduced-motion: reduce) {
+  .reportCard { transition: none; }
+  .reportCard:hover { transform: none; }
 }

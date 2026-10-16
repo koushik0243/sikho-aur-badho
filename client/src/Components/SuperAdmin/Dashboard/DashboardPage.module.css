@@ -769,3 +769,10 @@
 
   .topCount { min-width: 60px; font-size: 11px; }
 }
+
+/* ── KPI tiles: the number is the headline, label sentence case, plain caption ── */
+.kpiLabel.kpiLabel { color: #4d6464; text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 13px !important; margin-bottom: 2px; }
+.kpiValue.kpiValue { color: #12302f; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; font-size: 26px !important; }
+.kpiHint.kpiHint { color: #6b7d7d; font-size: 12.5px !important; }
+.kpiCard.kpiCard { border-color: #e6eded; box-shadow: 0 1px 2px rgba(15, 60, 60, 0.04); }
+.kpiTop.kpiTop { margin-bottom: 10px; }

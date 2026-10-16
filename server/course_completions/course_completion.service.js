@@ -4,6 +4,7 @@ import Chapter from '../chapters/chapter.model.js';
 import Topic from '../topics/topic.model.js';
 import Progress from '../progress/progress.model.js';
 import QuizAttempt from '../quiz_attempts/quiz_attempt.model.js';
+import TopicActivity, { HOMEWORK_DONE_FILTER } from '../topic_activity/topic_activity.model.js';
 
 const { ObjectId } = mongoose.Types;
 
@@ -31,22 +32,25 @@ const topicKind = (t) => {
   return 'lesson';
 };
 
-// Server-side check of what the server can see: every lesson video watched and
-// every quiz passed. (Assignments are marked done in the learner's browser and
-// zoom sessions have no completion signal, so those aren't checked here.)
+// Server-side check: every lesson video watched, every quiz passed and every
+// assignment approved by a reviewer. (Zoom sessions have no completion signal.)
 async function verifyCourseDone({ userId, courseId, topics, chapterIds }) {
   if (chapterIds.length === 0 || topics.length === 0) return false;
   const lessonIds = topics.filter(t => topicKind(t) === 'lesson' && t.videoUrl).map(t => t._id);
   const quizIds   = topics.filter(t => topicKind(t) === 'quiz').map(t => t._id);
-  const [watched, passed] = await Promise.all([
+  const homeworkIds = topics.filter(t => topicKind(t) === 'assignment').map(t => t._id);
+  const [watched, passed, approved] = await Promise.all([
     lessonIds.length
       ? Progress.countDocuments({ userId, topicId: { $in: lessonIds }, completed: true })
       : 0,
     quizIds.length
       ? QuizAttempt.distinct('topicId', { userId, topicId: { $in: quizIds }, passed: true })
       : [],
+    homeworkIds.length
+      ? TopicActivity.distinct('topicId', { userId, topicId: { $in: homeworkIds }, type: 'assignment_done', ...HOMEWORK_DONE_FILTER })
+      : [],
   ]);
-  return watched === lessonIds.length && passed.length === quizIds.length;
+  return watched === lessonIds.length && passed.length === quizIds.length && approved.length === homeworkIds.length;
 }
 
 /**

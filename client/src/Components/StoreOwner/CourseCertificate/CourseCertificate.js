@@ -293,6 +293,15 @@ export default function CourseCertificate() {
     setTimeout(() => setDownloading(false), 3000);
   }
 
+  const quizzesTotal  = Number(status?.quizzesTotal || 0);
+  const quizzesPassed = Number(status?.quizzesPassed || 0);
+  const state = passed ? 'earned' : attempted ? 'progress' : 'none';
+  const STATE_LABEL = { earned: 'Certificate earned', progress: 'In progress', none: 'Not started' };
+  const initials = (learnerName || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  const downloadHint = !passed
+    ? 'Available once the learner completes the course.'
+    : !certHtml ? 'Assign a certificate template to this course first.' : 'Opens your browser\'s print dialog — choose "Save as PDF".';
+
   return (
     <div className={s.page}>
 
@@ -300,23 +309,24 @@ export default function CourseCertificate() {
         {BackArrow} Back
       </button>
 
-      {/* ── Filter bar ── */}
-      <div className={s.filterCard}>
-        <p className={s.filterMeta}>Certificates</p>
-        <h2 className={s.filterTitle}>Course Certificate</h2>
+      {/* ── Header + filters ── */}
+      <header className={s.head}>
+        <div className={s.headText}>
+          <p className={s.eyebrow}>Certificates</p>
+          <h1 className={s.title}>Course Certificate</h1>
+          <p className={s.subtitle}>Preview, verify and download a learner&apos;s certificate for a course.</p>
+        </div>
         <div className={s.filterRow}>
-          <div className={s.filterGroup}>
-            <label className={s.filterLabel}>Learner</label>
-            <div className={s.selectWrap}>
+          <label className={s.filterGroup}>
+            <span className={s.filterLabel}>Learner</span>
+            <span className={s.selectWrap}>
               <select
                 className={s.select}
                 value={selectedLearner}
                 onChange={e => setSelectedLearner(e.target.value)}
                 disabled={loadingBase}
               >
-                <option value="">
-                  {loadingBase ? 'Loading learners…' : '— Select a learner —'}
-                </option>
+                <option value="">{loadingBase ? 'Loading learners…' : 'Select a learner'}</option>
                 {learners.map(l => {
                   const uid = String(l._id || '');
                   const name = l.name || l.fullName || `${l.firstName || ''} ${l.lastName || ''}`.trim() || 'Learner';
@@ -324,181 +334,179 @@ export default function CourseCertificate() {
                 })}
               </select>
               <span className={s.selectArrow}>{ChevronIcon}</span>
-            </div>
-          </div>
-
-          <div className={s.filterGroup}>
-            <label className={s.filterLabel}>Course</label>
-            <div className={s.selectWrap}>
+            </span>
+          </label>
+          <label className={s.filterGroup}>
+            <span className={s.filterLabel}>Course</span>
+            <span className={s.selectWrap}>
               <select
                 className={s.select}
                 value={selectedCourse}
                 onChange={e => setSelectedCourse(e.target.value)}
                 disabled={!selectedLearner || loadingCourses}
               >
-                <option value="">
-                  {loadingCourses ? 'Loading courses…' : '— Select a course —'}
-                </option>
+                <option value="">{loadingCourses ? 'Loading courses…' : selectedLearner ? 'Select a course' : 'Select a learner first'}</option>
                 {courseOptions.map(c => (
                   <option key={c._id} value={c._id}>{c.title}</option>
                 ))}
               </select>
               <span className={s.selectArrow}>{ChevronIcon}</span>
-            </div>
-          </div>
+            </span>
+          </label>
         </div>
-      </div>
+      </header>
 
       {/* ── Prompt state ── */}
       {(!selectedLearner || !selectedCourse) && (
         <div className={s.emptyState}>
-          <svg viewBox="0 0 64 64" fill="none" width="56" height="56">
-            <rect x="8" y="12" width="48" height="40" rx="5" stroke="#0b7b7b" strokeWidth="2" fill="#f0fafa" />
-            <path d="M18 24h28M18 31h20M18 38h14" stroke="#0b7b7b" strokeWidth="2" strokeLinecap="round" />
-            <circle cx="48" cy="44" r="10" fill="#0b7b7b" />
-            <path d="M44 44l3 3 5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <p className={s.emptyTitle}>Select a learner and course to view the certificate</p>
-          <span className={s.emptySub}>Choose a learner, then a course from the dropdowns above.</span>
+          <div className={s.emptyArt} aria-hidden="true">
+            <svg viewBox="0 0 64 64" fill="none" width="56" height="56">
+              <rect x="8" y="12" width="48" height="40" rx="5" stroke="#0b7b7b" strokeWidth="2" fill="#f0fafa" />
+              <path d="M18 24h28M18 31h20M18 38h14" stroke="#0b7b7b" strokeWidth="2" strokeLinecap="round" />
+              <circle cx="48" cy="44" r="10" fill="#0b7b7b" />
+              <path d="M44 44l3 3 5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <p className={s.emptyTitle}>Choose a learner and a course</p>
+          <ol className={s.emptySteps}>
+            <li><span>1</span>Pick a learner</li>
+            <li><span>2</span>Pick one of their courses</li>
+            <li><span>3</span>Preview and download the certificate</li>
+          </ol>
         </div>
       )}
 
       {/* ── Loading ── */}
       {selectedLearner && selectedCourse && loadingData && (
-        <div className={s.loadingWrap}><div className={s.spinner} /></div>
+        <div className={s.loadingWrap} role="status" aria-label="Loading certificate"><div className={s.spinner} /></div>
       )}
 
-      {/* ── Certificate layout ── */}
       {hasData && (
-        <div className={s.layout}>
-
-          {/* Preview */}
-          <div className={s.certPanel}>
-            <div className={s.certPanelHeader}>
-              <div>
-                <h3 className={s.certPanelTitle}>{learnerName}&apos;s Certificate</h3>
-                {template ? (
-                  <span className={s.templateTag}>
-                    <svg viewBox="0 0 16 16" fill="currentColor" width="11" height="11">
-                      <path fillRule="evenodd" d="M4 1a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V2a1 1 0 00-1-1H4zm1 2h6v1H5V3zm0 3h6v1H5V6zm0 3h4v1H5V9z" clipRule="evenodd" />
-                    </svg>
-                    {template.title}
+        <>
+          {/* ── Status strip ── */}
+          <section className={`${s.strip} ${s[`strip_${state}`]}`} aria-label="Certificate status">
+            <div className={s.stripWho}>
+              <span className={s.avatar} aria-hidden="true">{initials}</span>
+              <div className={s.stripText}>
+                <p className={s.stripName}>{learnerName}</p>
+                <p className={s.stripCourse}>{courseName}</p>
+              </div>
+              <span className={`${s.statePill} ${s[`pill_${state}`]}`}>
+                {state === 'earned' ? '✓ ' : ''}{STATE_LABEL[state]}
+              </span>
+            </div>
+            <div className={s.stripFacts}>
+              {quizzesTotal > 0 && (
+                <div className={s.fact}>
+                  <span className={s.factLbl}>Quizzes passed</span>
+                  <span className={s.factVal}>{quizzesPassed} / {quizzesTotal}</span>
+                  <span className={s.factBar} role="progressbar" aria-valuenow={quizzesPassed} aria-valuemin={0} aria-valuemax={quizzesTotal} aria-label="Quizzes passed">
+                    <span style={{ width: `${Math.round((quizzesPassed / quizzesTotal) * 100)}%` }} />
                   </span>
+                </div>
+              )}
+              <div className={s.fact}><span className={s.factLbl}>Assigned</span><span className={s.factVal}>{fmtDate(assignedDate)}</span></div>
+              <div className={s.fact}><span className={s.factLbl}>Completed</span><span className={s.factVal}>{fmtDate(completionDate)}</span></div>
+              <div className={s.fact}><span className={s.factLbl}>Score</span><span className={s.factVal}>{score > 0 ? `${score}%` : '—'}</span></div>
+            </div>
+          </section>
+
+          <div className={s.layout}>
+            {/* Preview */}
+            <section className={s.certPanel} aria-labelledby="cert-preview-h">
+              <div className={s.certPanelHeader}>
+                <h2 id="cert-preview-h" className={s.certPanelTitle}>Certificate preview</h2>
+                {template
+                  ? <span className={s.templateTag}>Template: {template.title}</span>
+                  : <span className={s.templateTagDefault}>No template assigned</span>}
+              </div>
+
+              <div className={s.viewer}>
+                {!passed ? (
+                  <div className={s.locked}>
+                    <div className={s.lockIcon} aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="26" height="26"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 018 0v3" strokeLinecap="round" /></svg>
+                    </div>
+                    <p className={s.lockedTitle}>Certificate not earned yet</p>
+                    <p className={s.lockedSub}>{learnerName || 'The learner'} receives this certificate after meeting every requirement:</p>
+                    <ul className={s.reqList}>
+                      {quizzesTotal > 0 && (
+                        <li className={quizzesPassed >= quizzesTotal ? s.reqDone : s.reqTodo}>
+                          <span className={s.reqMark} aria-hidden="true">{quizzesPassed >= quizzesTotal ? '✓' : ''}</span>
+                          Pass every quiz <span className={s.reqCount}>{quizzesPassed} of {quizzesTotal}</span>
+                        </li>
+                      )}
+                      <li className={s.reqTodo}>
+                        <span className={s.reqMark} aria-hidden="true" />
+                        Complete every lesson
+                      </li>
+                    </ul>
+                  </div>
+                ) : certHtml ? (
+                  <div className={s.paper} style={{ height: iframeHeight }}>
+                    <iframe
+                      ref={certIframeRef}
+                      srcDoc={certHtml}
+                      className={s.certIframe}
+                      style={{ height: iframeHeight }}
+                      onLoad={handleIframeLoad}
+                      title="Certificate preview"
+                      scrolling="no"
+                    />
+                  </div>
                 ) : (
-                  <span className={s.templateTagDefault}>No template assigned</span>
+                  <div className={s.locked}>
+                    <div className={`${s.lockIcon} ${s.lockIconWarn}`} aria-hidden="true">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" width="26" height="26"><circle cx="12" cy="12" r="9" /><path d="M12 7v6M12 16.5v.5" strokeLinecap="round" /></svg>
+                    </div>
+                    <p className={s.lockedTitle}>No certificate template assigned</p>
+                    <p className={s.lockedSub}>{learnerName} has completed this course, but the course has no certificate template yet, so there is nothing to preview or download.</p>
+                  </div>
                 )}
               </div>
-              <span className={s.certPanelSub}>Preview</span>
-            </div>
+            </section>
 
-            {!passed ? (
-              <div className={s.noTemplateWrap}>
-                <svg viewBox="0 0 48 48" fill="none" width="40" height="40">
-                  <rect x="12" y="21" width="24" height="17" rx="3" stroke="#64748b" strokeWidth="2" fill="#f1f5f9" />
-                  <path d="M17 21v-4a7 7 0 0114 0v4" stroke="#64748b" strokeWidth="2" strokeLinecap="round" />
-                </svg>
-                <p className={s.noTemplateTitle}>Certificate not available yet</p>
-                <p className={s.noTemplateSub}>
-                  {learnerName || 'The learner'} will get this certificate after completing every lesson and passing every quiz in this course.
-                </p>
+            {/* Sidebar */}
+            <aside className={s.sidebar}>
+              <div className={s.card}>
+                <h3 className={s.cardTitle}>Download</h3>
+                <button
+                  className={s.downloadBtn}
+                  onClick={handleDownload}
+                  disabled={downloading || !certHtml}
+                >
+                  <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16" aria-hidden="true">
+                    <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clipRule="evenodd" />
+                  </svg>
+                  {downloading ? 'Opening print dialog…' : 'Download PDF'}
+                </button>
+                <p className={s.cardHint}>{downloadHint}</p>
               </div>
-            ) : certHtml ? (
-              <div className={s.certFrame} style={{ height: iframeHeight }}>
-                <iframe
-                  ref={certIframeRef}
-                  srcDoc={certHtml}
-                  className={s.certIframe}
-                  style={{ height: iframeHeight }}
-                  onLoad={handleIframeLoad}
-                  title="Certificate Preview"
-                  scrolling="no"
-                />
+
+              <div className={s.card}>
+                <h3 className={s.cardTitle}>Certificate details</h3>
+                <dl className={s.details}>
+                  {[
+                    ['Certificate ID', <span key="id" className={s.mono}>{certId}</span>],
+                    ['Template',       template?.title || '—'],
+                    ['Course',         courseName],
+                    ['Learner',        learnerName],
+                    ['Chapters',       chapterCount > 0 ? chapterCount : '—'],
+                    ['Assigned',       fmtDate(assignedDate)],
+                    ['Completed',      fmtDate(completionDate)],
+                    ['Score',          score > 0 ? `${score}%` : '—'],
+                    ['Status',         <span key="st" className={passed ? s.badgePassed : s.badgeInProgress}>{passed ? 'Passed' : attempted ? 'In Progress' : 'Not Attempted'}</span>],
+                  ].map(([label, value]) => (
+                    <div key={label} className={s.detailRow}>
+                      <dt>{label}</dt>
+                      <dd>{value}</dd>
+                    </div>
+                  ))}
+                </dl>
               </div>
-            ) : (
-              <div className={s.noTemplateWrap}>
-                <svg viewBox="0 0 48 48" fill="none" width="40" height="40">
-                  <circle cx="24" cy="24" r="20" stroke="#f59e0b" strokeWidth="2" fill="#fffbeb" />
-                  <path d="M24 14v12M24 30v4" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round" />
-                </svg>
-                <p className={s.noTemplateTitle}>No certificate template assigned</p>
-                <p className={s.noTemplateSub}>This course does not have a certificate template configured yet.</p>
-              </div>
-            )}
+            </aside>
           </div>
-
-          {/* Sidebar */}
-          <aside className={s.sidebar}>
-            <div className={s.card}>
-              <h3 className={s.cardTitle}>Download Certificate</h3>
-              <p className={s.cardSubtitle}>Print or save as PDF via your browser</p>
-              <button
-                className={s.downloadBtn}
-                onClick={handleDownload}
-                disabled={downloading || !certHtml}
-              >
-                <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
-                  <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clipRule="evenodd" />
-                </svg>
-                {downloading ? 'Opening print dialog…' : 'Download PDF'}
-              </button>
-            </div>
-
-            <div className={s.card}>
-              <h3 className={s.cardTitle}>Certificate Details</h3>
-              {[
-                { label: 'Certificate ID', value: certId },
-                { label: 'Template',       value: template?.title || '—' },
-                { label: 'Course',         value: courseName },
-                { label: 'Learner',        value: learnerName },
-                { label: 'Chapters',        value: chapterCount > 0 ? chapterCount : '—' },
-                { label: 'Assigned Date',   value: fmtDate(assignedDate) },
-                { label: 'Completion Date', value: fmtDate(completionDate) },
-                { label: 'Score',           value: score > 0 ? `${score}%` : '—' },
-              ].map(r => (
-                <div key={r.label} className={s.summaryRow}>
-                  <span className={s.summaryLabel}>{r.label}</span>
-                  <span className={s.summaryVal}>{r.value}</span>
-                </div>
-              ))}
-              <div className={s.summaryRow}>
-                <span className={s.summaryLabel}>Status</span>
-                <span className={passed ? s.badgePassed : s.badgeInProgress}>
-                  {passed ? 'Passed' : attempted ? 'In Progress' : 'Not Attempted'}
-                </span>
-              </div>
-            </div>
-
-            <div className={`${s.achieveCard} ${
-              !passed ? s.achieveNotPassed :
-              (template?.slug || '').includes('modern')  ? s.achieveModern  :
-              (template?.slug || '').includes('purple') || (template?.slug || '').includes('royal') ? s.achievePurple :
-              (template?.slug || '').includes('elegant') || (template?.slug || '').includes('gold') ? s.achieveElegant : ''
-            }`}>
-              {passed ? (
-                <svg viewBox="0 0 64 64" fill="none" width="44" height="44">
-                  <path d="M32 40c-8.84 0-16-7.16-16-16V10h32v14c0 8.84-7.16 16-16 16z" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.6)" strokeWidth="2" />
-                  <path d="M16 14H10a4 4 0 000 8c1.5 3 4 5 6 5M48 14h6a4 4 0 010 8c-1.5 3-4 5-6 5" stroke="rgba(255,255,255,0.6)" strokeWidth="2" strokeLinecap="round" />
-                  <rect x="24" y="40" width="16" height="5" rx="2" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.6)" strokeWidth="1.8" />
-                  <rect x="20" y="45" width="24" height="4" rx="2" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.6)" strokeWidth="1.8" />
-                </svg>
-              ) : (
-                <svg viewBox="0 0 64 64" fill="none" width="44" height="44">
-                  <circle cx="32" cy="32" r="20" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.7)" strokeWidth="2.5" />
-                  <path d="M32 21v11l8 6" stroke="rgba(255,255,255,0.9)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              )}
-              <h3 className={s.achieveTitle}>{passed ? 'Great Achievement!' : 'Not Completed Yet'}</h3>
-              <p className={s.achieveText}>
-                {passed
-                  ? <><strong>{learnerName}</strong> has successfully completed this course.</>
-                  : attempted
-                    ? <>{learnerName} has started this course but hasn&apos;t completed it yet
-                        {status?.quizzesTotal > 0 && ` (${status.quizzesPassed} of ${status.quizzesTotal} quizzes passed)`}.</>
-                    : <>{learnerName} hasn&apos;t attempted the course quiz yet.</>}
-              </p>
-            </div>
-          </aside>
-        </div>
+        </>
       )}
     </div>
   );

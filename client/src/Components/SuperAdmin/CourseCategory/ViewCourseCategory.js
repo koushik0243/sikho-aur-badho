@@ -4,8 +4,14 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./ViewCourseCategory.module.css";
-import vs from "./ViewCourseCategory.module.css";
+import sPage from "./ViewCourseCategory.module.css";
+import vsPage from "./ViewCourseCategory.module.css";
+import ViewToolbar from '../../ViewToolbar/ViewToolbar';
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
+const vs = withAdminKit(vsPage);
 
 const LayersIcon = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -49,10 +55,11 @@ export default function ViewCourseCategory() {
           {BackArrow} Back to Categories
         </button>
       </div>
-      <div>
-        <h1 className={s.pageTitle}>View Course Category</h1>
-        <p className={s.pageSubtitle}>Course category details</p>
-      </div>
+      <ViewToolbar
+        parent={{ label: 'Course Categories', onClick: () => router.push('/superadmin/course-category') }}
+        current={row?.title || (loading ? 'Loading…' : 'Category')}
+        onEdit={row ? () => router.push(`/superadmin/course-category/${id}/edit`) : undefined}
+      />
 
       {error && <p style={{ color: '#dc2626', fontSize: 13 }}>{error}</p>}
 
@@ -96,18 +103,6 @@ export default function ViewCourseCategory() {
         </div>
       </div>
 
-      {row && (
-        <div className={s.actions}>
-          <button className={s.btnSubmit}
-            onClick={() => router.push(`/superadmin/course-category/${id}/edit`)}>
-            Edit Category
-          </button>
-          <button className={s.btnCancel}
-            onClick={() => router.push('/superadmin/course-category')}>
-            Back
-          </button>
-        </div>
-      )}
     </SuperAdminShell>
   );
 }

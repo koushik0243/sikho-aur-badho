@@ -594,3 +594,54 @@
     min-width: 0;
   }
 }
+
+/* ── Shared view-page label column: same width on every view page (--view-label-width in globals.css) ── */
+@media (min-width: 481px) {
+  .sectionRow > .sectionLabel {
+    flex: 0 0 var(--view-label-width, 180px);
+    width: var(--view-label-width, 180px);
+    min-width: 0;
+  }
+}
+
+/* ── Restyle (store owner detail look) ───────────────────── */
+/* Status badges — the colour classes were never defined, so every status showed as plain text. */
+.statusBadge.statusBadge {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px;
+  font-weight: 700; background: #f1f5f5; color: #4d6464; font-size: 12px !important;
+}
+.statusBadge.statusBadge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.statusOpen.statusOpen             { background: #eaf1fe; color: #1d4ed8; }
+.statusInProgress.statusInProgress { background: #fff4e0; color: #b45309; }
+.statusResolved.statusResolved     { background: #e7f7ee; color: #15803d; }
+.statusClosed.statusClosed         { background: #f1f5f5; color: #4d6464; }
+.statusNotPossible.statusNotPossible { background: #fdecec; color: #b91c1c; }
+.statusDeleted.statusDeleted       { background: #f1f5f5; color: #8a9a9a; }
+
+/* Delete — a destructive action, so outlined red rather than the primary teal */
+.btnDeleteOutline.btnDeleteOutline {
+  height: 34px; padding: 0 14px; border-radius: 9px; cursor: pointer; font-weight: 600;
+  background: #fff; color: #b91c1c; border: 1px solid #f3c4c4; font-size: 13.5px !important;
+}
+.btnDeleteOutline.btnDeleteOutline:hover:not(:disabled) { background: #fdf2f2; border-color: #dc2626; }
+.btnDeleteOutline.btnDeleteOutline:focus-visible { outline: 2px solid #dc2626; outline-offset: 2px; }
+
+/* Ticket card: full width, subject as the headline, description / notes as soft panels */
+.detailCard.detailCard.detailCard { max-width: none; width: 100%; margin-bottom: 18px; }
+.ticketId.ticketId { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 800; color: #12302f; font-size: 15px !important; }
+.ticketCategory.ticketCategory { color: #4d6464; font-weight: 600; }
+.detailBody.detailBody { padding: 18px 22px 20px; display: flex; flex-direction: column; gap: 14px; }
+.viewSubject.viewSubject { font-weight: 800; color: #12302f; margin: 0; font-size: 19px !important; }
+.sectionBlock.sectionBlock.sectionBlock { padding: 12px 16px; background: #f8fbfb; border: 1px solid #eef3f3; border-radius: 12px; }
+.sectionBlock .sectionLabel.sectionLabel { display: block; margin-bottom: 4px; color: #6b7d7d; font-weight: 700; font-size: 12px !important; text-transform: uppercase; letter-spacing: 0.05em; }
+.sectionText.sectionText { margin: 0; color: #2b4141; line-height: 1.55; white-space: pre-wrap; font-size: 14px !important; }
+
+/* Response history — same card look, timeline-style entries */
+.logsCard.logsCard { background: #fff; border: 1px solid #e6eded; border-left: 1px solid #e6eded; border-radius: 14px; box-shadow: 0 1px 2px rgba(15,60,60,0.04); overflow: hidden; }
+.logsHead.logsHead { padding: 14px 22px; background: #f8fbfb; border-bottom: 1px solid #eef3f3; }
+.logsTitle.logsTitle { margin: 0; color: #12302f; font-weight: 700; text-transform: none; letter-spacing: 0; font-size: 16px !important; }
+.logEntry.logEntry { padding: 14px 22px; border-bottom: 1px solid #f1f5f5; }
+.logEntryHeader.logEntryHeader { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.logDate.logDate { color: #7a8c8c; font-size: 12.5px !important; }
+.logAdmin.logAdmin { color: #12302f; font-weight: 700; font-size: 13.5px !important; }
+.logComment.logComment { margin: 6px 0 0; color: #2b4141; line-height: 1.5; font-size: 14px !important; }

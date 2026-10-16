@@ -4,9 +4,14 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import apiServiceHandler from '../../../service/apiService';
 import { API_URL } from '../../../lib/constant';
-import { useMediaToken, secureMediaUrl } from '../../../lib/mediaToken';
+import { useMediaToken, secureMediaUrl, downloadMedia } from '../../../lib/mediaToken';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./ViewCourseBuilder.module.css";
+import sPage from "./ViewCourseBuilder.module.css";
+import ViewQASection, { pickSelected } from './ViewQASection';
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 /* ── Icons ──────────────────────────────────────────────────────── */
 const BackArrow = (
@@ -19,6 +24,52 @@ const MenuIcon = (
     <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
   </svg>
 );
+
+// Aptitude Test → Settings defaults when a course has none saved (same as the course builder).
+const DEFAULT_APTITUDE_SETTINGS = {
+  timeLimit: '60', timeUnit: 'Minutes', hideQuizTime: false,
+  quizAutoStart: false, questionLayout: 'single', questionOrder: 'sequential', hideQuestionNumber: false,
+};
+
+const listOf = res => (Array.isArray(res?.data) ? res.data : []);
+
+/**
+ * The selected categories as a tree: every selected item plus its parents (so
+ * the path is visible), nested under their parents, sorted by name.
+ * @returns {Array<{ _id, name, selected: boolean, children: Array }>}
+ */
+function selectedCategoryTree(allCategories, selectedIds) {
+  const byId = new Map(allCategories.map(c => [c._id, c]));
+  const selected = new Set(selectedIds.filter(id => byId.has(id)));
+  const include = new Set();
+  for (const id of selected) {
+    for (let cur = byId.get(id); cur && !include.has(cur._id); cur = byId.get(cur.parentId)) include.add(cur._id);
+  }
+  const nodes = new Map([...include].map(id => [id, { _id: id, name: byId.get(id).name, selected: selected.has(id), children: [] }]));
+  const roots = [];
+  for (const node of nodes.values()) {
+    const parent = nodes.get(byId.get(node._id).parentId);
+    (parent ? parent.children : roots).push(node);
+  }
+  const sortTree = list => { list.sort((a, b) => a.name.localeCompare(b.name)); list.forEach(n => sortTree(n.children)); return list; };
+  return sortTree(roots);
+}
+
+function CategoryTree({ nodes, depth = 0 }) {
+  return (
+    <ul className={depth ? s.catTreeChildren : s.catTreeList} role={depth ? 'group' : 'tree'} aria-label={depth ? undefined : 'Selected categories'}>
+      {nodes.map(n => (
+        <li key={n._id} role="treeitem" aria-selected={n.selected}>
+          <span className={n.selected ? s.catTreeSelected : s.catTreeParent}>
+            {n.selected && <span className={s.catTreeCheck} aria-hidden="true">✓</span>}
+            {n.name}
+          </span>
+          {n.children.length > 0 && <CategoryTree nodes={n.children} depth={depth + 1} />}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /* ── Topic type colours (same palette as CourseBuilder) ────────── */
 const TYPE_STYLE = {
@@ -46,6 +97,9 @@ export default function ViewCourseBuilder() {
   const [allCategories, setAllCategories] = useState([]);
   const [tags, setTags] = useState([]);
   const [certTemplates, setCertTemplates] = useState([]);
+  const [aptitudeQuestions, setAptitudeQuestions] = useState([]);
+  const [quizQuestions, setQuizQuestions] = useState({});   // quiz topic id → its questions
+  const [quizQuestionsLoading, setQuizQuestionsLoading] = useState(true);
 
   useEffect(() => {
     if (!id) return;
@@ -57,7 +111,9 @@ export default function ViewCourseBuilder() {
       apiServiceHandler('GET', 'course-subcategory/list').catch(() => null),
       apiServiceHandler('GET', 'tags/list').catch(() => null),
       apiServiceHandler('GET', 'certificate-template/list').catch(() => null),
-    ]).then(([courseRes, chaptersRes, topicsRes, catRes, subRes, tagsRes, certRes]) => {
+      apiServiceHandler('GET', `aptitude-questions/list?courseId=${id}`).catch(() => null),
+    ]).then(([courseRes, chaptersRes, topicsRes, catRes, subRes, tagsRes, certRes, aptRes]) => {
+      setAptitudeQuestions(listOf(aptRes));
       setCourse(courseRes?.data ?? null);
       setChapters(
         Array.isArray(chaptersRes?.data)
@@ -84,6 +140,20 @@ export default function ViewCourseBuilder() {
     }).finally(() => setLoading(false));
   }, [id]);
 
+  // Each quiz's questions (the topic list only carries the selected ids).
+  useEffect(() => {
+    const quizzes = topics.filter(t => t.video_type === 'quiz' && t._id);
+    if (loading) return undefined;
+    let cancelled = false;
+    Promise.all(quizzes.map(q =>
+      apiServiceHandler('GET', `quiz-questions/list?quizId=${q._id}`)
+        .then(res => [String(q._id), listOf(res)])
+        .catch(() => [String(q._id), []])))
+      .then(entries => { if (!cancelled) setQuizQuestions(Object.fromEntries(entries)); })
+      .finally(() => { if (!cancelled) setQuizQuestionsLoading(false); });
+    return () => { cancelled = true; };
+  }, [topics, loading]);
+
   if (loading) {
     return (
       <SuperAdminShell activeSection="course-builder">
@@ -103,9 +173,12 @@ export default function ViewCourseBuilder() {
   }
 
   /* ── Derive selected IDs from course data ──────────────────── */
-  const catId = course.catId?._id ? String(course.catId._id) : (course.catId ? String(course.catId) : null);
-  const subCatIds = Array.isArray(course.subCatIds) ? course.subCatIds.map(sc => String(sc._id ?? sc)) : [];
-  const selectedCatIds = catId ? [catId, ...subCatIds] : subCatIds;
+  // All selected categories (catIds; older courses only have catId) + sub-categories.
+  const catIds = (Array.isArray(course.catIds) && course.catIds.length ? course.catIds : [course.catId])
+    .map(c => c?._id ?? c).filter(Boolean).map(String);
+  const subCatIds = Array.isArray(course.subCatIds) ? course.subCatIds.filter(Boolean).map(sc => String(sc._id ?? sc)) : [];
+  const selectedCatIds = [...new Set([...catIds, ...subCatIds])];
+  const catTree = selectedCategoryTree(allCategories, selectedCatIds);
   const selectedTagIds = Array.isArray(course.tagIds) ? course.tagIds.map(t => String(t._id ?? t)) : [];
   const certTemplateId = course.certificate_template_id?._id
     ? String(course.certificate_template_id._id)
@@ -134,9 +207,9 @@ export default function ViewCourseBuilder() {
                 href={secureMediaUrl(course.intro_video, mediaToken) || undefined}
                 target="_blank"
                 rel="noreferrer"
-                style={{ fontSize: 13, color: '#2563eb', textDecoration: 'underline', wordBreak: 'break-all' }}
+                style={{ fontSize: 13, color: '#2563eb', textDecoration: 'underline' }}
               >
-                {course.intro_video.split('/').pop()}
+                Watch Video
               </a>
             ) : (
               <span style={{ fontSize: 13, color: '#9ca3af' }}>N/A</span>
@@ -148,17 +221,8 @@ export default function ViewCourseBuilder() {
         <div className={s.sidePanelCard} style={{ border: 'none' }}>
           <div className={s.sidePanelTitle}>Categories</div>
           <div className={s.sidePanelBody}>
-            {selectedCatIds.length > 0 ? (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 8px' }}>
-                {selectedCatIds.map(id => {
-                  const cat = allCategories.find(c => c._id === id);
-                  return cat ? (
-                    <span key={id} style={{ fontSize: 12, color: '#374151', background: '#f3f4f6', borderRadius: 4, padding: '2px 8px' }}>
-                      {cat.name}
-                    </span>
-                  ) : null;
-                })}
-              </div>
+            {catTree.length > 0 ? (
+              <CategoryTree nodes={catTree} />
             ) : (
               <span style={{ fontSize: 13, color: '#9ca3af' }}>N/A</span>
             )}
@@ -205,7 +269,12 @@ export default function ViewCourseBuilder() {
               </div>
             </div>
           </div>
+        </div>
 
+        {SidePanel()}
+
+        {/* Options + Aptitude Test — full width of the content area */}
+        <div className={s.fullRow}>
           {/* Options panel */}
           <div className={s.formCard} style={{ border: 'none' }}>
             <div className={s.formCardHeader}>
@@ -271,9 +340,26 @@ export default function ViewCourseBuilder() {
               </div>
             </div>
           </div>
-        </div>
 
-        {SidePanel()}
+          {/* Aptitude Test (read-only) */}
+          <div className={s.formCard} style={{ border: 'none' }}>
+            <div className={s.formCardHeader}>
+              <div className={s.formCardHeaderLeft}>{MenuIcon} Aptitude Test</div>
+            </div>
+            <div style={{ padding: '4px 0 0' }}>
+              <ViewQASection
+                kind="aptitude"
+                settings={{ ...DEFAULT_APTITUDE_SETTINGS, ...(course.aptitudeSettings || {}) }}
+                questions={pickSelected(aptitudeQuestions, course.aptitudeSelectedQuestionIds)}
+                totalGenerated={aptitudeQuestions.length}
+                extraRows={[
+                  ['Status', course.aptitudeEnabled ? 'Enabled' : 'Disabled'],
+                  ['Context', course.aptitudeContext || '—'],
+                ]}
+              />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -321,6 +407,7 @@ export default function ViewCourseBuilder() {
                         const isZoom       = t.video_type === 'zoom_link';
                         const isAssignment = t.video_type === 'assignment';
                         const isLesson     = t.video_type === 'lesson';
+                        const isQuiz       = t.video_type === 'quiz';
                         const fileUrl      = t.attachments?.[0]?.url || t.fileUrl || null;
                         return (
                           <div key={t._id ?? ti} className={s.lessonRow} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
@@ -353,28 +440,41 @@ export default function ViewCourseBuilder() {
                               <div style={{ paddingLeft: 52, display: 'flex', flexDirection: 'column', gap: 6, width: '100%', marginTop: 2 }}>
                                 {/* Content */}
                                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                                  <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600, minWidth: 100, flexShrink: 0, paddingTop: 1 }}>Content</span>
+                                  <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600, width: 112, flexShrink: 0, paddingTop: 1 }}>Content</span>
                                   <span style={{ fontSize: 12, color: t.desc ? '#374151' : '#9ca3af', lineHeight: 1.5 }}>{t.desc || '—'}</span>
                                 </div>
                                 {/* Featured Image */}
                                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                                  <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600, minWidth: 100, flexShrink: 0, paddingTop: 1 }}>Featured Image</span>
+                                  <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600, width: 112, flexShrink: 0, paddingTop: 1 }}>Featured Image</span>
                                   {t.imageUrl
-                                    ? <a href={secureMediaUrl(t.imageUrl, mediaToken) || undefined} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#2563eb', textDecoration: 'underline', wordBreak: 'break-all', lineHeight: 1.5 }}>{t.imageUrl.split('/').pop()}</a>
+                                    ? <a href={secureMediaUrl(t.imageUrl, mediaToken) || undefined} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#2563eb', textDecoration: 'underline', lineHeight: 1.5 }}>View Image</a>
                                     : <span style={{ fontSize: 12, color: '#9ca3af' }}>N/A</span>}
                                 </div>
                                 {/* Video */}
                                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                                  <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600, minWidth: 100, flexShrink: 0, paddingTop: 1 }}>Video</span>
+                                  <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600, width: 112, flexShrink: 0, paddingTop: 1 }}>Video</span>
                                   {t.videoUrl
-                                    ? <a href={secureMediaUrl(t.videoUrl, mediaToken) || undefined} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#2563eb', textDecoration: 'underline', wordBreak: 'break-all', lineHeight: 1.5 }}>{t.videoUrl}</a>
+                                    ? <a href={secureMediaUrl(t.videoUrl, mediaToken) || undefined} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#2563eb', textDecoration: 'underline', lineHeight: 1.5 }}>Watch Video</a>
                                     : <span style={{ fontSize: 12, color: '#9ca3af' }}>N/A</span>}
                                 </div>
                                 {/* Video Playback Time */}
                                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                  <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600, minWidth: 100, flexShrink: 0 }}>Playback Time</span>
+                                  <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600, width: 112, flexShrink: 0 }}>Playback Time</span>
                                   <span style={{ fontSize: 12, color: '#374151' }}>{t.duration_hr || 0}h &nbsp;{t.duration_min || 0}m &nbsp;{t.duration_sec || 0}s</span>
                                 </div>
+                              </div>
+                            )}
+
+                            {/* Quiz: settings + selected questions & answers */}
+                            {isQuiz && (
+                              <div style={{ paddingLeft: 52, width: '100%', boxSizing: 'border-box', marginTop: 6 }}>
+                                <ViewQASection
+                                  kind="quiz"
+                                  settings={t.quizSettings || {}}
+                                  questions={pickSelected(quizQuestions[String(t._id)], t.quizSettings?.selectedQuestionIds)}
+                                  totalGenerated={quizQuestionsLoading ? undefined : (quizQuestions[String(t._id)] || []).length}
+                                  loading={quizQuestionsLoading}
+                                />
                               </div>
                             )}
 
@@ -383,11 +483,11 @@ export default function ViewCourseBuilder() {
                               <div style={{ paddingLeft: 52 }}>
                                 <a
                                   href={secureMediaUrl(fileUrl, mediaToken) || undefined}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  style={{ fontSize: 12, color: '#b45309', textDecoration: 'underline', wordBreak: 'break-all' }}
+                                  download
+                                  onClick={e => { e.preventDefault(); downloadMedia(fileUrl, t.attachments?.[0]?.name); }}
+                                  style={{ fontSize: 12, color: '#b45309', textDecoration: 'underline', cursor: 'pointer' }}
                                 >
-                                  {fileUrl.split('/').pop()}
+                                  View Assignment
                                 </a>
                               </div>
                             )}

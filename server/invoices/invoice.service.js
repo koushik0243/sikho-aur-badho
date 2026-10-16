@@ -16,6 +16,14 @@ const buildQuery = (filters = {}) => {
         query.org_id   = new ObjectId(filters.org_id);
     if (filters.order_id && ObjectId.isValid(filters.order_id))
         query.order_id = new ObjectId(filters.order_id);
+    // Payment date range (ISO timestamps; either end optional, both inclusive).
+    const from = filters.date_from ? new Date(filters.date_from) : null;
+    const to   = filters.date_to ? new Date(filters.date_to) : null;
+    if ((from && !isNaN(from)) || (to && !isNaN(to))) {
+        query.payment_date = {};
+        if (from && !isNaN(from)) query.payment_date.$gte = from;
+        if (to && !isNaN(to)) query.payment_date.$lte = to;
+    }
     return query;
 };
 

@@ -124,3 +124,30 @@ export async function openMediaInNewTab(filePath) {
   tab.location.replace(url);
   return true;
 }
+
+/**
+ * Downloads an uploaded file (e.g. an assignment) instead of opening it. The
+ * API is on another origin, where <a download> is ignored, so the file is
+ * fetched and saved from a blob URL. Falls back to opening it in a new tab.
+ * @param {string} filePath e.g. "/uploads/assignments/123.pdf"
+ * @param {string} [fileName] name to save as (defaults to the file's name)
+ */
+export async function downloadMedia(filePath, fileName) {
+  if (!filePath) return;
+  const url = secureMediaUrl(filePath, await getMediaToken())
+    || (filePath.startsWith('http') ? filePath : `${API_URL}${filePath}`);
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blobUrl = URL.createObjectURL(await res.blob());
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = fileName || filePath.split('/').pop().split('?')[0] || 'download';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(blobUrl);
+  } catch {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+}

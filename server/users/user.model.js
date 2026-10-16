@@ -66,6 +66,7 @@ const Users = new Schema(
         resetPasswordToken: { type: String, required: false, default: null },
         resetPasswordExpires: { type: Date, required: false, default: null },
         isVerified: { type: Boolean, default: false },        
+        lastLoginAt: { type: Date, default: null }, // set on each successful sign-in
         deletedAt: { type: Date, default: null },        
         status: { type: String, enum: ['active', 'inactive', 'suspended', 'deleted'], default: 'active', required: true },        
     },

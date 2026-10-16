@@ -6,7 +6,11 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from "./CourseCategoryList.module.css";
+import sPage from "./CourseCategoryList.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const Icon = {
   search: (
@@ -99,8 +103,8 @@ export default function CourseCategoryList() {
     const id = confirm.id;
     setConfirm({ show: false, id: null });
     apiServiceHandler('GET', `course-category/delete/${id}`)
-      .then(() => { toast.success('Category deleted.'); fetchRows(); })
-      .catch(() => toast.error('Delete failed'));
+      .then(() => { toast.error('Category deleted.'); fetchRows(); })
+      .catch(() => toast.warning('Delete failed'));
   }
 
   function handleBulkDelete() { if (selected.length > 0) setBulkConfirm(true); }
@@ -109,8 +113,8 @@ export default function CourseCategoryList() {
     const ids = [...selected];
     setSelected([]);
     Promise.all(ids.map(id => apiServiceHandler('GET', `course-category/delete/${id}`)))
-      .then(() => { toast.success(`${ids.length} categor${ids.length !== 1 ? 'ies' : 'y'} deleted.`); fetchRows(); })
-      .catch(() => toast.error('Some deletes failed'));
+      .then(() => { toast.error(`${ids.length} categor${ids.length !== 1 ? 'ies' : 'y'} deleted.`); fetchRows(); })
+      .catch(() => toast.warning('Some deletes failed'));
   }
 
   const allIds = rows.map(r => r._id);
@@ -229,15 +233,15 @@ export default function CourseCategoryList() {
                   <td>{fmtDate(row.createdAt)}</td>
                   <td>
                     <div className={s.actions} onClick={e => e.stopPropagation()}>
-                      <button className={s.btnView} title="View"
+                      <button data-action="view" className={s.btnView} title="View"
                         onClick={() => router.push(`/superadmin/course-category/${row._id}`)}>
                         {Icon.eye}
                       </button>
-                      <button className={s.btnEdit} title="Edit"
+                      <button data-action="edit" className={s.btnEdit} title="Edit"
                         onClick={() => router.push(`/superadmin/course-category/${row._id}/edit`)}>
                         {Icon.edit}
                       </button>
-                      <button className={s.btnDelete} title="Delete"
+                      <button data-action="delete" className={s.btnDelete} title="Delete"
                         onClick={() => handleDelete(row._id)}>
                         {Icon.trash}
                       </button>

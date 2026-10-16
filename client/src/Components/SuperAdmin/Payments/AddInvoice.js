@@ -5,8 +5,13 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./AddInvoice.module.css";
+import sPage from "./AddInvoice.module.css";
 import AppDatePicker from '../AppDatePicker';
+import { usePaymentMethods } from '../../../lib/paymentMethods';
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const BackArrow = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -60,6 +65,8 @@ const EMPTY = {
 export default function AddInvoice() {
   const router = useRouter();
   const [form, setForm]             = useState(EMPTY);
+  // Options from SuperAdmin → Payments → Manage Payment Method.
+  const { options: paymentMethodOptions, loading: paymentMethodsLoading } = usePaymentMethods(form.payment_method);
   const [orgs, setOrgs]             = useState([]);
   const [allOrders, setAllOrders]   = useState([]);
   const [filteredOrders, setFilteredOrders] = useState([]);
@@ -135,7 +142,7 @@ export default function AddInvoice() {
       toast.success('Invoice created successfully.');
       router.push('/superadmin/payments/invoices');
     } catch (err) {
-      toast.error(err?.message || 'Failed to create invoice.');
+      toast.warning(err?.message || 'Failed to create invoice.');
     } finally {
       setSubmitting(false);
     }
@@ -182,7 +189,7 @@ export default function AddInvoice() {
               { value: 'failed',  label: 'Failed' },
               { value: 'refunded',label: 'Refunded' },
             ]} />
-            <Field form={form} setField={setField} errors={errors}label="Payment Method" name="payment_method" placeholder="e.g. manual, netbanking, upi" />
+            <Field form={form} setField={setField} errors={errors} label="Payment Method" name="payment_method" options={[{ value: '', label: paymentMethodsLoading ? 'Loading payment methods…' : 'Select payment method' }, ...paymentMethodOptions]} />
             <Field form={form} setField={setField} errors={errors}label="Transaction ID" name="transaction_id" placeholder="TXN-XXXXXXXXXX" />
             <Field form={form} setField={setField} errors={errors} label="Payment Date" name="payment_date" type="date" maxDate={new Date()} />
             <Field form={form} setField={setField} errors={errors}label="Status" name="status" options={[

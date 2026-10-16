@@ -4,10 +4,12 @@ import { useSelector } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import { selectUser, selectAuthReady } from '../../../redux/slices/authSlice';
 import apiServiceHandler, { clearGetCache } from '../../../service/apiService';
-import { API_URL } from '../../../lib/constant';
+import CourseCard from '../../../Components/Learner/CourseCard/CourseCard';
+import CourseFilters from '../../../Components/Learner/CourseCard/CourseFilters';
+import { STAGE_LABEL, STAGE_RANK, courseState } from '../../../Components/Learner/CourseCard/courseCardData';
 import s from "./Courses.module.css";
 
-const PAGE_SIZE = 9;
+const PAGE_SIZE = 12; // two full rows of six
 
 // Extract an array from any common API response shape
 function toArray(res) {
@@ -52,71 +54,39 @@ function formatDuration(hr, min) {
   return null;
 }
 
-function CourseCard({ course, attempt, onResume }) {
-  const title    = course?.title    || 'Untitled Course';
-  const desc     = course?.desc     || course?.description || '';
-  const imgPath  = course?.course_image;
-  const imgSrc   = imgPath ? `${API_URL}${imgPath}` : null;
-  const pct      = Number(attempt?.score || 0);
+/** This page's extra card lines: chapters + duration, and the star rating (shown inside the shared card). */
+function CourseMeta({ course }) {
   const chapters = Number(course?.totalChapters || 0);
   const duration = formatDuration(course?.duration_hr, course?.duration_min);
   const rating   = Number(course?.rating || 0);
-
   return (
-    <div className={s.card}>
-      <div className={s.thumbWrap}>
-        {imgSrc
-          ? <img src={imgSrc} alt={title} className={s.thumb}/>
-          : (
-            <div className={s.thumbPlaceholder}>
-              <BookIcon/>
-            </div>
-          )
-        }
-        <div className={s.progressOverlay}>
-          <div className={s.progressTrack}>
-            <div className={s.progressFill} style={{ width: `${pct}%` }}/>
-          </div>
+    <>
+      <div className={s.metaRow}>
+        <div className={s.metaLeft}>
+          {chapters > 0 && (
+            <span className={s.metaItem}>
+              <svg viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd"/>
+              </svg>
+              {chapters} Chapter{chapters !== 1 ? 's' : ''}
+            </span>
+          )}
+          {duration && (
+            <span className={s.metaItem}>
+              <svg viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"/>
+              </svg>
+              {duration}
+            </span>
+          )}
         </div>
-        {pct > 0 && <span className={s.progressLabel}>{pct}%</span>}
+        <button className={s.cardMenuBtn} aria-label="More options">⋯</button>
       </div>
-
-      <div className={s.cardBody}>
-        <div className={s.metaRow}>
-          <div className={s.metaLeft}>
-            {chapters > 0 && (
-              <span className={s.metaItem}>
-                <svg viewBox="0 0 20 20" fill="currentColor" style={{width:13,height:13,opacity:0.7}}>
-                  <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd"/>
-                </svg>
-                {chapters} Chapter{chapters !== 1 ? 's' : ''}
-              </span>
-            )}
-            {duration && (
-              <span className={s.metaItem}>
-                <svg viewBox="0 0 20 20" fill="currentColor" style={{width:13,height:13,opacity:0.7}}>
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"/>
-                </svg>
-                {duration}
-              </span>
-            )}
-          </div>
-          <button className={s.cardMenuBtn} aria-label="More options">⋯</button>
-        </div>
-
-        <div className={s.ratingRow}>
-          <StarRating value={rating}/>
-          <button className={s.ratingLink} onClick={() => {}}>Leave A Rating</button>
-        </div>
-
-        <h3 className={s.cardTitle}>{title}</h3>
-        {desc && <p className={s.cardDesc}>{desc}</p>}
-
-        <div className={s.cardFooter}>
-          <button className={s.resumeBtn} onClick={onResume}>Resume</button>
-        </div>
+      <div className={s.ratingRow}>
+        <StarRating value={rating}/>
+        <button className={s.ratingLink} onClick={() => {}}>Leave A Rating</button>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -145,6 +115,7 @@ export default function LearnerCoursesPage() {
   const [items,   setItems]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [page,    setPage]    = useState(1);
+  const [filter,  setFilter]  = useState('all');
 
   const load = useCallback(async () => {
     if (!userId) {
@@ -160,11 +131,14 @@ export default function LearnerCoursesPage() {
         return String(raw);
       })();
 
-      const [caRes, courseRes, ocRes] = await Promise.all([
+      const [caRes, courseRes, ocRes, myProgRes] = await Promise.all([
         apiServiceHandler('GET', `course-assignment/list?userId=${userId}`).catch(() => null),
         apiServiceHandler('GET', 'course/list').catch(() => null),
         orgId ? apiServiceHandler('GET', `organization-course/list?orgId=${orgId}`).catch(() => null) : Promise.resolve(null),
+        apiServiceHandler('GET', `my-report/progress?t=${Date.now()}`).catch(() => null),
       ]);
+      // Real progress per course (as on the dashboard): stage, %, chapters, certificate.
+      const myProgress = new Map((myProgRes?.data?.courses || []).map(c => [String(c.courseId), c]));
 
       const assignments    = toArray(caRes);
       const rawCourseList  = toArray(courseRes);
@@ -229,7 +203,9 @@ export default function LearnerCoursesPage() {
         }));
       }
 
-      setItems(merged.map(({ cid: _cid, ...rest }) => rest));
+      setItems(merged
+        .map(({ cid, ...rest }) => ({ ...rest, ...courseState(myProgress.get(cid)) }))
+        .sort((x, y) => STAGE_RANK[x.stage] - STAGE_RANK[y.stage] || Number(y.progress || 0) - Number(x.progress || 0)));
     } finally {
       setLoading(false);
     }
@@ -240,8 +216,10 @@ export default function LearnerCoursesPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
-  const pageItems  = items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const shown      = items.filter(it => filter === 'all' || it.stage === filter);
+  const totalPages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+  const pageItems  = shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const changeFilter = (key) => { setFilter(key); setPage(1); };
 
   async function handleResume(course) {
     const courseId = course?._id ? String(course._id) : null;
@@ -269,11 +247,11 @@ export default function LearnerCoursesPage() {
   }
 
   function renderPagination() {
-    const from = items.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-    const to   = Math.min(page * PAGE_SIZE, items.length);
+    const from = shown.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+    const to   = Math.min(page * PAGE_SIZE, shown.length);
     return (
       <div className={s.pagination}>
-        <span className={s.paginationInfo}>Showing {from}–{to} of {items.length}</span>
+        <span className={s.paginationInfo}>Showing {from}–{to} of {shown.length}</span>
         <div className={s.paginationBtns}>
           <button className={s.pageBtn} onClick={() => setPage(p => p - 1)} disabled={page === 1}>Previous</button>
           {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
@@ -291,40 +269,43 @@ export default function LearnerCoursesPage() {
 
   return (
     <div className={s.page}>
-      <div className={s.pageHeader}>
-        <h1 className={s.pageTitle}>
-          My Courses
-          {!loading && items.length > 0 && (
-            <span className={s.courseCount}> ({items.length})</span>
-          )}
-        </h1>
-      </div>
+      <section className={s.panel} aria-labelledby="courses-h">
+        <CourseFilters id="courses-h" as="h1" title="My Courses" courses={items} value={filter} onChange={changeFilter} showControls={!loading} />
 
-      {loading ? (
-        <div className={s.grid}>
-          {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i}/>)}
-        </div>
-      ) : items.length === 0 ? (
-        <div className={s.empty}>
-          <BookIcon/>
-          <p className={s.emptyTitle}>No courses available yet</p>
-          <p className={s.emptyDesc}>Courses added to your organisation will appear here.</p>
-        </div>
-      ) : (
-        <>
+        {loading ? (
           <div className={s.grid}>
-            {pageItems.map(({ id, course, assignment }) => (
-              <CourseCard
-                key={id}
-                course={course}
-                attempt={assignment}
-                onResume={() => handleResume(course)}
-              />
-            ))}
+            {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i}/>)}
           </div>
-          {renderPagination()}
-        </>
-      )}
+        ) : items.length === 0 ? (
+          <div className={s.empty}>
+            <BookIcon/>
+            <p className={s.emptyTitle}>No courses available yet</p>
+            <p className={s.emptyDesc}>Courses added to your organisation will appear here.</p>
+          </div>
+        ) : shown.length === 0 ? (
+          <div className={s.empty}>
+            <BookIcon/>
+            <p className={s.emptyTitle}>No {STAGE_LABEL[filter].toLowerCase()} courses</p>
+          </div>
+        ) : (
+          <>
+            <div className={s.grid} role="list" aria-label="My courses">
+              {pageItems.map(({ id, course, ...state }) => (
+                <CourseCard
+                  key={id}
+                  title={course?.title || 'Untitled Course'}
+                  category={course?.catId?.title || course?.category || ''}
+                  desc={course?.desc || course?.description || ''}
+                  {...state}
+                  extra={<CourseMeta course={course}/>}
+                  onOpen={() => handleResume(course)}
+                />
+              ))}
+            </div>
+            {renderPagination()}
+          </>
+        )}
+      </section>
     </div>
   );
 }

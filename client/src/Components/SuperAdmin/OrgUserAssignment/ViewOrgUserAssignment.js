@@ -4,7 +4,12 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import vp from "./ViewOrgUserAssignment.module.css";
+import vpPage from "./ViewOrgUserAssignment.module.css";
+import ViewDetailRows, { capitalize } from '../ViewDetailRows';
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const vp = withAdminKit(vpPage);
 
 const BackArrow = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -57,59 +62,38 @@ export default function ViewOrgUserAssignment() {
   if (loading) return <SuperAdminShell activeSection="assign-user"><p className={vp.loadingText}>Loading…</p></SuperAdminShell>;
   if (!user?._id) return <SuperAdminShell activeSection="assign-user"><p className={vp.loadingText}>Assignment not found.</p></SuperAdminShell>;
   const displayName = user.name || user.email || '—';
-  const isActive    = user.status === 'active';
 
   return (
     <SuperAdminShell activeSection="assign-user">
       <button className={vp.backBtn} onClick={() => router.push('/superadmin/organization-user-assignment')}>
         {BackArrow} Back to User Assignments
       </button>
-      <nav className={vp.breadcrumb}>
-        <button className={vp.breadcrumbLink} onClick={() => router.push('/superadmin/organization-user-assignment')}>User Assignments</button>
-        <span className={vp.breadcrumbSep}>›</span>
-        <span className={vp.breadcrumbCurr}>{displayName}</span>
-      </nav>
+      <div className={vp.viewToolbar}>
+        <nav className={vp.breadcrumb}>
+          <button className={vp.breadcrumbLink} onClick={() => router.push('/superadmin/organization-user-assignment')}>User Assignments</button>
+          <span className={vp.breadcrumbSep}>›</span>
+          <span className={vp.breadcrumbCurr}>{displayName}</span>
+        </nav>
+        <button className={vp.btnEdit} onClick={() => router.push(`/superadmin/organization-user-assignment/edit/${id}`)}>
+          <EditIcon /> Edit
+        </button>
+      </div>
 
       <div className={vp.detailCard}>
-        <div className={vp.detailHead}>
-          <div className={vp.detailHeadLeft}>
-            <div className={vp.detailAvatar}>{displayName.charAt(0).toUpperCase()}</div>
-            <div>
-              <h1 className={vp.detailTitle}>{displayName}</h1>
-              <div className={vp.detailBadges}>
-                {orgName && <span className={vp.badgeNeutral}>{orgName}</span>}
-                <span className={isActive ? vp.badgeActive : vp.badgeInactive}>
-                  {user.status ? user.status.charAt(0).toUpperCase() + user.status.slice(1) : 'Unknown'}
-                </span>
-              </div>
-            </div>
-          </div>
-          <button className={vp.btnEdit} onClick={() => router.push(`/superadmin/organization-user-assignment/edit/${id}`)}>
-            <EditIcon /> Edit
-          </button>
-        </div>
 
         <div className={vp.detailBody}>
-          <div className={vp.detailRows}>
-            <div className={vp.detailRow}>
-              <span className={vp.detailLabel}>Email</span>
-              <span className={vp.detailValue}>{user.email || '—'}</span>
-            </div>
-            {orgName && (
-              <div className={vp.detailRow}>
-                <span className={vp.detailLabel}>Organization</span>
-                <span className={vp.detailValue}>{orgName}</span>
-              </div>
-            )}
-            <div className={vp.detailRow}>
-              <span className={vp.detailLabel}>Role</span>
-              <span className={vp.detailValue}>{user.orgRole || '—'}</span>
-            </div>
-            <div className={vp.detailRow}>
-              <span className={vp.detailLabel}>Assigned On</span>
-              <span className={vp.detailValue}>{fmtDate(user.updatedAt || user.createdAt)}</span>
-            </div>
-          </div>
+          <ViewDetailRows s={vp} rows={[
+              { label: 'Name', value: user.name },
+              { label: 'Email', value: user.email },
+              { label: 'WhatsApp No', value: user.whatsapp_no },
+              { label: 'Employee ID', value: user.emp_id },
+              { label: 'Department', value: user.department },
+              { label: 'Designation', value: user.designation },
+              { label: 'Organization', value: orgName },
+              { label: 'Role', value: capitalize(user.orgRole) },
+              { label: 'Status', value: capitalize(user.status) },
+              { label: 'Assigned On', value: fmtDate(user.updatedAt || user.createdAt) },
+          ]} />
         </div>
       </div>
     </SuperAdminShell>

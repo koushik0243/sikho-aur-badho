@@ -5,6 +5,7 @@ import { useSelector } from 'react-redux';
 import { selectUser } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
 import s from "./Credits.module.css";
+import { kit as k, PageHeader, KpiTiles, Card, Pill, Pager, SkeletonRows, KitIcon } from '../PageKit/PageKit';
 
 function getTokenUserId() {
   if (typeof window === 'undefined') return null;
@@ -21,23 +22,6 @@ function fmtDate(val) {
   try {
     return new Date(val).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   } catch { return '—'; }
-}
-
-function CreditBar({ value, max, showBubble, bubbleLabel }) {
-  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
-  return (
-    <div className={s.barRow}>
-      <div className={s.barLabel} />
-      <div className={s.barTrack}>
-        <div className={s.barFill} style={{ width: `${pct}%` }}>
-          {showBubble && (
-            <div className={s.barBubble}>{bubbleLabel ?? value}</div>
-          )}
-        </div>
-      </div>
-      <div className={s.barValue}>{value}</div>
-    </div>
-  );
 }
 
 export default function CreditsPage() {
@@ -126,138 +110,85 @@ export default function CreditsPage() {
     { label: 'Credits used',      value: loading ? '…' : `${assignedCount} / ${totalCredits}` },
   ];
 
+  const remaining = creditsRemaining > 0 ? creditsRemaining : 0;
+  const usedPct = totalCredits > 0 ? Math.min(100, Math.round((assignedCount / totalCredits) * 100)) : 0;
+  const remainingTone = loading || totalCredits === 0 ? '' : remaining === 0 ? 'bad' : remaining / totalCredits < 0.2 ? 'warn' : 'good';
+  const pagedHistory = history.slice((histPage - 1) * PAGE_SIZE, histPage * PAGE_SIZE);
+
   return (
-    <>
-      {/* ── Two-column top section ── */}
+    <div className={k.page}>
+      <PageHeader title="Credits Usage" sub="How many credits you have, how many are used, and where each one went. One credit is used per course assigned." />
+
+      <KpiTiles items={[
+        { label: 'Total credits',  value: loading ? '—' : totalCredits,  icon: KitIcon.coins, hint: 'All packs purchased' },
+        { label: 'Used',           value: loading ? '—' : assignedCount, icon: KitIcon.spark, hint: loading || !totalCredits ? '' : `${usedPct}% of total` },
+        { label: 'Remaining',      value: loading ? '—' : remaining,     icon: KitIcon.check, tone: remainingTone, hint: remainingTone === 'bad' ? 'Buy more to keep assigning' : remainingTone === 'warn' ? 'Running low' : 'Available to assign' },
+        { label: 'Active learners', value: loading ? '—' : activeUsers,  icon: KitIcon.users },
+      ]} />
+
       <div className={s.topGrid}>
-
-        {/* Left: Credit Usage bars */}
-        <div className={s.card}>
-          <div className={s.cardHead}>
-            <h2 className={s.cardTitle}>Credit Usage</h2>
-            <div className={s.bubbleBadge}>{loading ? '…' : creditsRemaining}</div>
+        <Card title="Credit usage" sub="Used vs. remaining across all purchased packs.">
+          <div className={s.usageHead}>
+            <div>
+              <span className={s.usageBig}>{loading ? '—' : assignedCount}</span>
+              <span className={s.usageOf}> / {loading ? '—' : totalCredits} used</span>
+            </div>
+            <span className={s.usagePct}>{loading ? '' : `${usedPct}%`}</span>
           </div>
-          <div className={s.cardBody}>
-          <div className={s.barsGroup}>
-            <div className={s.barsGroupLabel}>Issued This Cycle</div>
-            <CreditBar value={totalCredits} max={totalCredits || 1} />
+          <div className={s.usageBar} role="progressbar" aria-valuenow={usedPct} aria-valuemin={0} aria-valuemax={100} aria-label="Credits used">
+            <span className={s.usageUsed} style={{ width: `${usedPct}%` }} />
           </div>
+          <ul className={s.legend}>
+            <li><span className={`${s.dot} ${s.dotUsed}`} />Used <strong>{loading ? '—' : assignedCount}</strong></li>
+            <li><span className={`${s.dot} ${s.dotLeft}`} />Remaining <strong>{loading ? '—' : remaining}</strong></li>
+          </ul>
+        </Card>
 
-          <div className={s.barsGroup}>
-            <div className={s.barsGroupLabel}>Consumed</div>
-            <CreditBar value={assignedCount} max={totalCredits || 1} />
-          </div>
-
-          <div className={s.barsDivider} />
-
-          <div className={s.barsGroup}>
-            <div className={s.barsGroupLabel}>Remaining</div>
-            <CreditBar
-              value={creditsRemaining > 0 ? creditsRemaining : 0}
-              max={totalCredits || 1}
-              showBubble
-              bubbleLabel={String(creditsRemaining > 0 ? creditsRemaining : 0)}
-            />
-          </div>
-          </div>
-        </div>
-
-        {/* Right: Store Snapshot */}
-        <div className={s.card}>
-          <div className={s.cardHead}><h2 className={s.cardTitle}>Store Snapshot</h2></div>
-          <div className={s.cardBody}>
-          <div className={s.snapshotList}>
-            {SNAPSHOT.map((row) => (
-              <div key={row.label} className={s.snapshotRow}>
-                <span className={s.snapshotLabel}>{row.label}</span>
-                <span className={s.snapshotDots} />
-                <span className={`${s.snapshotValue} ${row.large ? s.snapshotValueLarge : ''} ${row.bold ? s.snapshotValueBold : ''}`}>
-                  {row.value}
-                </span>
+        <Card title="Store snapshot">
+          <dl className={k.dl}>
+            {SNAPSHOT.map(row => (
+              <div key={row.label} className={k.dlRow}>
+                <dt>{row.label}</dt>
+                <dd>{row.value}</dd>
               </div>
             ))}
-          </div>
-          </div>
-        </div>
+          </dl>
+        </Card>
       </div>
 
-      {/* ── Credit Usage History ── */}
-      {(() => {
-        const totalPages   = Math.ceil(history.length / PAGE_SIZE);
-        const pagedHistory = history.slice((histPage - 1) * PAGE_SIZE, histPage * PAGE_SIZE);
-        return (
-          <div className={s.card}>
-            <div className={s.cardHead}><h2 className={s.cardTitle}>Credit Usage History</h2></div>
-            <div className={s.cardBody}>
-            <table className={s.historyTable}>
-              <thead>
-                <tr>
-                  <th className={s.thNum}>Sl.</th>
-                  <th className={s.thLearner}>Learner</th>
-                  <th className={s.thCourse}>Course</th>
-                  <th className={s.thStatus}>Status</th>
-                  <th className={s.thHistDate}>Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <tr key={i} className={s.historyRow}>
-                      <td colSpan={5}><div className={s.skeletonRow} /></td>
-                    </tr>
-                  ))
-                ) : history.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className={s.tdEmpty}>
-                      No credit usage history yet.
-                      <div className={s.tdEmptyDivider} />
-                    </td>
+      <Card title="Credit usage history" sub="One row per course assigned to a learner, newest first."
+        meta={!loading && <Pill tone="neutral">{history.length} record{history.length !== 1 ? 's' : ''}</Pill>} flush>
+        <div className={k.tableWrap}>
+          <table className={k.table}>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Learner</th>
+                <th>Course</th>
+                <th>Status</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? <SkeletonRows rows={3} cols={5} /> : history.length === 0 ? (
+                <tr><td colSpan={5} className={k.empty}>No credit usage history yet.</td></tr>
+              ) : pagedHistory.map((row, i) => {
+                const status = (row.status || 'active').toLowerCase();
+                return (
+                  <tr key={row._id ?? i}>
+                    <td className={k.idx}>{(histPage - 1) * PAGE_SIZE + i + 1}</td>
+                    <td className={k.strong}>{row.learnerId?.name || row.learnerId?.email || '—'}</td>
+                    <td>{row.courseId?.title || '—'}</td>
+                    <td><Pill tone={status === 'active' ? 'good' : 'neutral'}>{status}</Pill></td>
+                    <td className={k.muted}>{fmtDate(row.createdAt)}</td>
                   </tr>
-                ) : pagedHistory.map((row, i) => {
-                  const isActive = (row.status || 'active') === 'active';
-                  return (
-                    <tr key={row._id ?? i} className={s.historyRow}>
-                      <td className={s.tdNum}>{(histPage - 1) * PAGE_SIZE + i + 1}</td>
-                      <td className={s.tdAction}>
-                        {row.learnerId?.name || row.learnerId?.email || '—'}
-                      </td>
-                      <td className={s.tdBalance}>
-                        {row.courseId?.title || '—'}
-                      </td>
-                      <td className={s.tdDate}>
-                        <span className={`${s.statusBadge} ${isActive ? s.statusBadgeActive : s.statusBadgeInactive}`}>
-                          {row.status || 'active'}
-                        </span>
-                      </td>
-                      <td className={s.tdCredits}>{fmtDate(row.createdAt)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-
-            {!loading && (
-              <div className={s.pagination}>
-                <span className={s.paginationInfo}>
-                  Showing {history.length === 0 ? 0 : (histPage - 1) * PAGE_SIZE + 1}–{Math.min(histPage * PAGE_SIZE, history.length)} of {history.length}
-                </span>
-                <div className={s.paginationBtns}>
-                  <button className={s.pageBtn} onClick={() => setHistPage(p => Math.max(1, p - 1))} disabled={histPage <= 1}>‹</button>
-                  {Array.from({ length: Math.max(1, totalPages) }, (_, i) => i + 1).map(p => (
-                    <button
-                      key={p}
-                      className={`${s.pageBtn} ${p === histPage ? s.pageBtnActive : ''}`}
-                      onClick={() => setHistPage(p)}
-                    >{p}</button>
-                  ))}
-                  <button className={s.pageBtn} onClick={() => setHistPage(p => Math.min(totalPages, p + 1))} disabled={histPage >= totalPages}>›</button>
-                </div>
-              </div>
-            )}
-            </div>
-          </div>
-        );
-      })()}
-    </>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {!loading && <Pager page={histPage} pageSize={PAGE_SIZE} total={history.length} onPage={setHistPage} />}
+      </Card>
+    </div>
   );
 }

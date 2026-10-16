@@ -18,21 +18,6 @@ function toArr(res) {
   return [];
 }
 
-function Ring({ pct }) {
-  const r = 28, circ = 2 * Math.PI * r, dash = (pct / 100) * circ;
-  const stroke = pct > 60 ? '#e05252' : pct > 35 ? '#d97706' : '#0b7b7b';
-  return (
-    <svg className={s.ring} viewBox="0 0 70 70">
-      <circle cx="35" cy="35" r={r} fill="none" stroke="#e8edf0" strokeWidth="5" />
-      <circle cx="35" cy="35" r={r} fill="none"
-        stroke={stroke} strokeWidth="5"
-        strokeDasharray={`${dash} ${circ}`}
-        strokeLinecap="round" transform="rotate(-90 35 35)" />
-      <text x="35" y="40" textAnchor="middle" fontSize="13" fontWeight="700" fill="#1a2b2b">{pct}%</text>
-    </svg>
-  );
-}
-
 function InitialAvatar({ name, idx }) {
   const color    = AVATAR_COLORS[idx % AVATAR_COLORS.length];
   const initials = name
@@ -51,6 +36,13 @@ const ChevronIcon = (
     <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
   </svg>
 );
+
+const Icon = {
+  users:     <svg viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" /></svg>,
+  book:      <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" /></svg>,
+  clipboard: <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>,
+  check:     <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>,
+};
 
 const EyeIcon = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -71,6 +63,7 @@ export default function TrackAnalysisPage() {
   const [selectedCourse,  setSelectedCourse]  = useState(null);
   const [quizTopics,      setQuizTopics]      = useState([]);
   const [courseAttempts,  setCourseAttempts]  = useState([]);
+  const [attemptTotals,   setAttemptTotals]   = useState({ total: 0, passed: 0 });
 
   useEffect(() => {
     async function load() {
@@ -118,6 +111,7 @@ export default function TrackAnalysisPage() {
             )
           );
           const allAttempts = attResults.flatMap(r => toArr(r));
+          setAttemptTotals({ total: allAttempts.length, passed: allAttempts.filter(a => a.passed).length });
 
           const topicStats = {};
           for (const att of allAttempts) {
@@ -180,157 +174,196 @@ export default function TrackAnalysisPage() {
     if (title) learnerLatestCourse[uid] = title;
   }
 
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
-        <div className={s.spinner} />
-      </div>
-    );
-  }
+  const overallPass = attemptTotals.total > 0 ? Math.round((attemptTotals.passed / attemptTotals.total) * 100) : null;
+  const KPIS = [
+    { label: 'Learners',          value: learners.length,       icon: Icon.users },
+    { label: 'Courses',           value: coursesForDrop.length, icon: Icon.book },
+    { label: 'Quiz attempts',     value: attemptTotals.total,   icon: Icon.clipboard },
+    { label: 'Overall pass rate', value: overallPass === null ? '—' : `${overallPass}%`, icon: Icon.check,
+      tone: overallPass === null ? '' : overallPass >= 60 ? 'good' : overallPass >= 35 ? 'warn' : 'bad' },
+  ];
 
   return (
-    <>
-      {/* ── Chapter-wise failure analysis ── */}
-      <div className={s.card}>
-        <div className={s.cardHead}>
-          <h2 className={s.cardTitle}>Chapter-wise Failure Analysis</h2>
-          <span className={s.cardMeta}>
-            {failureChapters.length > 0
-              ? `Top ${failureChapters.length} by fail rate`
-              : 'No quiz attempt data yet'}
-          </span>
+    <div className={s.page}>
+      <header className={s.pageHead}>
+        <div>
+          <h1 className={s.pageTitle}>Track &amp; Analysis</h1>
+          <p className={s.pageSub}>Where learners struggle, how each learner is doing, and how every quiz is performing.</p>
         </div>
-        <div className={s.cardBody}>
-          {failureChapters.length > 0 ? (
-            <div className={s.ringRow}>
-              {failureChapters.map(ch => (
-                <div key={ch.label} className={s.ringItem}>
-                  <div className={s.ringLabel}>{ch.label}</div>
-                  <Ring pct={ch.pct} />
-                  <div className={s.ringMeta}>{ch.total} attempt{ch.total !== 1 ? 's' : ''}</div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className={s.emptyNote} style={{ textAlign: 'center', padding: '16px 0' }}>No quiz attempts recorded yet for your courses.</p>
-          )}
-        </div>
-      </div>
+      </header>
 
-      {/* ── Bottom two-column grid ── */}
-      <div className={s.bottomGrid}>
-
-        {/* Left: Learner progress detail */}
-        <div className={s.card}>
-          <div className={s.cardHead}>
-            <h3 className={s.cardTitle}>Learner Progress Detail</h3>
-            <span className={s.cardMeta}>{learners.length} learner{learners.length !== 1 ? 's' : ''}</span>
-          </div>
-          <div className={s.learnerList}>
-            {learners.length === 0 && (
-              <p className={s.emptyNote} style={{ textAlign: 'center', padding: '16px 0' }}>No learners enrolled yet.</p>
-            )}
-            {learners.length > 0 && (
-              <div className={s.learnerHeaderRow}>
-                <div className={s.headerAvatarSpacer} />
-                <div className={s.learnerInfo}>
-                  <div className={s.statLabel}>LEARNER</div>
-                </div>
-                <div className={s.learnerStats}>
-                  <div className={s.statLabel}>COURSES</div>
-                </div>
-                <div className={s.learnerStats}>
-                  <div className={s.statLabel}>STATUS</div>
-                </div>
-                <div className={s.headerActionsLabel}>
-                  <div className={s.statLabel}>ACTIONS</div>
+      {loading ? (
+        <div className={s.loadingWrap} role="status" aria-label="Loading analysis"><div className={s.spinner} /></div>
+      ) : (
+        <>
+          {/* ── KPIs ── */}
+          <section className={s.kpis} aria-label="Overview">
+            {KPIS.map(k => (
+              <div key={k.label} className={`${s.kpi} ${k.tone ? s[`kpi_${k.tone}`] : ''}`}>
+                <span className={s.kpiIcon} aria-hidden="true">{k.icon}</span>
+                <div>
+                  <div className={s.kpiValue}>{k.value}</div>
+                  <div className={s.kpiLabel}>{k.label}</div>
                 </div>
               </div>
-            )}
-            {learners.slice(0, 8).map((l, i) => {
-              const uid     = String(l._id || '');
-              const name    = l.name || l.fullName || `${l.firstName || ''} ${l.lastName || ''}`.trim() || 'Learner';
-              const courses = learnerAssignCount[uid] || 0;
-              const latest  = learnerLatestCourse[uid] || '—';
-              return (
-                <div key={uid || i} className={s.learnerRow}>
-                  <InitialAvatar name={name} idx={i} />
-                  <div className={s.learnerInfo}>
-                    <div className={s.learnerName}>{name}</div>
-                    <div className={s.learnerSub}>{latest}</div>
-                  </div>
-                  <div className={s.learnerStats}>
-                    <div className={s.statVal}>{courses}</div>
-                  </div>
-                  <div className={s.learnerStats}>
-                    <div className={s.statVal} style={{ textTransform: 'capitalize' }}>{l.status || 'Active'}</div>
-                  </div>
-                  <button className={s.btnView} onClick={() => router.push(`/storeowner/track-analysis/${uid}`)}>
-                    {EyeIcon} View Details
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+            ))}
+          </section>
 
-        {/* Right: Quiz completion tracking */}
-        <div className={`${s.card} ${s.videoCard}`}>
-          <div className={s.cardHead}>
-            <h3 className={s.cardTitle}>Quiz Completion Tracking</h3>
-          </div>
-          <div className={s.cardBody}>
-            <div className={s.selectWrap}>
-              <select
-                className={s.select}
-                style={{ color: selectedCourse ? '#1a2b2b' : undefined }}
-                value={selectedCourse?._id || ''}
-                onChange={e => {
-                  const found = coursesForDrop.find(c => c._id === e.target.value);
-                  setSelectedCourse(found || null);
-                }}
-              >
-                <option value="" disabled>Select Course</option>
-                {coursesForDrop.map(c => (
-                  <option key={c._id} value={c._id}>{c.title}</option>
-                ))}
-              </select>
-              <span className={s.chevron}>{ChevronIcon}</span>
+          {/* ── Chapter-wise failure analysis ── */}
+          <section className={s.card} aria-labelledby="ta-fail-h">
+            <div className={s.cardHead}>
+              <div>
+                <h2 id="ta-fail-h" className={s.cardTitle}>Chapter-wise failure analysis</h2>
+                <p className={s.cardSub}>Quizzes learners fail most often — the place to improve content first.</p>
+              </div>
+              <span className={s.cardMeta}>
+                {failureChapters.length > 0 ? `Top ${failureChapters.length} by fail rate` : 'No quiz attempt data yet'}
+              </span>
             </div>
-
-            {!selectedCourse && (
-              <p className={s.emptyNote}>Select a course to view quiz stats.</p>
-            )}
-            {selectedCourse && quizTopics.length === 0 && (
-              <p className={s.emptyNote}>No quiz topics in this course.</p>
-            )}
-
-            {quizTopics.length > 0 && (
-              <div className={s.videoList}>
-                {quizTopics.map(tp => {
-                  const tid   = String(tp._id);
-                  const stats = topicStatMap[tid] || { total: 0, passed: 0 };
-                  const pct   = stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0;
-                  return (
-                    <div key={tid} className={s.videoItem}>
-                      <div className={s.videoTitle}>{tp.title}</div>
-                      <div className={s.videoSub}>Quiz · {stats.total} attempt{stats.total !== 1 ? 's' : ''}</div>
-                      <div className={s.videoProgressRow}>
-                        <div className={s.videoTrack}>
-                          <div className={s.videoFill} style={{ width: `${pct}%` }} />
+            <div className={s.cardBody}>
+              {failureChapters.length > 0 ? (
+                <ol className={s.failList}>
+                  {failureChapters.map((ch, i) => {
+                    const tone = ch.pct > 60 ? 'bad' : ch.pct > 35 ? 'warn' : 'good';
+                    return (
+                      <li key={ch.label} className={s.failRow}>
+                        <span className={s.failRank}>{i + 1}</span>
+                        <div className={s.failMain}>
+                          <div className={s.failTop}>
+                            <span className={s.failLabel} title={ch.label}>{ch.label}</span>
+                            <span className={s.failMeta}>{ch.total} attempt{ch.total !== 1 ? 's' : ''}</span>
+                          </div>
+                          <div className={s.failTrack} role="progressbar" aria-valuenow={ch.pct} aria-valuemin={0} aria-valuemax={100} aria-label={`${ch.label} fail rate`}>
+                            <span className={s[`fill_${tone}`]} style={{ width: `${Math.max(ch.pct, 2)}%` }} />
+                          </div>
                         </div>
-                        <span className={s.videoScore}>{stats.passed}/{stats.total}</span>
-                      </div>
-                      <div className={s.videoMeta}>Pass rate: {pct}%</div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
+                        <span className={`${s.failPct} ${s[`pct_${tone}`]}`}>{ch.pct}%<small>fail</small></span>
+                      </li>
+                    );
+                  })}
+                </ol>
+              ) : (
+                <p className={s.emptyNote}>No quiz attempts recorded yet for your courses.</p>
+              )}
+            </div>
+          </section>
 
-      </div>
-    </>
+          {/* ── Learners + quiz tracking ── */}
+          <div className={s.bottomGrid}>
+            <section className={s.card} aria-labelledby="ta-learners-h">
+              <div className={s.cardHead}>
+                <div>
+                  <h2 id="ta-learners-h" className={s.cardTitle}>Learner progress</h2>
+                  <p className={s.cardSub}>Open a learner to see their course-by-course progress.</p>
+                </div>
+                <span className={s.cardMeta}>{learners.length} learner{learners.length !== 1 ? 's' : ''}</span>
+              </div>
+              {learners.length === 0 ? (
+                <p className={s.emptyNote}>No learners enrolled yet.</p>
+              ) : (
+                <div className={s.tableWrap}>
+                  <table className={s.table}>
+                    <thead>
+                      <tr>
+                        <th scope="col">Learner</th>
+                        <th scope="col" className={s.num}>Courses</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" className={s.actionCol}><span className={s.srOnly}>Actions</span></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {learners.map((l, i) => {
+                        const uid     = String(l._id || '');
+                        const name    = l.name || l.fullName || `${l.firstName || ''} ${l.lastName || ''}`.trim() || 'Learner';
+                        const courses = learnerAssignCount[uid] || 0;
+                        const latest  = learnerLatestCourse[uid] || 'No course assigned';
+                        const active  = (l.status || 'active').toLowerCase() === 'active';
+                        return (
+                          <tr key={uid || i}>
+                            <td>
+                              <div className={s.who}>
+                                <InitialAvatar name={name} idx={i} />
+                                <div className={s.whoText}>
+                                  <div className={s.learnerName}>{name}</div>
+                                  <div className={s.learnerSub}>{latest}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className={s.num}><span className={s.countPill}>{courses}</span></td>
+                            <td><span className={active ? s.statusActive : s.statusInactive}>{l.status || 'Active'}</span></td>
+                            <td className={s.actionCol}>
+                              <button data-action="view" className={s.btnView} onClick={() => router.push(`/storeowner/track-analysis/${uid}`)}
+                                title="View" aria-label={`View ${name}'s progress`}>
+                                {EyeIcon}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            <section className={`${s.card} ${s.videoCard}`} aria-labelledby="ta-quiz-h">
+              <div className={s.cardHead}>
+                <div>
+                  <h2 id="ta-quiz-h" className={s.cardTitle}>Quiz completion tracking</h2>
+                  <p className={s.cardSub}>Pass rate for every quiz in a course.</p>
+                </div>
+              </div>
+              <div className={s.cardBody}>
+                <div className={s.selectWrap}>
+                  <select
+                    className={s.select}
+                    aria-label="Course"
+                    value={selectedCourse?._id || ''}
+                    onChange={e => {
+                      const found = coursesForDrop.find(c => c._id === e.target.value);
+                      setSelectedCourse(found || null);
+                    }}
+                  >
+                    <option value="" disabled>Select a course</option>
+                    {coursesForDrop.map(c => (
+                      <option key={c._id} value={c._id}>{c.title}</option>
+                    ))}
+                  </select>
+                  <span className={s.chevron}>{ChevronIcon}</span>
+                </div>
+
+                {!selectedCourse && <p className={s.emptyNote}>Select a course to view quiz stats.</p>}
+                {selectedCourse && quizTopics.length === 0 && <p className={s.emptyNote}>No quiz topics in this course.</p>}
+
+                {quizTopics.length > 0 && (
+                  <div className={s.videoList} tabIndex={0} role="region" aria-label="Quiz completion by quiz">
+                    {quizTopics.map(tp => {
+                      const tid   = String(tp._id);
+                      const stats = topicStatMap[tid] || { total: 0, passed: 0 };
+                      const pct   = stats.total > 0 ? Math.round((stats.passed / stats.total) * 100) : 0;
+                      const tone  = stats.total === 0 ? 'none' : pct >= 60 ? 'good' : pct >= 35 ? 'warn' : 'bad';
+                      return (
+                        <div key={tid} className={s.videoItem}>
+                          <div className={s.videoTop}>
+                            <div className={s.videoTitle}>{tp.title}</div>
+                            <span className={`${s.ratePill} ${s[`rate_${tone}`]}`}>{stats.total ? `${pct}% pass` : 'No attempts'}</span>
+                          </div>
+                          <div className={s.videoProgressRow}>
+                            <div className={s.videoTrack}>
+                              <div className={`${s.videoFill} ${s[`fill_${tone === 'none' ? 'good' : tone}`]}`} style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className={s.videoScore}>{stats.passed}/{stats.total} passed</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
+        </>
+      )}
+    </div>
   );
 }

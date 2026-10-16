@@ -4,7 +4,12 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import vp from "./ViewTag.module.css";
+import vpPage from "./ViewTag.module.css";
+import ViewDetailRows, { capitalize } from '../ViewDetailRows';
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const vp = withAdminKit(vpPage);
 
 const BackArrow = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -41,54 +46,34 @@ export default function ViewTag() {
   if (loading) return <SuperAdminShell activeSection="tags"><p className={vp.loadingText}>Loading…</p></SuperAdminShell>;
   if (!tag?._id) return <SuperAdminShell activeSection="tags"><p className={vp.loadingText}>Tag not found.</p></SuperAdminShell>;
 
-  const isActive = tag.status === 'active';
 
   return (
     <SuperAdminShell activeSection="tags">
       <button className={vp.backBtn} onClick={() => router.push('/superadmin/tags')}>
         {BackArrow} Back to Tags
       </button>
-      <nav className={vp.breadcrumb}>
-        <button className={vp.breadcrumbLink} onClick={() => router.push('/superadmin/tags')}>Tags</button>
-        <span className={vp.breadcrumbSep}>›</span>
-        <span className={vp.breadcrumbCurr}>{tag.title}</span>
-      </nav>
+      <div className={vp.viewToolbar}>
+        <nav className={vp.breadcrumb}>
+          <button className={vp.breadcrumbLink} onClick={() => router.push('/superadmin/tags')}>Tags</button>
+          <span className={vp.breadcrumbSep}>›</span>
+          <span className={vp.breadcrumbCurr}>{tag.title}</span>
+        </nav>
+        <button className={vp.btnEdit} onClick={() => router.push(`/superadmin/tags/${id}/edit`)}>
+          <EditIcon /> Edit
+        </button>
+      </div>
 
       <div className={vp.detailCard}>
-        <div className={vp.detailHead}>
-          <div className={vp.detailHeadLeft}>
-            <div className={vp.detailAvatar}>{(tag.title || 'T').charAt(0).toUpperCase()}</div>
-            <div>
-              <h1 className={vp.detailTitle}>{tag.title}</h1>
-              <div className={vp.detailBadges}>
-                <span className={isActive ? vp.badgeActive : vp.badgeInactive}>
-                  {tag.status ? tag.status.charAt(0).toUpperCase() + tag.status.slice(1) : 'Unknown'}
-                </span>
-              </div>
-            </div>
-          </div>
-          <button className={vp.btnEdit} onClick={() => router.push(`/superadmin/tags/${id}/edit`)}>
-            <EditIcon /> Edit
-          </button>
-        </div>
 
         <div className={vp.detailBody}>
-          <div className={vp.detailRows}>
-            <div className={vp.detailRow}>
-              <span className={vp.detailLabel}>Created</span>
-              <span className={vp.detailValue}>{fmtDate(tag.createdAt)}</span>
-            </div>
-            <div className={vp.detailRow}>
-              <span className={vp.detailLabel}>Updated</span>
-              <span className={vp.detailValue}>{fmtDate(tag.updatedAt)}</span>
-            </div>
-            {tag.desc && (
-              <div className={vp.detailRow}>
-                <span className={vp.detailLabel}>Description</span>
-                <span className={vp.detailValueDesc}>{tag.desc}</span>
-              </div>
-            )}
-          </div>
+          <ViewDetailRows s={vp} rows={[
+              { label: 'Title', value: tag.title },
+              { label: 'Slug', value: tag.slug, variant: 'mono' },
+              { label: 'Description', value: tag.desc, variant: 'desc' },
+              { label: 'Status', value: capitalize(tag.status) },
+              { label: 'Created', value: fmtDate(tag.createdAt) },
+              { label: 'Updated', value: fmtDate(tag.updatedAt) },
+          ]} />
         </div>
       </div>
     </SuperAdminShell>

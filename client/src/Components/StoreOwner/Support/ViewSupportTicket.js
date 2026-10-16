@@ -3,8 +3,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import apiServiceHandler from '../../../service/apiService';
-import vp from "./ViewSupportTicket.module.css";
-import s from "./ViewSupportTicket.module.css";
+import pageStyles from "./ViewSupportTicket.module.css";
+import { withDetailKit } from '../PageKit/PageKit';
+
+// Page styles + the shared store owner detail-page look.
+const vp = withDetailKit(pageStyles);
+const s = withDetailKit(pageStyles);
 
 const BackArrow = (
   <svg viewBox="0 0 20 20" fill="currentColor">

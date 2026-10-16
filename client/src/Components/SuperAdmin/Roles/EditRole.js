@@ -5,7 +5,11 @@ import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./EditRole.module.css";
+import sPage from "./EditRole.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const BackArrow = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -44,7 +48,7 @@ export default function EditRole() {
           });
         }
       })
-      .catch(() => toast.error('Failed to load role.'))
+      .catch(() => toast.warning('Failed to load role.'))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -76,7 +80,7 @@ export default function EditRole() {
       toast.success('Role updated successfully.');
       router.push('/superadmin/roles');
     } catch (err) {
-      toast.error(err?.message || 'Failed to update role.');
+      toast.warning(err?.message || 'Failed to update role.');
     } finally {
       setSubmitting(false);
     }

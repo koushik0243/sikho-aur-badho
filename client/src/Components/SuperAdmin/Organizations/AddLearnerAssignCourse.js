@@ -5,8 +5,12 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler, { clearGetCache } from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from './AddLearnerAssignCourse.module.css';
+import sPage from './AddLearnerAssignCourse.module.css';
 import PasswordInput from '../../PasswordInput/PasswordInput';
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const BackArrow = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -147,7 +151,7 @@ export default function AddLearnerAssignCourse() {
       router.push(BACK_PATH);
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Please try again.';
-      toast.error(newUserId
+      toast.warning(newUserId
         ? `The learner was created, but assigning courses failed: ${msg}`
         : `Failed to add the learner: ${msg}`);
     } finally {

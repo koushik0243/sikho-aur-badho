@@ -5,7 +5,11 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from './DepartmentForm.module.css';
+import sPage from './DepartmentForm.module.css';
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const LIST_PATH = '/superadmin/departments';
 const NAME_MAX = 100;
@@ -86,7 +90,7 @@ export default function DepartmentForm({ id }) {
       toast.success(isEdit ? 'Department updated.' : 'Department created.');
       router.push(LIST_PATH);
     } catch (err) {
-      toast.error(err?.message || `Failed to ${isEdit ? 'update' : 'create'} department. Please try again.`);
+      toast.warning(err?.message || `Failed to ${isEdit ? 'update' : 'create'} department. Please try again.`);
     } finally {
       setSubmitting(false);
     }

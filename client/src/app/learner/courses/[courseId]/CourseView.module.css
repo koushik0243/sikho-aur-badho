@@ -2416,3 +2416,199 @@
 
 /* Voice answer: live preview of the phrase being spoken (confirmed text follows after each pause) */
 .quizLivePreview { color: #8a9a9a; font-style: italic; }
+
+/* ── Redesign: compact back link, title with an eyebrow, calmer chapter list ── */
+.backBtn.backBtn {
+  height: 34px; padding: 0 12px; margin-bottom: 4px; border-radius: 9px;
+  background: #fff; color: #0b6767; border: 1px solid #cfe5e5; font-weight: 600; font-size: 13.5px !important; opacity: 1;
+}
+.backBtn.backBtn:hover { background: #eef8f8; border-color: #0b7b7b; opacity: 1; }
+.backBtn.backBtn:focus-visible { outline: 2px solid #0b7b7b; outline-offset: 2px; }
+
+.watchHead { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.watchKind { color: #0b6767; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; font-size: 11.5px !important; }
+.watchTitle.watchTitle { font-weight: 800; color: #12302f; letter-spacing: -0.01em; font-size: 22px !important; overflow-wrap: anywhere; }
+
+.stat.stat { border-color: #e6eded; border-radius: 12px; box-shadow: 0 1px 2px rgba(15, 60, 60, 0.04); }
+.contentCard.contentCard, .aside.aside { border-color: #e6eded; box-shadow: 0 1px 2px rgba(15, 60, 60, 0.04); }
+
+/* "My Progress" sat above the card (absolute, clipped) — put it inline above the bar */
+.progressLabel.progressLabel {
+  position: static; display: flex; align-items: baseline; justify-content: space-between;
+  padding: 0; margin: 0 0 8px; background: none; color: #4d6464; font-weight: 600; font-size: 13px !important;
+}
+.progressPct.progressPct { font-weight: 800; font-variant-numeric: tabular-nums; font-size: 14px !important; }
+.progressBarWrap.progressBarWrap { margin-bottom: 18px; }
+.progressBarTrack.progressBarTrack { height: 8px; border-radius: 999px; background: #e8f0f0; }
+.progressBarFill.progressBarFill { border-radius: 999px; }
+
+.chaptersHeading.chaptersHeading { font-weight: 800; color: #12302f; font-size: 16px !important; }
+.chapterCard.chapterCard { border: 1px solid #eef3f3; border-radius: 12px; }
+.chapterHeader { border-radius: 11px; transition: background 0.15s; }
+.chapterCard:not(.chapterLocked) .chapterHeader:hover { background: #f4fafa; }
+.chapterActive.chapterActive { border-color: #9fd3d3; }
+.chapterActive.chapterActive .chapterHeader { background: #eaf6f5; box-shadow: inset 3px 0 0 #0b7b7b; }
+.chapterActive.chapterActive .chTitle { color: #0b6767; }
+.chMeta.chMeta { color: #6b7d7d; }
+.chapterLocked.chapterLocked { background: #fafcfc; }
+.chActiveBtn.chActiveBtn { padding: 3px 10px; border-radius: 999px; background: #f1f5f5; border-color: #e2e9ec; color: #6b7d7d; font-weight: 700; font-size: 11px !important; }
+
+/* ── Assignment: download → upload a video of the finished work (≤ 25 MB) ── */
+/* Same height as the video box when it fits; grows (no clipping) when the steps need more room. */
+.assignPanel.assignPanel { height: auto; min-height: calc(50cqw + 70px); gap: 12px; }
+.assignSteps { list-style: none; margin: 4px 0 0; padding: 0; width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 12px; text-align: left; }
+.assignStep { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border: 1px solid #e6eded; border-radius: 12px; background: #fbfdfd; }
+.assignStepNum {
+  width: 26px; height: 26px; flex-shrink: 0; display: grid; place-items: center; border-radius: 50%;
+  background: #e3f3f1; color: #0b6767; font-weight: 800; font-size: 13px !important;
+}
+.assignStepBody { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.assignStepTitle { color: #12302f; font-weight: 700; font-size: 14px !important; }
+.assignStepBody .panelBtnOutline { padding: 8px 20px; font-size: 14px !important; }
+
+.subBox { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.assignStepBody .subBox { max-width: none; }
+.subInput { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.subPick {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; padding: 16px 14px; cursor: pointer;
+  border: 1.5px dashed #9fcfcf; border-radius: 12px; background: #f4fbfa; color: #2b4141; text-align: center;
+  transition: background 0.15s, border-color 0.15s; font-size: 13.5px !important;
+}
+.subPick svg { color: #0b7b7b; }
+.subPick strong { color: #0b6767; }
+.subPick:hover:not(:disabled) { background: #eaf6f5; border-color: #0b7b7b; }
+.subPick:focus-visible { outline: 2px solid #0b7b7b; outline-offset: 2px; }
+.subHint { color: #7a8c8c; font-size: 12px !important; }
+.subFile { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid #d7e5e5; border-radius: 10px; background: #fff; text-align: left; }
+.subFileIcon { width: 30px; height: 30px; flex-shrink: 0; display: grid; place-items: center; border-radius: 8px; background: #e3f3f1; color: #0b6767; font-size: 12px !important; }
+.subFileName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #12302f; font-weight: 600; font-size: 13.5px !important; }
+.subFileSize { flex-shrink: 0; color: #6b7d7d; font-variant-numeric: tabular-nums; font-size: 12.5px !important; }
+.subLink { flex-shrink: 0; background: none; border: none; padding: 0; color: #0b6767; font-weight: 700; cursor: pointer; font-size: 13px !important; }
+.subLink:hover { text-decoration: underline; }
+.subProgress { height: 8px; border-radius: 999px; background: #e3ecec; overflow: hidden; }
+.subProgress span { display: block; height: 100%; background: #0b7b7b; border-radius: 999px; transition: width 0.2s; }
+.subError { margin: 0; padding: 8px 12px; border-radius: 9px; background: #fdf2f2; color: #b91c1c; text-align: left; font-size: 13px !important; }
+.subMeta { margin: 0; max-width: 520px; color: #4d6464; overflow-wrap: anywhere; font-size: 13.5px !important; }
+.assignPanel .assignBtnRow { justify-content: center; }
+.assignStepBody .assignBtnRow { justify-content: flex-start; }
+
+/* Reviewer asked for a new assignment video */
+.reuploadNote { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 12px; background: #fff7ed; border: 1px solid #fed7aa; border-left: 4px solid #f59e0b; text-align: left; }
+.reuploadNote strong { color: #9a3412; font-size: 14px !important; }
+.reuploadNote span { color: #4d3a26; overflow-wrap: anywhere; font-size: 13.5px !important; }
+.reuploadNote small { color: #8a6a4a; font-size: 12px !important; }
+
+/* Assignment approved / waiting for review */
+.assignComplete, .assignWaiting { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: 12px; text-align: left; }
+.assignComplete { background: #f0fdf4; border: 1px solid #bbf7d0; border-left: 4px solid #16a34a; }
+.assignComplete strong { color: #15803d; font-size: 15px !important; }
+.assignComplete span { color: #1f4d33; font-size: 13.5px !important; }
+.assignCompleteNote.assignCompleteNote { margin-top: 2px; color: #3f6b52; font-style: italic; overflow-wrap: anywhere; }
+.assignWaiting { background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #f59e0b; }
+.assignWaiting strong { color: #b45309; font-size: 15px !important; }
+.assignWaiting span { color: #5c4a1e; font-size: 13.5px !important; }
+
+/* ── Assignment: section 1 — choose one video, Upload right after it (add more by repeating) ── */
+.assignPanel .assignSteps { max-width: 640px; }
+.upRow { display: flex; align-items: stretch; gap: 10px; width: 100%; }
+.upPick {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 14px; cursor: pointer;
+  border: 1.5px dashed #9fcfcf; border-radius: 10px; background: #f4fbfa; color: #2b4141; text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+}
+.upPick svg { flex-shrink: 0; color: #0b7b7b; }
+.upPick:hover:not(:disabled) { background: #eaf6f5; border-color: #0b7b7b; }
+.upPick:focus-visible { outline: 2px solid #0b7b7b; outline-offset: 2px; }
+.upPickText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 13.5px !important; }
+.upBtn.upBtn { flex-shrink: 0; height: 46px; padding: 0 26px; }
+.upDone { margin: 0; padding: 8px 12px; border-radius: 9px; background: #f0fdf4; color: #15803d; text-align: left; overflow-wrap: anywhere; font-size: 13px !important; }
+@media (max-width: 520px) { .upRow { flex-direction: column; } .upBtn.upBtn { width: 100%; } }
+
+/* ── Assignment: section 2 — uploaded videos, two columns ── */
+.vidSection { width: 100%; max-width: 760px; text-align: left; margin-top: 4px; }
+.vidSectionTitle.vidSectionTitle { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; color: #12302f; font-weight: 800; font-size: 15px !important; }
+.vidCount.vidCount { min-width: 22px; height: 22px; padding: 0 7px; display: inline-grid; place-items: center; border-radius: 999px; background: #e3f3f1; color: #0b6767; font-weight: 700; font-size: 12px !important; }
+.vidGrid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 640px) { .vidGrid { grid-template-columns: minmax(0, 1fr); } }
+.vidTile { display: flex; flex-direction: column; border: 1px solid #e2ecec; border-radius: 12px; overflow: hidden; background: #fff; }
+.vidStage { aspect-ratio: 16 / 9; background: #0b1414; display: grid; place-items: center; }
+.vidPlayer { width: 100%; height: 100%; display: block; background: #000; }
+.vidPlay {
+  display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 18px; border-radius: 999px; cursor: pointer;
+  border: none; background: rgba(255, 255, 255, 0.92); color: #0b6767; font-weight: 700; transition: transform 0.15s; font-size: 14px !important;
+}
+.vidPlay svg { width: 20px; height: 20px; }
+.vidPlay:hover:not(:disabled) { transform: scale(1.04); }
+.vidPlay:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.vidPlay:disabled { opacity: 0.7; cursor: wait; }
+.vidInfo { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px 12px; min-width: 0; }
+.vidTop { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.vidLabel.vidLabel { color: #0b6767; font-weight: 800; font-size: 13px !important; }
+.vidMeta.vidMeta { color: #7a8c8c; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: 12px !important; }
+.vidName.vidName { color: #12302f; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px !important; }
+.vidError.vidError { color: #b91c1c; font-size: 12.5px !important; }
+.vidComment.vidComment { margin: 4px 0 0; padding: 8px 10px; border-radius: 8px; background: #f4f9f9; color: #2b4141; overflow-wrap: anywhere; font-size: 12.5px !important; }
+.vidComment small { color: #7a8c8c; }
+.vidCommentWarn.vidCommentWarn { background: #fff7ed; color: #9a3412; }
+.vidCommentGood.vidCommentGood { background: #f0fdf4; color: #15803d; }
+
+/* ── Assignment · download card: text left, button right ── */
+.dlCard {
+  width: 100%; max-width: 760px; display: flex; align-items: center; gap: 14px; padding: 14px 16px; text-align: left;
+  border: 1px solid #d8ecea; border-radius: 14px; background: linear-gradient(135deg, #f3faf9 0%, #ffffff 70%);
+  box-shadow: 0 1px 2px rgba(15, 60, 60, 0.04);
+}
+.dlIcon { width: 44px; height: 44px; flex-shrink: 0; display: grid; place-items: center; border-radius: 12px; background: #e3f3f1; color: #0b7b7b; }
+.dlIcon svg { width: 22px; height: 22px; }
+.dlText { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dlTitle.dlTitle { color: #12302f; font-weight: 800; font-size: 15px !important; }
+.dlFile.dlFile { color: #6b7d7d; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px !important; }
+.dlBtn.dlBtn {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 20px; border-radius: 10px; cursor: pointer;
+  background: linear-gradient(180deg, #047279 0%, #299c8f 100%); color: #fff; border: 1px solid #047279; font-weight: 700;
+  transition: box-shadow 0.15s; font-size: 14px !important;
+}
+.dlBtn svg { width: 17px; height: 17px; }
+.dlBtn.dlBtn:hover:not(:disabled) { box-shadow: 0 6px 14px rgba(4, 114, 121, 0.25); }
+.dlBtn.dlBtn:focus-visible { outline: 2px solid #0b7b7b; outline-offset: 2px; }
+@media (max-width: 520px) { .dlCard { flex-wrap: wrap; } .dlBtn.dlBtn { width: 100%; justify-content: center; } }
+
+/* ── Assignment · separated sections with headings ── */
+.asgSection { width: 100%; max-width: 760px; text-align: left; margin-top: 6px; padding-top: 18px; border-top: 1px solid #e3ecec; }
+.asgHeading.asgHeading { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; color: #12302f; font-weight: 800; font-size: 16px !important; }
+.asgHint.asgHint { margin: 0 0 12px; color: #6b7d7d; font-size: 13px !important; }
+.asgHint strong { color: #12302f; font-weight: 700; font-size: 13px !important; }
+.vidSection.vidSection { margin-top: 6px; }
+.vidSectionTitle.vidSectionTitle { margin-bottom: 12px; }
+
+/* ── Assignment · upload rows ── */
+.upList { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.upItem { display: flex; flex-direction: column; gap: 8px; }
+.upDoneRow { display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 14px; border-radius: 10px; background: #f0fdf4; border: 1px solid #bbf7d0; }
+.upTick { width: 24px; height: 24px; flex-shrink: 0; display: grid; place-items: center; border-radius: 50%; background: #16a34a; color: #fff; }
+.upTick svg { width: 14px; height: 14px; }
+.upDoneName.upDoneName { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #14532d; font-weight: 600; font-size: 13.5px !important; }
+.upDoneTag.upDoneTag { flex-shrink: 0; color: #15803d; font-weight: 700; font-size: 12.5px !important; }
+.addMoreBtn.addMoreBtn {
+  display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 18px; border-radius: 10px; cursor: pointer;
+  background: #fff; color: #0b6767; border: 1.5px dashed #9fcfcf; font-weight: 700; transition: background 0.15s, border-color 0.15s; font-size: 14px !important;
+}
+.addMoreBtn.addMoreBtn:hover:not(:disabled) { background: #eaf6f5; border-color: #0b7b7b; }
+.addMoreBtn.addMoreBtn:focus-visible { outline: 2px solid #0b7b7b; outline-offset: 2px; }
+.addMoreBtn.addMoreBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Assignment panel: every section (status, download, upload, uploaded videos) uses the full content width */
+.assignPanel.assignPanel { align-items: stretch; text-align: left; padding: 24px 28px; }
+.assignPanel .panelIcon, .assignPanel .panelTitle { align-self: center; text-align: center; }
+.assignPanel .assignComplete, .assignPanel .assignWaiting, .assignPanel .reuploadNote,
+.assignPanel .dlCard, .assignPanel .asgSection, .assignPanel .vidSection, .assignPanel .panelSub { max-width: none; width: 100%; }
+.assignPanel .assignBtnRow { justify-content: flex-start; }
+
+/* Video comments: "Comment:" then one bullet per comment */
+.vidComments { list-style: none; margin: 4px 0 0; padding: 4px 12px; border-radius: 9px; background: #f4f9f9; text-align: left; display: flex; flex-direction: column; flex-shrink: 0; max-height: 200px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #c5d9d9 transparent; }
+.vidCommentsItem { flex-shrink: 0; padding: 8px 0; }
+.vidCommentsItem + .vidCommentsItem { border-top: 1px solid #dde9e9; }
+.vidCommentsHead.vidCommentsHead { display: block; color: #12302f; font-weight: 700; font-size: 12.5px !important; }
+.vidCommentsHead em { font-style: italic; font-weight: 400; color: #6b7d7d; font-size: 12.5px !important; }
+.vidCommentsHead strong { color: #0b6767; font-weight: 700; font-size: 12.5px !important; }
+.vidCommentsText.vidCommentsText { margin: 3px 0 0; color: #2b4141; overflow-wrap: anywhere; white-space: pre-line; line-height: 1.45; font-size: 13px !important; }

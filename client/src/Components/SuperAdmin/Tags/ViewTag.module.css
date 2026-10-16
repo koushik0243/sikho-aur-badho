@@ -319,3 +319,23 @@
     max-width: 160px;
   }
 }
+
+/* ── Shared view-page label column: same width on every view page (--view-label-width in globals.css) ── */
+@media (min-width: 481px) {
+  .detailRow > .detailLabel {
+    flex: 0 0 var(--view-label-width, 180px);
+    width: var(--view-label-width, 180px);
+    min-width: 0;
+  }
+}
+
+/* Breadcrumb + Edit button on one line, right edge lined up with the card */
+.viewToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  max-width: 700px;
+}
+.viewToolbar .breadcrumb { margin: 0; }

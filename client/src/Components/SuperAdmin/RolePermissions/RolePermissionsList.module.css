@@ -786,3 +786,7 @@
   padding: 20px !important;
   border-top: 1px solid #e3e3e3 !important;
 }
+
+/* ── Column alignment: headers line up with their values ── */
+/* Header text starts where the column values start (same side padding as the cells). */
+.table thead tr th:not(:has(input[type="checkbox"])) { padding-left: 6px; padding-right: 6px; }

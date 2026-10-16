@@ -390,3 +390,22 @@
 
   .selectorTitle { font-size: 17px; }
 }
+
+/* ── Redesign: compact label · value detail rows, status pill ── */
+.summaryRow.summaryRow { flex-direction: row; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 0; }
+.summaryLabel.summaryLabel { color: #6b7d7d; text-transform: none; letter-spacing: 0; font-weight: 500; flex-shrink: 0; font-size: 13.5px !important; }
+.summaryVal.summaryVal { color: #12302f; font-weight: 600; text-align: right; overflow-wrap: anywhere; font-size: 14px !important; }
+.summaryRow .progressWrap { flex: 1; max-width: 60%; flex-direction: row; align-items: center; gap: 8px; }
+.summaryRow .progressTrack { flex: 1; }
+.badgePassed.badgePassed, .badgeInProgress.badgeInProgress {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; border: none; font-weight: 700; font-size: 12px !important;
+}
+.badgePassed.badgePassed { background: #e7f7ee; color: #15803d; }
+.badgeInProgress.badgeInProgress { background: #fff4e0; color: #b45309; }
+.badgePassed::before, .badgeInProgress::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.achieveText.achieveText { display: block; }
+.downloadBtn.downloadBtn { height: 42px; border-radius: 9px; }
+.summaryRow .progressTrack.progressTrack { position: relative; flex: 1; min-width: 80px; height: 6px; border-radius: 999px; background: #e8f0f0; cursor: default; }
+.summaryRow .progressFill.progressFill { height: 100%; border-radius: 999px; background: #0b7b7b; }
+.summaryRow .progressWrap { justify-content: flex-end; }
+.achieveText.achieveText strong { margin-right: 4px; color: #fff; }

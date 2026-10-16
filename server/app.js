@@ -7,7 +7,8 @@ import compression from 'compression';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import protect from './middleware/authMiddleware.js';
+import protect, { requireSuperAdmin } from './middleware/authMiddleware.js';
+import { guardUploads, mediaTokenRouter } from './middleware/mediaAuth.js';
 
 // Recreate __filename and __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -33,6 +34,12 @@ import organizationCreditAssignmentRouter from './organization_credit_assignment
 
 import industryTypeRouter from './industry_type/industry_type.controller.js';
 import departmentRouter from './departments/department.controller.js';
+import designationRouter from './designations/designation.controller.js';
+import paymentMethodRouter from './payment_methods/payment_method.controller.js';
+import reportRouter from './reports/report.controller.js';
+import orgReportRouter from './reports/org_report.controller.js';
+import myReportRouter from './reports/my_report.controller.js';
+import topicActivityRouter from './topic_activity/topic_activity.controller.js';
 import tagRouter from './tags/tag.controller.js';
 import certificateTemplateRouter from './certificate_template/certificate_template.controller.js';
 import roleRouter from './roles/role.controller.js';
@@ -48,6 +55,7 @@ import quizAttemptRouter from './quiz_attempts/quiz_attempt.controller.js';
 import aptitudeQuestionRouter from './aptitude_questions/aptitude_question.controller.js';
 import aptitudeAttemptRouter from './aptitude_attempts/aptitude_attempt.controller.js';
 import progressRouter from './progress/progress.controller.js';
+import courseCompletionRouter from './course_completions/course_completion.controller.js';
 import noteRouter from './notes/note.controller.js';
 import reviewRouter from './reviews/review.controller.js';
 import speechRouter from './speech/speech.controller.js';
@@ -85,8 +93,10 @@ app.use(cors({
   optionsSuccessStatus: 204
 }));
 
-// Serve uploaded files as static assets (must come after cors so CORS headers are applied)
-app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
+// Serve uploaded files as static assets (must come after cors so CORS headers are applied).
+// Course content (lesson videos/images, assignments, intro videos) needs a media token — see middleware/mediaAuth.js.
+app.use('/uploads', guardUploads, express.static(path.join(__dirname, 'public', 'uploads')));
+app.use('/media', protect, mediaTokenRouter);
 
 app.use('/course-category', protect, courseCategoryRouter);
 app.use('/course-subcategory', protect, courseSubCategoryRouter);
@@ -107,6 +117,12 @@ app.use('/organization-course-assignment', protect, organizationCourseAssignment
 app.use('/organization-credit-assignment', protect, organizationCreditAssignmentRouter);
 app.use('/industry-type', protect, industryTypeRouter);
 app.use('/department', protect, departmentRouter);
+app.use('/designation', protect, designationRouter);
+app.use('/payment-method', protect, paymentMethodRouter);
+app.use('/report', protect, requireSuperAdmin, reportRouter);
+app.use('/org-report', protect, orgReportRouter); // store owner: own organization only
+app.use('/my-report', protect, myReportRouter);   // learner: own data only
+app.use('/topic-activity', protect, topicActivityRouter);
 app.use('/tags', protect, tagRouter);
 app.use('/certificate-template', protect, certificateTemplateRouter);
 app.use('/role', protect, roleRouter);
@@ -121,6 +137,7 @@ app.use('/quiz-attempt',   protect, quizAttemptRouter);
 app.use('/aptitude-questions', protect, aptitudeQuestionRouter);
 app.use('/aptitude-attempt', protect, aptitudeAttemptRouter);
 app.use('/progress',       protect, progressRouter);
+app.use('/course-completion', protect, courseCompletionRouter);
 app.use('/note', protect, noteRouter);
 app.use('/review', protect, reviewRouter);
 app.use('/speech', protect, speechRouter);

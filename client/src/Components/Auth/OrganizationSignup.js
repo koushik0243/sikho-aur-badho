@@ -100,7 +100,7 @@ export default function OrganizationSignup() {
       toast.success('Organization created! You can now log in.');
       router.push('/login');
     } catch (err) {
-      toast.error(err?.message || 'Failed to create your organization. Please try again.');
+      toast.warning(err?.message || 'Failed to create your organization. Please try again.');
     } finally {
       setSubmitting(false);
     }

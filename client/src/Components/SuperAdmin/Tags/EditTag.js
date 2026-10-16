@@ -5,7 +5,11 @@ import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./EditTag.module.css";
+import sPage from "./EditTag.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const TagIcon = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -37,7 +41,7 @@ export default function EditTag() {
         setTitle(d?.title ?? '');
         setDesc(d?.desc ?? '');
       })
-      .catch(() => toast.error('Failed to load tag details.'))
+      .catch(() => toast.warning('Failed to load tag details.'))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -58,7 +62,7 @@ export default function EditTag() {
       toast.success('Tag updated successfully.');
       router.push('/superadmin/tags');
     } catch {
-      toast.error('Failed to update tag. Please try again.');
+      toast.warning('Failed to update tag. Please try again.');
     } finally {
       setSubmitting(false);
     }

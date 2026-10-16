@@ -7,8 +7,13 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import { selectUser, selectUserType } from '../../../redux/slices/authSlice';
-import s from "./AddRolePermission.module.css";
-import rp from "./AddRolePermission.module.css";
+import sPage from "./AddRolePermission.module.css";
+import rpPage from "./AddRolePermission.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
+const rp = withAdminKit(rpPage);
 
 const BackArrow = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -186,7 +191,7 @@ export default function AddRolePermission() {
       );
       router.push('/superadmin/role-permissions');
     } catch (err) {
-      toast.error(err?.message || 'Failed to assign permissions.');
+      toast.warning(err?.message || 'Failed to assign permissions.');
     } finally {
       setSubmitting(false);
     }

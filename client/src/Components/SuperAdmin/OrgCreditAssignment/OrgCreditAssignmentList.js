@@ -1,29 +1,18 @@
-﻿'use client';
+'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from "./OrgCreditAssignmentList.module.css";
+import ListFilterBar, { EMPTY_LIST_FILTERS, isDateRangeInvalid, listFilterParams } from '../ListFilterBar';
+import sPage from "./OrgCreditAssignmentList.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
 
-const SearchIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-  </svg>
-);
-const EyeIcon = () => (
-  <svg viewBox="0 0 20 20" fill="currentColor">
-    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-    <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-  </svg>
-);
-const EditIcon = () => (
-  <svg viewBox="0 0 20 20" fill="currentColor">
-    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-  </svg>
-);
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
+
 const TrashIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
     <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -44,74 +33,85 @@ function fmtPrice(val) {
   return `₹${num.toFixed(2)}`;
 }
 
-function groupByOrg(records) {
-  const map = new Map();
-  for (const rec of records) {
-    const orgKey = String(rec.orgId?._id ?? 'unknown');
-    if (!map.has(orgKey)) {
-      map.set(orgKey, {
-        orgId:    rec.orgId?._id,
-        orgName:  rec.orgId?.org_name  || '—',
-        orgPhone: rec.orgId?.org_phone || null,
-        orgEmail: rec.orgId?.org_email || null,
-        credits: [],
-      });
-    }
-    const c = rec.creditId;
-    map.get(orgKey).credits.push({
-      recordId:   rec._id,
-      title:      c?.title      || '—',
-      limit_from: c?.limit_from ?? '—',
-      limit_to:   c?.limit_to   ?? '—',
-      price:      fmtPrice(c?.price),
-      status:     rec.status,
-      createdAt:  rec.createdAt,
-    });
-  }
-  return [...map.values()];
-}
-
 const LIMIT = 50;
+
+const STATUSES = [
+  { value: 'active',   label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+];
+
+const time = v => new Date(v).getTime() || 0;
+
+/** Row order on the page: by the clicked column; otherwise the server's order (most recent first). */
+function compareRecords(key, dir) {
+  const sign = dir === 'asc' ? 1 : -1;
+  const pick = {
+    orgName:    r => (r.orgId?.org_name ?? '').toLowerCase(),
+    assignedOn: r => time(r.createdAt),
+  }[key];
+  if (!pick) return null;
+  return (a, b) => { const av = pick(a), bv = pick(b); return av < bv ? -sign : av > bv ? sign : 0; };
+}
 
 export default function OrgCreditAssignmentList() {
   const router = useRouter();
-  const [records, setRecords]     = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [search, setSearch]       = useState('');
+  const [loaded, setLoaded]       = useState({ key: null, records: [], total: 0, totalPages: 1 });
+  const [reloadToken, setReloadToken] = useState(0);
+  const [orgs, setOrgs]           = useState([]);
+  const [filters, setFilters]     = useState(EMPTY_LIST_FILTERS);
   const [page, setPage]           = useState(1);
-  const [total, setTotal]         = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [hoveredOrg, setHoveredOrg] = useState(null);
   const [confirm, setConfirm]     = useState({ show: false, id: null, label: '' });
-  const [sortKey, setSortKey] = useState('');
-  const [sortDir, setSortDir] = useState('asc');
+  const [sortKey, setSortKey]     = useState('');
+  const [sortDir, setSortDir]     = useState('asc');
 
-  const fetchRecords = useCallback(() => {
-    setLoading(true);
-    const params = new URLSearchParams({ page, limit: LIMIT });
+  const dateRangeInvalid = isDateRangeInvalid(filters);
+
+  // One page of assignments matching the filters (filtered + paged on the server, newest first).
+  const query = `${listFilterParams(filters, { orgParam: 'orgId', statusParam: 'status' })}`;
+  const queryKey = `${query}|${page}|${reloadToken}`;
+  const loading = !dateRangeInvalid && loaded.key !== queryKey;
+  const { records, total, totalPages } = loaded;
+
+  useEffect(() => {
+    if (dateRangeInvalid) return undefined;
+    let cancelled = false;
+    const params = new URLSearchParams(query);
+    params.set('page', String(page));
+    params.set('limit', String(LIMIT));
+    params.set('t', String(Date.now()));   // skip apiServiceHandler's GET cache (fresh after a delete)
     apiServiceHandler('GET', `organization-credit-assignment/list-pagination?${params}`)
       .then(res => {
-        setRecords(Array.isArray(res?.data) ? res.data : []);
-        setTotal(res?.total ?? 0);
-        setTotalPages(res?.totalPages ?? 1);
+        if (cancelled) return;
+        setLoaded({
+          key: queryKey,
+          records: Array.isArray(res?.data) ? res.data : [],
+          total: res?.total ?? 0,
+          totalPages: Math.max(1, res?.totalPages ?? 1),
+        });
       })
-      .catch(() => setRecords([]))
-      .finally(() => setLoading(false));
-  }, [page]);
+      .catch(() => {
+        if (cancelled) return;
+        setLoaded({ key: queryKey, records: [], total: 0, totalPages: 1 });
+        toast.warning('Failed to load credit assignments.');
+      });
+    return () => { cancelled = true; };
+  }, [query, page, queryKey, dateRangeInvalid]);
 
-  useEffect(() => { fetchRecords(); }, [fetchRecords]);
+  useEffect(() => {
+    apiServiceHandler('GET', 'organization/list-pagination?limit=1000')
+      .then(res => setOrgs(Array.isArray(res?.data) ? res.data : []))
+      .catch(() => setOrgs([]));
+  }, []);
 
-  const grouped = groupByOrg(records);
-
-  const filtered = search.trim()
-    ? grouped.filter(g => {
-        const term = search.toLowerCase();
-        return g.orgName.toLowerCase().includes(term) ||
-          (g.orgPhone || '').toLowerCase().includes(term) ||
-          (g.orgEmail || '').toLowerCase().includes(term) ||
-          g.credits.some(c => c.title.toLowerCase().includes(term));
-      })
-    : grouped;
+  function setFilter(key, value) {
+    setFilters(prev => ({ ...prev, [key]: value }));
+    setPage(1);
+  }
+  function clearFilters() {
+    setFilters(EMPTY_LIST_FILTERS);
+    setPage(1);
+  }
+  const hasFilters = Object.values(filters).some(Boolean);
 
   function toggleSort(key) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -122,32 +122,20 @@ export default function OrgCreditAssignmentList() {
     return sortDir === 'asc' ? ' ↑' : ' ↓';
   }
 
-  const sorted = sortKey === 'orgName'
-    ? [...filtered].sort((a, b) => {
-        const av = (a.orgName ?? '').toLowerCase();
-        const bv = (b.orgName ?? '').toLowerCase();
-        if (av < bv) return sortDir === 'asc' ? -1 : 1;
-        if (av > bv) return sortDir === 'asc' ? 1 : -1;
-        return 0;
-      })
-    : sortKey === 'assignedOn'
-      ? [...filtered].sort((a, b) => {
-          const av = new Date(a.credits[0]?.createdAt).getTime() || 0;
-          const bv = new Date(b.credits[0]?.createdAt).getTime() || 0;
-          return sortDir === 'asc' ? av - bv : bv - av;
-        })
-      : filtered;
+  const cmp = compareRecords(sortKey, sortDir);
+  const rows = dateRangeInvalid ? [] : (cmp ? [...records].sort(cmp) : records);
 
   function doDelete() {
     const { id } = confirm;
     setConfirm({ show: false, id: null, label: '' });
     apiServiceHandler('GET', `organization-credit-assignment/delete/${id}`)
-      .then(() => { toast.success('Assignment deleted.'); fetchRecords(); })
-      .catch(() => toast.error('Delete failed.'));
+      .then(() => { toast.error('Assignment deleted.'); setReloadToken(n => n + 1); })
+      .catch(() => toast.warning('Delete failed.'));
   }
 
-  const from = total === 0 ? 0 : (page - 1) * LIMIT + 1;
-  const to   = Math.min(page * LIMIT, total);
+  const shownTotal = dateRangeInvalid ? 0 : total;
+  const from = shownTotal === 0 ? 0 : (page - 1) * LIMIT + 1;
+  const to   = Math.min(page * LIMIT, shownTotal);
 
   return (
     <SuperAdminShell activeSection="assign-credit">
@@ -171,16 +159,15 @@ export default function OrgCreditAssignmentList() {
       </div>
 
       <div className={s.card}>
-        <div className={s.searchWrap}>
-          <SearchIcon />
-          <input
-            className={s.searchInput}
-            type="text"
-            placeholder="Search by organization or credit plan…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
+        <ListFilterBar
+          label="Filter credit assignments"
+          orgs={orgs}
+          statuses={STATUSES}
+          filters={filters}
+          onFilter={setFilter}
+          onClear={clearFilters}
+          canClear={hasFilters}
+        />
 
         <div className={s.tableWrap}>
           <table className={s.table}>
@@ -197,84 +184,54 @@ export default function OrgCreditAssignmentList() {
             <tbody>
               {loading ? (
                 <tr className={s.emptyRow}><td colSpan={6}>Loading…</td></tr>
-              ) : filtered.length === 0 ? (
-                <tr className={s.emptyRow}><td colSpan={6}>No credit assignments found.</td></tr>
-              ) : (
-                sorted.flatMap((g, idx) => {
-                  const rows   = g.credits.length > 0 ? g.credits : [null];
-                  const orgKey = g.orgId ?? idx;
-                  const stripe  = idx % 2 !== 0 ? s.stripeAlt : '';
-                  const hovered = hoveredOrg === String(orgKey) ? s.orgHover : '';
-                  const globalIdx = (page - 1) * LIMIT + idx + 1;
-                  return rows.map((credit, ci) => (
-                    <tr
-                      key={`${orgKey}-${ci}`}
-                      className={[stripe, hovered, ci > 0 ? s.subRow : ''].filter(Boolean).join(' ') || undefined}
-                      onMouseEnter={() => setHoveredOrg(String(orgKey))}
-                      onMouseLeave={() => setHoveredOrg(null)}
-                    >
-                      {ci === 0 && (
-                        <>
-                          <td rowSpan={rows.length}>{globalIdx}</td>
-                          <td rowSpan={rows.length}>
-                            <div className={s.cellMain}>{g.orgName}</div>
-                            {g.orgPhone && <div className={s.cellSub}>{g.orgPhone}</div>}
-                            {g.orgEmail && <div className={s.cellSub}>{g.orgEmail}</div>}
-                          </td>
-                        </>
-                      )}
-                      <td>
-                        {credit ? (
-                          <div className={s.cellMain}>
-                            {credit.title} <span className={s.cellSub}>({credit.limit_from}-{credit.limit_to}) {credit.price}</span>
-                          </div>
-                        ) : '—'}
-                      </td>
-                      <td>
-                        {credit
-                          ? credit.status === 'active'
-                            ? <span className={s.badgeActive}>Active</span>
-                            : <span className={s.badgeInactive}>Inactive</span>
-                          : '—'}
-                      </td>
-                      <td>{credit ? fmtDate(credit.createdAt) : '—'}</td>
-                      <td>
-                        <div className={s.actions} onClick={e => e.stopPropagation()}>
-                          <button
-                            className={s.btnView}
-                            title="View"
-                            onClick={() => router.push(`/superadmin/organization-credit-assignment/view/${g.orgId}`)}
-                          >
-                            <EyeIcon />
-                          </button>
-                          <button
-                            className={s.btnEdit}
-                            title="Edit"
-                            onClick={() => router.push(`/superadmin/organization-credit-assignment/${g.orgId}`)}
-                          >
-                            <EditIcon />
-                          </button>
-                          {credit && (
-                            <button
-                              className={s.btnDelete}
-                              title="Delete"
-                              onClick={() => setConfirm({ show: true, id: credit.recordId, label: `${g.orgName} — ${credit.title}` })}
-                            >
-                              <TrashIcon />
-                            </button>
-                          )}
+              ) : rows.length === 0 ? (
+                <tr className={s.emptyRow}><td colSpan={6}>{hasFilters ? 'No credit assignments match these filters.' : 'No credit assignments found.'}</td></tr>
+              ) : rows.map((rec, idx) => {
+                const org = rec.orgId;
+                const credit = rec.creditId;
+                const orgName = org?.org_name || '—';
+                return (
+                  <tr key={rec._id}>
+                    <td>{(page - 1) * LIMIT + idx + 1}</td>
+                    <td>
+                      <div className={s.cellMain}>{orgName}</div>
+                      {org?.org_phone && <div className={s.cellSub}>{org.org_phone}</div>}
+                      {org?.org_email && <div className={s.cellSub}>{org.org_email}</div>}
+                    </td>
+                    <td>
+                      {credit ? (
+                        <div className={s.cellMain}>
+                          {credit.title || '—'} <span className={s.cellSub}>({credit.limit_from ?? '—'}-{credit.limit_to ?? '—'}) {fmtPrice(credit.price)}</span>
                         </div>
-                      </td>
-                    </tr>
-                  ));
-                })
-              )}
+                      ) : '—'}
+                    </td>
+                    <td>
+                      {rec.status === 'active'
+                        ? <span className={s.badgeActive}>Active</span>
+                        : <span className={s.badgeInactive}>Inactive</span>}
+                    </td>
+                    <td>{fmtDate(rec.createdAt)}</td>
+                    <td>
+                      <div className={s.actions}>
+                        <button data-action="delete"
+                          className={s.btnDelete}
+                          title="Delete"
+                          aria-label={`Delete ${credit?.title || 'credit'} assignment for ${orgName}`}
+                          onClick={() => setConfirm({ show: true, id: rec._id, label: `${orgName} — ${credit?.title || '—'}` })}
+                        >
+                          <TrashIcon />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
 
         <div className={s.pagination}>
-          <span>Showing {from}–{to} of {total}</span>
+          <span>{shownTotal === 0 ? 'No records' : `Showing ${from}–${to} of ${shownTotal}`}</span>
           <div className={s.paginationBtns}>
             <button className={s.pageBtn} disabled={page <= 1} onClick={() => setPage(p => p - 1)}>‹</button>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (

@@ -5,10 +5,15 @@ import { useSelector } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import { selectUser } from '../../../redux/slices/authSlice';
 import useDepartments from '../../../hooks/useDepartments';
+import useDesignations from '../../../hooks/useDesignations';
 import apiServiceHandler, { clearGetCache } from '../../../service/apiService';
 import { toast } from 'sonner';
-import s from "./AddLearner.module.css";
 import PasswordInput from '../../PasswordInput/PasswordInput';
+import pageStyles from "./AddLearner.module.css";
+import { withFormKit } from '../PageKit/PageKit';
+
+// Page styles + the shared store owner form look.
+const s = withFormKit(pageStyles);
 
 // ── Icons ────────────────────────────────────────────────────────
 const Icon = {
@@ -46,6 +51,8 @@ export default function AddLearnerPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   // Department options come from SuperAdmin → Manage Department.
   const { departments, loading: departmentsLoading } = useDepartments(form.department);
+  // Designation options come from SuperAdmin → Manage Designation.
+  const { designations, loading: designationsLoading } = useDesignations(form.designation);
   const [courses, setCourses] = useState([]);
   const [coursesLoading, setCoursesLoading] = useState(false);
   const [selectedCourseIds, setSelectedCourseIds] = useState([]);
@@ -153,12 +160,12 @@ export default function AddLearnerPage() {
 
   async function goToStep1() {
     if (checkingDup) return;
-    if (!form.firstName.trim()) { toast.error('Name is required.'); return; }
-    if (!form.email.trim())     { toast.error('Email is required.'); return; }
-    if (!form.tempPassword.trim()) { toast.error('Temporary password is required.'); return; }
-    if (form.tempPassword.length < 6) { toast.error('Temporary password must be at least 6 characters.'); return; }
-    if (!form.confirmTempPassword) { toast.error('Please confirm the temporary password.'); return; }
-    if (form.tempPassword !== form.confirmTempPassword) { toast.error('Temporary passwords do not match.'); return; }
+    if (!form.firstName.trim()) { toast.warning('Name is required.'); return; }
+    if (!form.email.trim())     { toast.warning('Email is required.'); return; }
+    if (!form.tempPassword.trim()) { toast.warning('Temporary password is required.'); return; }
+    if (form.tempPassword.length < 6) { toast.warning('Temporary password must be at least 6 characters.'); return; }
+    if (!form.confirmTempPassword) { toast.warning('Please confirm the temporary password.'); return; }
+    if (form.tempPassword !== form.confirmTempPassword) { toast.warning('Temporary passwords do not match.'); return; }
 
     // Block on a duplicate email or WhatsApp No before letting the learner
     // move on — both are unique identifiers on the users table.
@@ -170,22 +177,22 @@ export default function AddLearnerPage() {
       const { emailExists, whatsappExists } = res?.data ?? res ?? {};
 
       if (emailExists && whatsappExists) {
-        toast.error('A learner with this email and WhatsApp No already exists.');
+        toast.warning('A learner with this email and WhatsApp No already exists.');
         return;
       }
-      if (emailExists)    { toast.error('A learner with this email already exists.'); return; }
-      if (whatsappExists) { toast.error('A learner with this WhatsApp No already exists.'); return; }
+      if (emailExists)    { toast.warning('A learner with this email already exists.'); return; }
+      if (whatsappExists) { toast.warning('A learner with this WhatsApp No already exists.'); return; }
 
       setActiveStep(1);
     } catch (err) {
-      toast.error(err?.message || 'Could not verify email/WhatsApp No. Please try again.');
+      toast.warning(err?.message || 'Could not verify email/WhatsApp No. Please try again.');
     } finally {
       setCheckingDup(false);
     }
   }
 
   function goToStep2() {
-    if (selectedCourseIds.length === 0) { toast.error('Please select at least one course to assign.'); return; }
+    if (selectedCourseIds.length === 0) { toast.warning('Please select at least one course to assign.'); return; }
     setActiveStep(2);
   }
 
@@ -246,7 +253,7 @@ export default function AddLearnerPage() {
       toast.success('Learner added successfully.');
       router.push('/storeowner/users');
     } catch (err) {
-      toast.error(err?.message || 'Failed to save learner. Please try again.');
+      toast.warning(err?.message || 'Failed to save learner. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -353,7 +360,13 @@ export default function AddLearnerPage() {
                 </div>
                 <div className={s.fieldGroup}>
                   <label className={s.label}>Designation</label>
-                  <input className={s.input} placeholder="e.g. Floor Supervisor" value={form.designation} onChange={set('designation')} />
+                  <div className={s.selectWrapper}>
+                    <select className={s.select} value={form.designation} onChange={set('designation')} disabled={designationsLoading}>
+                      <option value="">{designationsLoading ? 'Loading designations…' : 'Select Designation'}</option>
+                      {designations.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <span className={s.selectChevron}>{Icon.chevronDown}</span>
+                  </div>
                 </div>
                 <div className={s.fieldGroup}>
                   <label className={s.label}>Language Preference</label>

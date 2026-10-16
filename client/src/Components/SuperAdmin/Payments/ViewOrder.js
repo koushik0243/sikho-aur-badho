@@ -4,7 +4,11 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import vp from "./ViewOrder.module.css";
+import vpPage from "./ViewOrder.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const vp = withAdminKit(vpPage);
 
 const BackArrow = (
   <svg viewBox="0 0 20 20" fill="currentColor">

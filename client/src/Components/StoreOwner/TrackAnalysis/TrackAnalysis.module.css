@@ -1,526 +1,188 @@
+/* Store owner → Track & Analysis.
+   globals.css forces 15px text, so other sizes use doubled selectors + !important. */
 
+.page { display: flex; flex-direction: column; gap: 18px; }
 
+/* ── Page header ─────────────────────────────────────────── */
+.pageHead { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.pageTitle { margin: 0; font-weight: 700; color: #12302f; letter-spacing: -0.01em; }
+.pageTitle.pageTitle { font-size: 24px !important; }
+.pageSub { margin: 4px 0 0; color: #5f7272; }
+.pageSub.pageSub { font-size: 14px !important; }
 
-.ring {
-  width: 58px;
-  height: 58px;
-}
-
-
-
-.avatar {
-  width: 30px; height: 30px;
-  border-radius: 50%;
-  background: #e8edf0;
-  color: #4a6060;
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-
-
+.loadingWrap { display: flex; justify-content: center; padding: 72px 0; }
 .spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid #e8edf0;
-  border-top-color: #0b7b7b;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  width: 36px; height: 36px; border: 3px solid #e8edf0; border-top-color: #0b7b7b;
+  border-radius: 50%; animation: spin 0.8s linear infinite;
 }
-
-
-
-/* ─── Card ────────────────────────────────────────────────────── */
-.card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-left: 3px solid #0b7b7b;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-
-
-/* ─── Card ───────────────────────────────────────────────────── */
-.card {
-  background: #fff;
-  border-radius: 14px;
-  border: 1px solid #e8edf0;
-  padding: 0px;
-  margin-bottom: 18px;
-}
-
-
-
-.card {
-  background: #fff;
-  border-radius: 8px;
-  border: 1px solid #e8edf0;
-  overflow: hidden;
-}
-
-
-
-.cardHead {
-  display: flex;
-  align-items: center;
-  padding: 8px 20px;
-  background: #f8fafa;
-  border-bottom: 1px solid #edf0f3;
-}
-
-
-
-/* ─── Card header ─────────────────────────────────────────────── */
-.cardHead {
-  padding: 8px 20px;
-  background: #f8fafa;
-  border-bottom: 1px solid #edf0f3;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-
-
-/* ─── Card head ──────────────────────────────────────────────── */
-.cardHead {
-  padding: 8px 20px;
-  background: #f8fafa;
-  border-bottom: 1px solid #edf0f3;
-}
-
-
-
-.cardTitle {
-  font-size: 10.5px;
-  font-weight: 700;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  padding: 8px 14px;
-  background: #f8fafa;
-  border-bottom: 1px solid #edf0f3;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-
-
-/* ─── Extras ──────────────────────────────────────────────────────── */
-.cardMeta {
-  font-size: 11px;
-  color: #9aadad;
-  font-weight: 500;
-}
-
-
-
-.cardBody { padding: 14px; }
-
-
-
-/* ─── Card body ───────────────────────────────────────────────── */
-.cardBody {
-  padding: 16px 20px;
-}
-
-
-
-/* ─── Chapter failure rings ───────────────────────────────────── */
-.ringRow {
-  display: flex;
-  align-items: flex-end;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-
-
-
-.ringItem {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 7px;
-  min-width: 64px;
-}
-
-
-
-.ringLabel {
-  font-size: 11px;
-  font-weight: 500;
-  color: #4a6060;
-  text-align: center;
-  white-space: nowrap;
-}
-
-
-
-.ringMeta {
-  font-size: 10px;
-  color: #9aadad;
-  text-align: center;
-}
-
-
-
-.emptyNote {
-  font-size: 12.5px;
-  color: #c4cece;
-  font-style: italic;
-  padding: 8px 0;
-  margin: 0;
-}
-
-
-
-/* ─── Bottom two-column ───────────────────────────────────────── */
-.bottomGrid {
-  display: grid;
-  grid-template-columns: 1fr 300px;
-  gap: 16px;
-  align-items: start;
-}
-
-
-
-/* ─── Learner list ────────────────────────────────────────────── */
-.learnerList {
-  display: flex;
-  flex-direction: column;
-}
-
-
-
-.learnerRow {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 20px;
-  border-bottom: 1px solid #f4f6f8;
-  transition: background 0.12s;
-}
-
-
-
-.learnerHeaderRow {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 20px;
-  border-bottom: 1px solid #f4f6f8;
-}
-
-
-
-.headerAvatarSpacer {
-  width: 30px;
-  flex-shrink: 0;
-}
-
-
-
-.headerActionsLabel {
-  min-width: 118px;
-  flex-shrink: 0;
-}
-
-
-
-.learnerRow:last-child { border-bottom: none; }
-
-
-.learnerRow:hover { background: #fafcfc; }
-
-
-
-.learnerInfo {
-  flex: 1;
-  min-width: 90px;
-}
-
-
-
-.learnerName { font-weight: 500; color: #1a2b2b; }
-
-
-
-.learnerSub {
-  font-size: 11px;
-  color: #9aadad;
-}
-
-
-
-.learnerStats {
-  min-width: 110px;
-}
-
-
-
-.statLabel { font-size: 11.5px; color: #7a9090; font-weight: 500; }
-
-
-.statCardTeal .statLabel { color: rgba(255,255,255,0.8); }
-
-
-
-.statVal {
-  font-size: 12.5px;
-  color: #1a2b2b;
-  font-weight: 500;
-}
-
-
-
-/* ─── View button ────────────────────────────────────────────── */
-.btnView {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: 118px;
-  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
-  color: #fff;
-  border: none;
-  border-radius: 7px;
-  padding: 6px 14px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  letter-spacing: 0.04em;
-  transition: background 0.15s;
-  white-space: nowrap;
-}
-
-.btnView svg { width: 13px; height: 13px; flex-shrink: 0; }
-
-
-
-.btnView:hover { background: linear-gradient(180deg, #036067 0%, #23897d 100%); }
-
-
-
-.btnView {
-  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 5px 12px;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  letter-spacing: 0.04em;
-  transition: background 0.15s;
-}
-
-
-
-/* ─── Video tracking panel ────────────────────────────────────── */
-.videoCard {
-  position: sticky;
-  top: 78px;
-}
-
-
-
-.selectWrap {
-  position: relative;
-  margin-bottom: 14px;
-}
-
-
-
-.select {
-  width: 100%;
-  appearance: none;
-  -webkit-appearance: none;
-  padding: 7px 32px 7px 10px;
-  border: 1.5px solid #d1d5db;
-  border-radius: 7px;
-  font-size: 12.5px;
-  color: #9aadad;
-  background: #fff;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 20 20' fill='%236b7280'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-  outline: none;
-  cursor: pointer;
-}
-
-
-
-.select:focus { border-color: #0b7b7b; color: #1a2b2b; }
-
-
-
-.input,
-.select,
-.textarea {
-  border: 1px solid #d4dee0;
-  border-radius: 7px;
-  padding: 8px 10px;
-  font-size: 13px;
-  color: #1a2b2b;
-  background: #fff;
-  transition: border-color 0.15s;
-  outline: none;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-
-
-.input:focus, .select:focus, .textarea:focus {
-  border-color: #0b7b7b;
-  box-shadow: 0 0 0 3px rgba(11,123,123,0.08);
-}
-
-
-
-.select:-webkit-autofill,
-.select:-webkit-autofill:hover,
-.select:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0 1000px #fff inset !important;
-  box-shadow: 0 0 0 1000px #fff inset !important;
-  -webkit-text-fill-color: #1a2b2b !important;
-  caret-color: #1a2b2b;
-  transition: background-color 5000s ease-in-out 0s;
-}
-
-
-
-.chevron {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 15px;
-  height: 15px;
-  color: #9aadad;
-  pointer-events: none;
-}
-
-
-.chevron svg {
-  width: 16px;
-  height: 16px;
-}
-
-
-
-.videoList {
-  display: flex;
-  flex-direction: column;
-}
-
-
-
-.videoItem {
-  padding: 10px 0;
-  border-bottom: 1px solid #f0f4f4;
-}
-
-
-
-.videoItem:last-child { border-bottom: none; padding-bottom: 0; }
-
-
-
-.videoTitle {
-  font-size: 13px;
-  font-weight: 700;
-  color: #1a2b2b;
-  margin-bottom: 2px;
-}
-
-
-
-.videoSub {
-  font-size: 11px;
-  color: #9aadad;
-  margin-bottom: 7px;
-}
-
-
-
-.videoProgressRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 4px;
-}
-
-
-
-.videoTrack {
-  flex: 1;
-  height: 4px;
-  background: #e8edf0;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-
-
-.videoFill {
-  height: 100%;
-  background: #0b7b7b;
-  border-radius: 4px;
-}
-
-
-
-.videoScore {
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #1a2b2b;
-  min-width: 36px;
-  text-align: right;
-}
-
-
-
-.videoMeta {
-  font-size: 10.5px;
-  color: #9aadad;
-}
-
-
-
 @keyframes spin { to { transform: rotate(360deg); } }
 
-
-/* ─── Mobile responsive ───────────────────────────────────────── */
-@media (max-width: 768px) {
-  .bottomGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .videoCard {
-    position: static;
-  }
+/* ── KPI tiles ───────────────────────────────────────────── */
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.kpi {
+  display: flex; align-items: center; gap: 14px;
+  background: #fff; border: 1px solid #e6eded; border-radius: 14px;
+  padding: 16px 18px; box-shadow: 0 1px 2px rgba(15, 60, 60, 0.04);
 }
-
-@media (max-width: 640px) {
-  .learnerRow {
-    flex-wrap: wrap;
-    row-gap: 8px;
-  }
-
-  /* Avatar + name stay paired on the first line; stats + button wrap to a second line */
-  .learnerInfo + .learnerStats {
-    flex-basis: 100%;
-  }
-
-  /* Column alignment is meaningless once rows wrap to a stacked layout */
-  .learnerHeaderRow {
-    display: none;
-  }
+.kpiIcon {
+  width: 42px; height: 42px; border-radius: 11px; flex-shrink: 0;
+  display: grid; place-items: center; background: #e9f6f5; color: #0b7b7b;
 }
+.kpiIcon svg { width: 20px; height: 20px; }
+.kpiValue { font-weight: 800; color: #12302f; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.kpiValue.kpiValue { font-size: 24px !important; }
+.kpiLabel { color: #6b7d7d; font-weight: 500; }
+.kpiLabel.kpiLabel { font-size: 12.5px !important; }
+.kpi_good .kpiIcon { background: #e7f7ee; color: #15803d; }
+.kpi_warn .kpiIcon { background: #fff4e0; color: #b45309; }
+.kpi_bad  .kpiIcon { background: #fdecec; color: #b91c1c; }
+
+/* ── Cards ───────────────────────────────────────────────── */
+.card {
+  background: #fff; border: 1px solid #e6eded; border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(15, 60, 60, 0.04);
+  min-width: 0; overflow: hidden;
+}
+.cardHead {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 16px 20px; border-bottom: 1px solid #eef3f3;
+}
+.cardTitle { margin: 0; font-weight: 700; color: #12302f; }
+.cardTitle.cardTitle { font-size: 16px !important; }
+.cardSub { margin: 3px 0 0; color: #7a8c8c; }
+.cardSub.cardSub { font-size: 12.5px !important; }
+.cardMeta {
+  flex-shrink: 0; padding: 3px 10px; border-radius: 999px;
+  background: #f1f6f6; color: #4d6464; font-weight: 600;
+}
+.cardMeta.cardMeta { font-size: 12px !important; }
+.cardBody { padding: 16px 20px; }
+.emptyNote { margin: 0; padding: 18px 20px; text-align: center; color: #8a9a9a; }
+.emptyNote.emptyNote { font-size: 13px !important; }
+
+/* ── Failure analysis: ranked bars ───────────────────────── */
+.failList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.failRow { display: grid; grid-template-columns: 28px minmax(0, 1fr) 72px; align-items: center; gap: 14px; }
+.failRank {
+  width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center;
+  background: #f1f6f6; color: #4d6464; font-weight: 700;
+}
+.failRank.failRank { font-size: 13px !important; }
+.failMain { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.failTop { display: flex; justify-content: space-between; gap: 12px; }
+.failLabel { font-weight: 600; color: #12302f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.failLabel.failLabel { font-size: 14px !important; }
+.failMeta { flex-shrink: 0; color: #7a8c8c; }
+.failMeta.failMeta { font-size: 12.5px !important; }
+.failTrack { height: 8px; border-radius: 999px; background: #edf3f3; overflow: hidden; }
+.failTrack span { display: block; height: 100%; border-radius: 999px; }
+.failPct { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+.failPct.failPct { font-size: 18px !important; }
+.failPct small { display: block; margin-top: 2px; font-weight: 600; color: #8a9a9a; text-transform: uppercase; letter-spacing: 0.05em; }
+.failPct small.failPct, .failPct small { font-size: 10px !important; }
+
+.fill_good { background: linear-gradient(90deg, #0b7b7b, #14b8a6); }
+.fill_warn { background: linear-gradient(90deg, #d97706, #f59e0b); }
+.fill_bad  { background: linear-gradient(90deg, #dc2626, #f87171); }
+.pct_good { color: #0b7b7b; }
+.pct_warn { color: #b45309; }
+.pct_bad  { color: #b91c1c; }
+
+/* ── Bottom grid ─────────────────────────────────────────── */
+.bottomGrid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 18px; align-items: start; }
+
+/* Learner table */
+.tableWrap { overflow-x: auto; position: relative; }   /* relative: keeps the visually-hidden header inside the scroll box */
+.table { width: 100%; border-collapse: collapse; }
+.table thead th {
+  text-align: left; padding: 10px 20px; background: #f8fbfb; border-bottom: 1px solid #eef3f3;
+  color: #6b7d7d; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;
+}
+.table thead th, .table thead th * { font-size: 11px !important; }
+.table tbody td { padding: 12px 20px; border-bottom: 1px solid #f1f5f5; vertical-align: middle; }
+.table tbody tr:last-child td { border-bottom: none; }
+.table tbody tr { transition: background 0.12s; }
+.table tbody tr:hover { background: #f8fbfb; }
+.num { text-align: center !important; width: 90px; }
+.actionCol { text-align: right !important; width: 110px; }
+
+.who { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.avatar { width: 36px; height: 36px; flex-shrink: 0; }
+.whoText { min-width: 0; }
+.learnerName { font-weight: 600; color: #12302f; }
+.learnerName.learnerName { font-size: 14px !important; }
+.learnerSub { color: #7a8c8c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 280px; }
+.learnerSub.learnerSub { font-size: 12.5px !important; }
+.countPill {
+  display: inline-grid; place-items: center; min-width: 28px; height: 24px; padding: 0 8px;
+  border-radius: 999px; background: #eef6f6; color: #0b6767; font-weight: 700;
+}
+.countPill.countPill { font-size: 12.5px !important; }
+.statusActive, .statusInactive { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; text-transform: capitalize; }
+.statusActive.statusActive, .statusInactive.statusInactive { font-size: 13px !important; }
+.statusActive { color: #15803d; }
+.statusInactive { color: #6b7280; }
+.statusActive::before, .statusInactive::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+.btnView {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 8px; cursor: pointer;
+  background: #fff; border: 1px solid #b9dcdc; color: #0b6767; font-weight: 600;
+  transition: background 0.12s, border-color 0.12s;
+}
+.btnView.btnView { font-size: 13px !important; }
+.btnView:hover { background: #eef8f8; border-color: #0b7b7b; }
+.btnView:focus-visible { outline: 2px solid #0b7b7b; outline-offset: 2px; }
+.btnView svg { width: 14px; height: 14px; }
+
+.srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/* Quiz completion tracking — content capped at 500px; the course picker stays, the list scrolls. */
+.videoCard { position: sticky; top: 78px; }
+.videoCard .cardBody { max-height: 500px; display: flex; flex-direction: column; gap: 12px; }
+.selectWrap { position: relative; flex-shrink: 0; }
+.select {
+  width: 100%; appearance: none; -webkit-appearance: none;
+  padding: 10px 36px 10px 12px; border: 1.5px solid #e2e9ec; border-radius: 9px;
+  background: #f8fafa; color: #12302f; cursor: pointer; outline: none;
+}
+.select.select { font-size: 14px !important; }
+.select:focus { border-color: #0b7b7b; background: #fff; box-shadow: 0 0 0 3px rgba(11,123,123,0.12); }
+.chevron { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; color: #8a9a9a; display: flex; }
+.chevron svg { width: 16px; height: 16px; }
+.videoCard .emptyNote { padding: 8px 0; }
+
+.videoList { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 6px; display: flex; flex-direction: column; gap: 10px; }
+.videoList:focus-visible { outline: 2px solid #0b7b7b; outline-offset: 2px; border-radius: 6px; }
+.videoItem { padding: 12px 14px; border: 1px solid #eef3f3; border-radius: 10px; background: #fbfdfd; display: flex; flex-direction: column; gap: 8px; }
+.videoTop { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.videoTitle { font-weight: 600; color: #12302f; line-height: 1.35; }
+.videoTitle.videoTitle { font-size: 14px !important; }
+.ratePill { flex-shrink: 0; padding: 2px 9px; border-radius: 999px; font-weight: 700; white-space: nowrap; }
+.ratePill.ratePill { font-size: 11.5px !important; }
+.rate_good { background: #e7f7ee; color: #15803d; }
+.rate_warn { background: #fff4e0; color: #b45309; }
+.rate_bad  { background: #fdecec; color: #b91c1c; }
+.rate_none { background: #f1f5f5; color: #6b7d7d; }
+.videoProgressRow { display: flex; align-items: center; gap: 10px; }
+.videoTrack { flex: 1; height: 6px; border-radius: 999px; background: #edf3f3; overflow: hidden; }
+.videoFill { height: 100%; border-radius: 999px; }
+.videoScore { flex-shrink: 0; color: #6b7d7d; font-variant-numeric: tabular-nums; }
+.videoScore.videoScore { font-size: 12px !important; }
+
+/* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .bottomGrid { grid-template-columns: minmax(0, 1fr); }   /* minmax: the table scrolls inside its card instead of widening the page */
+  .videoCard { position: static; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .kpis { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kpi { padding: 12px; gap: 10px; }
+  .kpiIcon { width: 36px; height: 36px; }
+  .cardHead, .cardBody { padding: 14px; }
+  .table thead th, .table tbody td { padding: 10px 12px; }
+  .learnerSub { max-width: 140px; }
+  .failRow { grid-template-columns: 24px minmax(0, 1fr) 56px; gap: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2s; } .table tbody tr { transition: none; } }

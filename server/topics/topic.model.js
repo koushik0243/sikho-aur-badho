@@ -16,6 +16,9 @@ const TopicSchema = new Schema({
   duration_min: { type: String, required: false, default: '0' },
   duration_sec: { type: String, required: false, default: '0' },
   attachments: [{ name: String, url: String }],
+  // Assignment only: "How many videos can upload?" — the most videos a learner can ever
+  // upload for it (1–50; null on assignments saved before this existed = 10).
+  maxVideos: { type: Number, min: 1, max: 50, default: null },
   order: { type: Number, required: true },
   isPreview: { type: Boolean, required: false, default: false },
   isPublished: { type: Boolean, required: false, default: true },

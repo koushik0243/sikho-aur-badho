@@ -39,9 +39,20 @@ const SECTIONS = [
       { id: 'profile',     label: 'My Profile',  path: '/learner/profile',     icon: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" /></svg> },
     ],
   },
+  {
+    id: 'report', label: 'Report',
+    icon: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm2 10a1 1 0 10-2 0v3a1 1 0 102 0v-3zm2-3a1 1 0 011 1v5a1 1 0 11-2 0v-5a1 1 0 011-1zm4-1a1 1 0 10-2 0v7a1 1 0 102 0V8z" clipRule="evenodd" /></svg>,
+    // Report pages aren't built yet — these items have no path (no navigation).
+    items: [
+      { id: 'report-progress', label: 'Progress', path: '/learner/reports/progress', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clipRule="evenodd" /></svg> },
+      { id: 'report-test-results', label: 'Test Results', path: '/learner/reports/test-results', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg> },
+      { id: 'report-achievements', label: 'Achievements', path: '/learner/reports/achievements', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg> },
+      { id: 'report-weak-areas', label: 'Weak Areas', path: '/learner/reports/weak-areas', icon: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg> },
+    ],
+  },
 ];
 
-const ALL_ITEMS = SECTIONS.flatMap(sec => sec.items);
+const ALL_ITEMS = SECTIONS.flatMap(sec => sec.items).filter(i => i.path); // pages only
 
 function getActiveSectionFromPath(pathname) {
   const item = ALL_ITEMS.find(i => pathname === i.path || pathname.startsWith(i.path + '/'));
@@ -51,6 +62,8 @@ function getActiveSectionFromPath(pathname) {
 
 function getActiveLabelFromPath(pathname) {
   const item = ALL_ITEMS.find(i => pathname === i.path || pathname.startsWith(i.path + '/'));
+  // Pages not in the menu (e.g. Quiz Results, reached from a course) keep their own name.
+  if (!item && pathname.startsWith('/learner/quiz')) return 'Quiz Results';
   return item?.label || 'Dashboard';
 }
 
@@ -126,6 +139,14 @@ export default function LearnerShell({ children }) {
     return () => document.removeEventListener('mousedown', handler);
   }, [userMenuOpen]);
 
+  // A super admin opened this tab with "Log in" (public/tab-session.js keeps it per tab).
+  const impersonation = mounted && typeof window !== 'undefined' ? window.__tabSession?.info() : null;
+  function exitImpersonation() {
+    window.__tabSession?.exit();
+    window.close(); // tabs opened by the Log in icon can close themselves
+    window.location.href = '/superadmin/organization-user-assignment'; // if the browser kept it open
+  }
+
   function handleLogout() {
     dispatch(clearAuth());
     if (typeof window !== 'undefined') {
@@ -200,7 +221,9 @@ export default function LearnerShell({ children }) {
             {openSection.items.map(item => (
               <button key={item.id}
                       className={`${s.navItem} ${activeItemId === item.id ? s.navItemActive : ''}`}
-                      onClick={() => { router.push(item.path); setMobileMenuOpen(false); }}>
+                      // Items without a path (Report) are placeholders: no navigation.
+                      onClick={() => { if (!item.path) return; router.push(item.path); setMobileMenuOpen(false); }}
+                      title={item.path ? undefined : 'Coming soon'}>
                 <span className={s.navItemIcon}>{item.icon}</span>
                 {item.label}
               </button>
@@ -212,6 +235,15 @@ export default function LearnerShell({ children }) {
       {/* ── Mobile nav-panel backdrop ── */}
       {mobileMenuOpen && (
         <div className={s.backdrop} onClick={closeMobileMenu} />
+      )}
+
+      {/* Logged in from super admin (this tab only) */}
+      {impersonation && !impersonation.pending && (
+        <div className={s.impBar} role="status">
+          <span className={s.impDot} aria-hidden="true" />
+          <span>Logged in as <strong>{impersonation.name || userName}</strong> (learner{impersonation.orgName ? ` · ${impersonation.orgName}` : ''}) from super admin</span>
+          <button type="button" className={s.impExit} onClick={exitImpersonation}>Exit</button>
+        </div>
       )}
 
       {/* ── Topbar ── */}

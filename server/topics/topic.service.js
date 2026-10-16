@@ -15,6 +15,20 @@ const buildQuery = (filters = {}) => {
     return query;
 };
 
+// "How many videos can upload?" on an assignment: a whole number from 1 to 50.
+const MAX_VIDEOS_LIMIT = 50;
+function cleanMaxVideos(value) {
+    if (value === undefined) return undefined;
+    if (value === null || value === '') return null;
+    const n = Number(value);
+    if (!Number.isInteger(n) || n < 1 || n > MAX_VIDEOS_LIMIT) {
+        const err = new Error(`"How many videos can upload?" must be a whole number from 1 to ${MAX_VIDEOS_LIMIT}.`);
+        err.statusCode = 400;
+        throw err;
+    }
+    return n;
+}
+
 export const createTopic = async (data) => {
     try {
         return await new Topic({
@@ -28,6 +42,7 @@ export const createTopic = async (data) => {
             duration_hr: data.duration_hr || '0',
             duration_min: data.duration_min || '0',
             attachments: data.attachments || [],
+            maxVideos: data.video_type === 'assignment' ? (cleanMaxVideos(data.maxVideos) ?? null) : null,
             quizSettings: data.quizSettings || null,
             order: data.order,
             isPreview: data.isPreview !== undefined ? data.isPreview : false,
@@ -52,8 +67,9 @@ export const updateTopic = async (updateId, data) => {
         const fields = [
             'courseId', 'chapterId', 'title', 'desc', 'video_type',
             'imageUrl', 'videoUrl', 'duration_hr', 'duration_min', 'attachments',
-            'quizSettings', 'order', 'isPreview', 'isPublished', 'status'
+            'quizSettings', 'order', 'isPreview', 'isPublished', 'status', 'maxVideos'
         ];
+        if (data.maxVideos !== undefined) data = { ...data, maxVideos: cleanMaxVideos(data.maxVideos) };
         const updateFields = {};
         for (const field of fields) {
             if (data[field] !== undefined) updateFields[field] = data[field];

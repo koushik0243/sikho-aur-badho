@@ -8,6 +8,12 @@ const ChapterSchema = new Schema({
   order: { type: Number, required: true},
   isPublished: { type: Boolean, default: true },
   totalTopics: { type: Number, required: true, default: 0 },
+  // The course's "Final Course Assignment" (one per course, always last): holds one quiz
+  // whose questions are picked from the other chapters' quiz questions.
+  isFinalAssignment: { type: Boolean, default: false },
+  // "Bonus Content": a normal chapter (required like the others) placed after the Final
+  // Course Assignment.
+  isBonus: { type: Boolean, default: false },
   deletedAt: { type: Date, required: false, default: null },
   status: { type: String, enum: ['active', 'inactive'], default: 'active' },
   createdAt: { type: Date, default: Date.now },

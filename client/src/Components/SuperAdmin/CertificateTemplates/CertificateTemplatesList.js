@@ -7,7 +7,11 @@ import apiServiceHandler from '../../../service/apiService';
 import useScaledIframePreview from '../../../hooks/useScaledIframePreview';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from "./CertificateTemplatesList.module.css";
+import sPage from "./CertificateTemplatesList.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 // Small live-rendered preview of a template's HTML, shrunk to fit a fixed thumbnail
 // box (cropped, not scrolled) — same shrink-to-fit measurement the Add/Edit preview
@@ -444,8 +448,8 @@ export default function CertificateTemplatesList() {
     const id = confirm.id;
     setConfirm({ show: false, id: null });
     apiServiceHandler('GET', `certificate-template/delete/${id}`)
-      .then(() => { toast.success('Certificate template deleted.'); fetchRows(); })
-      .catch(() => toast.error('Delete failed'));
+      .then(() => { toast.error('Certificate template deleted.'); fetchRows(); })
+      .catch(() => toast.warning('Delete failed'));
   }
 
   function handleBulkDelete() { if (selected.length > 0) setBulkConfirm(true); }
@@ -454,8 +458,8 @@ export default function CertificateTemplatesList() {
     const ids = [...selected];
     setSelected([]);
     Promise.all(ids.map(id => apiServiceHandler('GET', `certificate-template/delete/${id}`)))
-      .then(() => { toast.success(`${ids.length} template${ids.length !== 1 ? 's' : ''} deleted.`); fetchRows(); })
-      .catch(() => toast.error('Some deletes failed'));
+      .then(() => { toast.error(`${ids.length} template${ids.length !== 1 ? 's' : ''} deleted.`); fetchRows(); })
+      .catch(() => toast.warning('Some deletes failed'));
   }
 
   const allIds = rows.map(r => r._id);
@@ -485,7 +489,7 @@ export default function CertificateTemplatesList() {
       toast.success(`${created} template${created !== 1 ? 's' : ''} seeded successfully.`);
       fetchRows();
     } else {
-      toast.error('No templates were created. They may already exist.');
+      toast.warning('No templates were created. They may already exist.');
     }
   }
 
@@ -589,7 +593,6 @@ export default function CertificateTemplatesList() {
                   </td>
                   <td>
                     <div className={s.nameCell}>
-                      <div className={s.certIcon}>{Icon.cert}</div>
                       <span className={s.certName}>{row.title ?? '—'}</span>
                     </div>
                   </td>
@@ -605,15 +608,15 @@ export default function CertificateTemplatesList() {
                   <td>{fmtDate(row.createdAt)}</td>
                   <td>
                     <div className={s.actions} onClick={e => e.stopPropagation()}>
-                      <button className={s.btnView} title="View"
+                      <button data-action="view" className={s.btnView} title="View"
                         onClick={() => router.push(`/superadmin/certificate-template/${row._id}`)}>
                         {Icon.eye}
                       </button>
-                      <button className={s.btnEdit} title="Edit"
+                      <button data-action="edit" className={s.btnEdit} title="Edit"
                         onClick={() => router.push(`/superadmin/certificate-template/${row._id}/edit`)}>
                         {Icon.edit}
                       </button>
-                      <button className={s.btnDelete} title="Delete"
+                      <button data-action="delete" className={s.btnDelete} title="Delete"
                         onClick={() => handleDelete(row._id)}>
                         {Icon.trash}
                       </button>

@@ -24,6 +24,6 @@ function buildLockSchema() {
   return schema;
 }
 
-export const VideoLock = mongoose.model('VideoLock', buildLockSchema());
+export const VideoLock = mongoose.model('VideoLock', buildLockSchema(), 'video_locks');
 
-export default mongoose.model('QuizLock', buildLockSchema());
+export default mongoose.model('QuizLock', buildLockSchema(), 'quiz_locks');

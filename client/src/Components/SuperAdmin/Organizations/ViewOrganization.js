@@ -5,7 +5,12 @@ import { useRouter, useParams } from 'next/navigation';
 import apiServiceHandler from '../../../service/apiService';
 import { API_URL } from '../../../lib/constant';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./ViewOrganization.module.css";
+import sPage from "./ViewOrganization.module.css";
+import ViewToolbar from '../../ViewToolbar/ViewToolbar';
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 function fmtDate(val) {
   if (!val) return '—';
@@ -115,8 +120,11 @@ export default function ViewOrganization() {
         {BackArrow} Back to Organizations
       </button>
 
-      <h1 className={s.pageTitle}>{org.org_name || '—'}</h1>
-      <p className={s.pageSubtitle}>Organization details</p>
+      <ViewToolbar
+        parent={{ label: 'Organizations', onClick: () => router.push('/superadmin/organizations') }}
+        current={org.org_name}
+        onEdit={() => router.push(`/superadmin/organizations/${id}/edit`)}
+      />
 
       {/* ── Organization Information ── */}
       <div className={s.sectionCard}>
@@ -215,14 +223,6 @@ export default function ViewOrganization() {
         </div>
       </div>
 
-      <div className={s.viewActions}>
-        <button className={s.btnEdit} onClick={() => router.push(`/superadmin/organizations/${id}/edit`)}>
-          Edit Organization
-        </button>
-        <button className={s.btnCancel} onClick={() => router.push('/superadmin/organizations')}>
-          Back
-        </button>
-      </div>
     </SuperAdminShell>
   );
 }

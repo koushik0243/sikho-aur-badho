@@ -6,7 +6,11 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from "./RolePermissionsList.module.css";
+import sPage from "./RolePermissionsList.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const SearchIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -83,7 +87,7 @@ function TypeBadge({ userType }) {
   const label = TYPE_LABEL[userType] || userType || '—';
   return (
     <span style={{
-      display: 'inline-block', padding: '2px 10px', borderRadius: 20,
+      display: 'inline-block', padding: '2px 0', borderRadius: 20,
       fontSize: 11.5, fontWeight: 400, background: 'transparent', color: '#000',
       whiteSpace: 'nowrap',
     }}>
@@ -214,8 +218,8 @@ export default function RolePermissionsList() {
     const { roleId } = confirm;
     setConfirm({ show: false, roleId: null });
     apiServiceHandler('POST', 'role-permission/assign', { role_id: roleId, permission_ids: [] })
-      .then(() => { toast.success('Role permissions removed.'); fetchRecords(); })
-      .catch(() => toast.error('Delete failed.'));
+      .then(() => { toast.error('Role permissions removed.'); fetchRecords(); })
+      .catch(() => toast.warning('Delete failed.'));
   }
 
   const allIds      = pagedRows.map(r => r.roleId);
@@ -231,8 +235,8 @@ export default function RolePermissionsList() {
     Promise.all(ids.map(roleId =>
       apiServiceHandler('POST', 'role-permission/assign', { role_id: roleId, permission_ids: [] })
     ))
-      .then(() => { toast.success(`${ids.length} role${ids.length !== 1 ? 's' : ''} cleared.`); fetchRecords(); })
-      .catch(() => toast.error('Some removals failed'));
+      .then(() => { toast.error(`${ids.length} role${ids.length !== 1 ? 's' : ''} cleared.`); fetchRecords(); })
+      .catch(() => toast.warning('Some removals failed'));
   }
 
   return (
@@ -322,21 +326,21 @@ export default function RolePermissionsList() {
                     <td className={s.permCell}>{buildPermissionsLabel(row.permissions)}</td>
                     <td>
                       <div className={s.actions} onClick={e => e.stopPropagation()}>
-                        <button
+                        <button data-action="view"
                           className={s.btnView}
                           title="View"
                           onClick={() => router.push(`/superadmin/role-permissions/${row.firstRecordId}`)}
                         >
                           <ViewIcon />
                         </button>
-                        <button
+                        <button data-action="edit"
                           className={s.btnEdit}
                           title="Edit"
                           onClick={() => router.push(`/superadmin/role-permissions/add?roleId=${row.roleId}`)}
                         >
                           <EditIcon />
                         </button>
-                        <button
+                        <button data-action="delete"
                           className={s.btnDelete}
                           title="Delete"
                           onClick={() => setConfirm({ show: true, roleId: row.roleId })}

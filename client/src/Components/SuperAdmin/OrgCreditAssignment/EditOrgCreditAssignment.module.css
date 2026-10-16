@@ -299,3 +299,6 @@
     white-space: nowrap;
 }
 }
+
+/* ── Dropdown text fully visible: fixed-height dropdowns have no top/bottom padding, so the 15px text isn't cut off ── */
+.formGroup.formGroup select { padding-top: 0; padding-bottom: 0; }

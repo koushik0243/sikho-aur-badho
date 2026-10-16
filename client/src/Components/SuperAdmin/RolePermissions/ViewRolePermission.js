@@ -4,7 +4,12 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import vp from "./ViewRolePermission.module.css";
+import vpPage from "./ViewRolePermission.module.css";
+import ViewDetailRows, { capitalize } from '../ViewDetailRows';
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const vp = withAdminKit(vpPage);
 
 const BackArrow = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -44,61 +49,34 @@ export default function ViewRolePermission() {
   const roleName   = record.role_id?.display_name || record.role_id?.name || record.role_id || '—';
   const permName   = record.permission_id?.name || record.permission_id || '—';
   const permDisplay = record.permission_id?.display_name || permName;
-  const isActive   = record.status === 'active';
 
   return (
     <SuperAdminShell activeSection="assign-role">
       <button className={vp.backBtn} onClick={() => router.push('/superadmin/role-permissions')}>
         {BackArrow} Back to Role Permissions
       </button>
-      <nav className={vp.breadcrumb}>
-        <button className={vp.breadcrumbLink} onClick={() => router.push('/superadmin/role-permissions')}>Role Permissions</button>
-        <span className={vp.breadcrumbSep}>›</span>
-        <span className={vp.breadcrumbCurr}>{roleName} · {permDisplay}</span>
-      </nav>
+      <div className={vp.viewToolbar}>
+        <nav className={vp.breadcrumb}>
+          <button className={vp.breadcrumbLink} onClick={() => router.push('/superadmin/role-permissions')}>Role Permissions</button>
+          <span className={vp.breadcrumbSep}>›</span>
+          <span className={vp.breadcrumbCurr}>{roleName} · {permDisplay}</span>
+        </nav>
+        <button className={vp.btnEdit} onClick={() => router.push(`/superadmin/role-permissions/${id}/edit`)}>
+          <EditIcon /> Edit
+        </button>
+      </div>
 
       <div className={vp.detailCard}>
-        <div className={vp.detailHead}>
-          <div className={vp.detailHeadLeft}>
-            <div className={vp.detailAvatarGray}>{roleName.charAt(0).toUpperCase()}</div>
-            <div>
-              <h1 className={vp.detailTitle}>{roleName}</h1>
-              <div className={vp.detailBadges}>
-                <span className={vp.badgeNeutral}>{permDisplay}</span>
-                <span className={isActive ? vp.badgeActive : vp.badgeInactive}>
-                  {record.status ? record.status.charAt(0).toUpperCase() + record.status.slice(1) : 'Unknown'}
-                </span>
-              </div>
-            </div>
-          </div>
-          <button className={vp.btnEdit} onClick={() => router.push(`/superadmin/role-permissions/${id}/edit`)}>
-            <EditIcon /> Edit
-          </button>
-        </div>
 
         <div className={vp.detailBody}>
-          <div className={vp.detailRows}>
-            <div className={vp.detailRow}>
-              <span className={vp.detailLabel}>Role</span>
-              <span className={vp.detailValue}>{roleName}</span>
-            </div>
-            <div className={vp.detailRow}>
-              <span className={vp.detailLabel}>Permission</span>
-              <span className={vp.detailValue}>{permDisplay}</span>
-            </div>
-            <div className={vp.detailRow}>
-              <span className={vp.detailLabel}>Permission Key</span>
-              <span className={vp.detailValueMono}>{permName}</span>
-            </div>
-            <div className={vp.detailRow}>
-              <span className={vp.detailLabel}>Created</span>
-              <span className={vp.detailValue}>{fmtDate(record.createdAt)}</span>
-            </div>
-            <div className={vp.detailRow}>
-              <span className={vp.detailLabel}>Updated</span>
-              <span className={vp.detailValue}>{fmtDate(record.updatedAt)}</span>
-            </div>
-          </div>
+          <ViewDetailRows s={vp} rows={[
+              { label: 'Role', value: roleName },
+              { label: 'Permission', value: permDisplay },
+              { label: 'Permission Key', value: permName, variant: 'mono' },
+              { label: 'Status', value: capitalize(record.status) },
+              { label: 'Created', value: fmtDate(record.createdAt) },
+              { label: 'Updated', value: fmtDate(record.updatedAt) },
+          ]} />
         </div>
       </div>
     </SuperAdminShell>

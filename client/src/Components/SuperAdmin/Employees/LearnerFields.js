@@ -2,6 +2,7 @@
 
 import apiServiceHandler from '../../../service/apiService';
 import useDepartments from '../../../hooks/useDepartments';
+import useDesignations from '../../../hooks/useDesignations';
 import PasswordInput from '../../PasswordInput/PasswordInput';
 
 // Learner details — the same fields, labels and hints as the store owner's
@@ -96,6 +97,7 @@ export async function findDuplicateLearnerFields(form, excludeUserId) {
  */
 export default function LearnerFields({ form, setField, errors, s, isEdit = false, pwReadOnly, onPasswordFocus }) {
   const { departments, loading: departmentsLoading } = useDepartments(form.department);
+  const { designations, loading: designationsLoading } = useDesignations(form.designation);
   const bind = key => ({ value: form[key], onChange: e => setField(key, e.target.value) });
 
   return (
@@ -135,7 +137,10 @@ export default function LearnerFields({ form, setField, errors, s, isEdit = fals
 
       <div className={s.formGroup}>
         <label>Designation</label>
-        <input className={s.input} type="text" placeholder="e.g. Floor Supervisor" autoComplete="off" {...bind('designation')} />
+        <select className={s.select} disabled={designationsLoading} {...bind('designation')}>
+          <option value="">{designationsLoading ? 'Loading designations…' : 'Select Designation'}</option>
+          {designations.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
       </div>
 
       <div className={s.formGroup}>

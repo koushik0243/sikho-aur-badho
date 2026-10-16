@@ -6,7 +6,11 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from "./UsersList.module.css";
+import sPage from "./UsersList.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const SearchIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -136,8 +140,8 @@ export default function UsersList() {
     const id = confirm.id;
     setConfirm({ show: false, id: null });
     apiServiceHandler('GET', `user/admin/delete/${id}`)
-      .then(() => { toast.success('User deleted.'); fetchUsers(); })
-      .catch(() => toast.error('Delete failed.'));
+      .then(() => { toast.error('User deleted.'); fetchUsers(); })
+      .catch(() => toast.warning('Delete failed.'));
   }
 
   const allIds = users.map(u => u._id);
@@ -150,8 +154,8 @@ export default function UsersList() {
     const ids = [...selected];
     setSelected([]);
     Promise.all(ids.map(id => apiServiceHandler('GET', `user/admin/delete/${id}`)))
-      .then(() => { toast.success(`${ids.length} user${ids.length !== 1 ? 's' : ''} deleted.`); fetchUsers(); })
-      .catch(() => toast.error('Some deletes failed'));
+      .then(() => { toast.error(`${ids.length} user${ids.length !== 1 ? 's' : ''} deleted.`); fetchUsers(); })
+      .catch(() => toast.warning('Some deletes failed'));
   }
 
   async function handleExportUsers() {
@@ -162,13 +166,13 @@ export default function UsersList() {
       const res = await apiServiceHandler('GET', `user/admin/export?${params}`);
       const exportedUsers = Array.isArray(res?.data) ? res.data : [];
       if (exportedUsers.length === 0) {
-        toast.error('No users to export.');
+        toast.warning('No users to export.');
         return;
       }
       downloadCsv(`superadmin-users-${Date.now()}.csv`, buildUsersCsv(exportedUsers));
       toast.success(`Exported ${exportedUsers.length} user${exportedUsers.length !== 1 ? 's' : ''}.`);
     } catch (err) {
-      toast.error(err?.message || 'Export failed.');
+      toast.warning(err?.message || 'Export failed.');
     } finally {
       setExporting(false);
     }
@@ -295,21 +299,21 @@ export default function UsersList() {
                   <td>{fmtDate(u.createdAt)}</td>
                   <td>
                     <div className={s.actions} onClick={e => e.stopPropagation()}>
-                      <button
+                      <button data-action="view"
                         className={s.btnView}
                         title="View"
                         onClick={() => router.push(`/superadmin/user/${u._id}`)}
                       >
                         <EyeIcon />
                       </button>
-                      <button
+                      <button data-action="edit"
                         className={s.btnEdit}
                         title="Edit"
                         onClick={() => router.push(`/superadmin/user/${u._id}/edit`)}
                       >
                         <EditIcon />
                       </button>
-                      <button
+                      <button data-action="delete"
                         className={s.btnDelete}
                         title="Delete"
                         onClick={() => setConfirm({ show: true, id: u._id })}

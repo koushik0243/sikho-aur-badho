@@ -39,7 +39,7 @@ async function evaluateAnswer(questionText, userAnswer, maxScore) {
 
 const httpError = (status, message) => Object.assign(new Error(message), { status });
 
-export const submitAttempt = async ({ userId, topicId, courseId, chapterId, answers }) => {
+export const submitAttempt = async ({ userId, topicId, courseId, chapterId, answers, timeTakenSec = null }) => {
   const n = answers.length;
   if (n === 0) throw new Error('No answers submitted.');
 
@@ -80,6 +80,7 @@ export const submitAttempt = async ({ userId, topicId, courseId, chapterId, answ
     totalScore,
     passed,
     passingGrade: settings.passingGrade,
+    timeTakenSec,
     status: 'evaluated',
     evaluatedAt: new Date(),
   });

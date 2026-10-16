@@ -5,7 +5,12 @@ import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import useDepartments from '../../../hooks/useDepartments';
-import s from "./EditLearner.module.css";
+import useDesignations from '../../../hooks/useDesignations';
+import pageStyles from "./EditLearner.module.css";
+import { withFormKit } from '../PageKit/PageKit';
+
+// Page styles + the shared store owner form look.
+const s = withFormKit(pageStyles);
 
 const Icon = {
   chevronDown: <svg viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>,
@@ -35,6 +40,8 @@ export default function EditLearnerPage() {
   // Department options come from SuperAdmin → Manage Department; the learner's
   // saved department stays selectable even if it's since been removed.
   const { departments, loading: departmentsLoading } = useDepartments(form.department);
+  // Designation options come from SuperAdmin → Manage Designation.
+  const { designations, loading: designationsLoading } = useDesignations(form.designation);
   const [notifyPrefs, setNotifyPrefs] = useState({ email: false, alert: false, digest: false });
   const [loading, setLoading]     = useState(true);
   const [notFound, setNotFound]   = useState(false);
@@ -78,8 +85,8 @@ export default function EditLearnerPage() {
 
   async function handleSave(e) {
     e.preventDefault();
-    if (!form.name.trim())  { toast.error('Name is required.'); return; }
-    if (!form.email.trim()) { toast.error('Email is required.'); return; }
+    if (!form.name.trim())  { toast.warning('Name is required.'); return; }
+    if (!form.email.trim()) { toast.warning('Email is required.'); return; }
 
     setSaving(true);
     try {
@@ -100,7 +107,7 @@ export default function EditLearnerPage() {
       toast.success('Learner updated successfully.');
       router.push(`/storeowner/users/${id}`);
     } catch (err) {
-      toast.error(err?.message || 'Failed to update learner. Please try again.');
+      toast.warning(err?.message || 'Failed to update learner. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -169,7 +176,13 @@ export default function EditLearnerPage() {
                   </div>
                   <div className={s.fieldGroup}>
                     <label className={s.label}>Designation</label>
-                    <input className={s.input} placeholder="e.g. Floor Supervisor" value={form.designation} onChange={set('designation')} />
+                    <div className={s.selectWrapper}>
+                      <select className={s.select} value={form.designation} onChange={set('designation')} disabled={designationsLoading}>
+                        <option value="">{designationsLoading ? 'Loading designations…' : 'Select Designation'}</option>
+                        {designations.map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                      <span className={s.selectChevron}>{Icon.chevronDown}</span>
+                    </div>
                   </div>
                   <div className={s.fieldGroup}>
                     <label className={s.label}>Language Preference</label>

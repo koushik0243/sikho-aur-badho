@@ -1,18 +1,18 @@
-﻿'use client';
+'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from "./OrdersList.module.css";
+import sPage from "./OrdersList.module.css";
+import ListFilterBar, { EMPTY_LIST_FILTERS, isDateRangeInvalid, listFilterParams } from '../ListFilterBar';
+import { withAdminKit } from '../AdminKit/AdminKit';
 
-const SearchIcon = () => (
-  <svg viewBox="0 0 20 20" fill="currentColor">
-    <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-  </svg>
-);
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
+
 const EyeIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
     <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
@@ -39,35 +39,91 @@ function fmtAmount(val) {
 
 const LIMIT = 50;
 
+const STATUSES = [
+  { value: 'success',  label: 'Success',  cls: 'badgeSuccess' },
+  { value: 'pending',  label: 'Pending',  cls: 'badgePending' },
+  { value: 'failed',   label: 'Failed',   cls: 'badgeFailed' },
+  { value: 'canceled', label: 'Canceled', cls: 'badgeCanceled' },
+  { value: 'refunded', label: 'Refunded', cls: 'badgeRefunded' },
+];
+const STATUS_BY_VALUE = Object.fromEntries(STATUSES.map(st => [st.value, st]));
+
+const time = v => new Date(v).getTime() || 0;
+
+/** List order: by the clicked column, otherwise most recent purchase first. */
+function compareOrders(key, dir) {
+  const sign = dir === 'asc' ? 1 : -1;
+  const pick = {
+    org_name:        o => (o.organizer_id?.org_name ?? '').toLowerCase(),
+    credit_title:    o => (o.credit_id?.title ?? '').toLowerCase(),
+    credit_amount:   o => Number(o.credit_amount) || 0,
+    purchase_date:   o => time(o.purchase_date),
+    payment_gateway: o => String(o.payment_gateway || '').toLowerCase(),
+  }[key];
+  if (!pick) return (a, b) => (time(b.purchase_date) - time(a.purchase_date)) || (time(b.createdAt) - time(a.createdAt));
+  return (a, b) => { const av = pick(a), bv = pick(b); return av < bv ? -sign : av > bv ? sign : 0; };
+}
+
+function StatusBadge({ status }) {
+  const st = STATUS_BY_VALUE[status];
+  return st
+    ? <span className={s[st.cls]}>{st.label}</span>
+    : <span className={s.badgePending} style={{ textTransform: 'capitalize' }}>{status || 'Pending'}</span>;
+}
+
 export default function OrdersList() {
   const router = useRouter();
-  const [orders, setOrders]         = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [search, setSearch]         = useState('');
+  const [loaded, setLoaded]         = useState({ key: null, orders: [] });   // orders for one query
+  const [reloadToken, setReloadToken] = useState(0);
+  const [orgs, setOrgs]             = useState([]);
+  const [filters, setFilters]       = useState(EMPTY_LIST_FILTERS);
   const [page, setPage]             = useState(1);
-  const [total, setTotal]           = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
   const [confirm, setConfirm]       = useState({ show: false, id: null });
   const [selected, setSelected]     = useState([]);
   const [bulkConfirm, setBulkConfirm] = useState(false);
   const [sortKey, setSortKey]       = useState('');
   const [sortDir, setSortDir]       = useState('asc');
-  const [statusFilter, setStatusFilter] = useState('');
 
-  const fetchOrders = useCallback(() => {
-    setLoading(true);
-    const params = new URLSearchParams({ page, limit: LIMIT });
-    apiServiceHandler('GET', `order/list-pagination?${params}`)
-      .then(res => {
-        setOrders(Array.isArray(res?.data) ? res.data : []);
-        setTotal(res?.total ?? 0);
-        setTotalPages(res?.totalPages ?? 1);
-      })
-      .catch(() => setOrders([]))
-      .finally(() => setLoading(false));
-  }, [page]);
+  const dateRangeInvalid = isDateRangeInvalid(filters);
 
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  // Every order matching the filters (filtered on the server); sorted and paged here.
+  const queryKey = `${listFilterParams(filters, { orgParam: 'organizer_id', statusParam: 'status' })}#${reloadToken}`;
+  const loading = !dateRangeInvalid && loaded.key !== queryKey;
+  const orders = loaded.orders;
+
+  useEffect(() => {
+    if (dateRangeInvalid) return undefined;
+    let cancelled = false;
+    const [query] = queryKey.split('#');
+    apiServiceHandler('GET', `order/list?${query}${query ? '&' : ''}t=${Date.now()}`)
+      .then(res => { if (!cancelled) setLoaded({ key: queryKey, orders: Array.isArray(res?.data) ? res.data : [] }); })
+      .catch(() => {
+        if (cancelled) return;
+        setLoaded({ key: queryKey, orders: [] });
+        toast.warning('Failed to load orders.');
+      });
+    return () => { cancelled = true; };
+  }, [queryKey, dateRangeInvalid]);
+
+  const fetchOrders = () => setReloadToken(n => n + 1);
+
+  useEffect(() => {
+    apiServiceHandler('GET', 'organization/list-pagination?limit=1000')
+      .then(res => setOrgs(Array.isArray(res?.data) ? res.data : []))
+      .catch(() => setOrgs([]));
+  }, []);
+
+  function setFilter(key, value) {
+    setFilters(prev => ({ ...prev, [key]: value }));
+    setPage(1);
+    setSelected([]);
+  }
+  function resetFilters() {
+    setFilters(EMPTY_LIST_FILTERS);
+    setPage(1);
+    setSelected([]);
+  }
+  const hasFilters = Object.values(filters).some(Boolean);
 
   function toggleSort(key) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -78,40 +134,25 @@ export default function OrdersList() {
     return sortDir === 'asc' ? ' ↑' : ' ↓';
   }
 
-  const filtered = orders.filter(o => {
-    const matchesSearch = !search ||
-      (o.organizer_id?.org_name || '').toLowerCase().includes(search.toLowerCase()) ||
-      (o.credit_id?.title || '').toLowerCase().includes(search.toLowerCase()) ||
-      (o.payment_gateway || '').toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = !statusFilter || o.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
 
-  const sorted = sortKey
-    ? [...filtered].sort((a, b) => {
-        let av, bv;
-        if (sortKey === 'org_name') { av = (a.organizer_id?.org_name ?? '').toLowerCase(); bv = (b.organizer_id?.org_name ?? '').toLowerCase(); }
-        else if (sortKey === 'credit_title') { av = (a.credit_id?.title ?? '').toLowerCase(); bv = (b.credit_id?.title ?? '').toLowerCase(); }
-        else if (sortKey === 'credit_amount') { return sortDir === 'asc' ? (Number(a.credit_amount)||0) - (Number(b.credit_amount)||0) : (Number(b.credit_amount)||0) - (Number(a.credit_amount)||0); }
-        else if (sortKey === 'purchase_date') { return sortDir === 'asc' ? (new Date(a.purchase_date).getTime()||0) - (new Date(b.purchase_date).getTime()||0) : (new Date(b.purchase_date).getTime()||0) - (new Date(a.purchase_date).getTime()||0); }
-        else { av = String(a[sortKey]||'').toLowerCase(); bv = String(b[sortKey]||'').toLowerCase(); }
-        if (av < bv) return sortDir === 'asc' ? -1 : 1;
-        if (av > bv) return sortDir === 'asc' ? 1 : -1;
-        return 0;
-      })
-    : filtered;
+  const sorted     = [...orders].sort(compareOrders(sortKey, sortDir));
+  const total      = sorted.length;
+  const totalPages = Math.max(1, Math.ceil(total / LIMIT));
+  const pageRows   = sorted.slice((page - 1) * LIMIT, page * LIMIT);
+  const from = total === 0 ? 0 : (page - 1) * LIMIT + 1;
+  const to   = Math.min(page * LIMIT, total);
 
   function doDelete() {
     const { id } = confirm;
     setConfirm({ show: false, id: null });
     apiServiceHandler('GET', `order/delete/${id}`)
-      .then(() => { toast.success('Order deleted.'); fetchOrders(); })
-      .catch(() => toast.error('Delete failed.'));
+      .then(() => { toast.error('Order deleted.'); fetchOrders(); })
+      .catch(() => toast.warning('Delete failed.'));
   }
 
-  const allIds = sorted.map(o => o._id);
-  const allSelected = allIds.length > 0 && allIds.every(id => selected.includes(id));
-  const toggleAll = () => setSelected(allSelected ? [] : allIds);
+  const pageIds = pageRows.map(o => o._id);
+  const allSelected = pageIds.length > 0 && pageIds.every(id => selected.includes(id));
+  const toggleAll = () => setSelected(allSelected ? [] : pageIds);
   const toggleOne = id => setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
   function doBulkDelete() {
@@ -119,12 +160,11 @@ export default function OrdersList() {
     const ids = [...selected];
     setSelected([]);
     Promise.all(ids.map(id => apiServiceHandler('GET', `order/delete/${id}`)))
-      .then(() => { toast.success(`${ids.length} order${ids.length !== 1 ? 's' : ''} deleted.`); fetchOrders(); })
-      .catch(() => toast.error('Some deletes failed.'));
+      .then(() => { toast.error(`${ids.length} order${ids.length !== 1 ? 's' : ''} deleted.`); fetchOrders(); })
+      .catch(() => toast.warning('Some deletes failed.'));
   }
 
-  const from = total === 0 ? 0 : (page - 1) * LIMIT + 1;
-  const to   = Math.min(page * LIMIT, total);
+  const sortable = { cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' };
 
   return (
     <SuperAdminShell activeSection="orders">
@@ -156,42 +196,27 @@ export default function OrdersList() {
       </div>
 
       <div className={s.card}>
-        <div className={s.toolbar}>
-          <div className={s.searchWrap}>
-            <SearchIcon />
-            <input
-              className={s.searchInput}
-              type="text"
-              placeholder="Search organization, credit, gateway…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
-          <select
-            className={s.statusSelect}
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-          >
-            <option value="">All Statuses</option>
-            <option value="success">Success</option>
-            <option value="pending">Pending</option>
-            <option value="failed">Failed</option>
-            <option value="canceled">Canceled</option>
-            <option value="refunded">Refunded</option>
-          </select>
-        </div>
+        <ListFilterBar
+          label="Filter orders"
+          orgs={orgs}
+          statuses={STATUSES}
+          filters={filters}
+          onFilter={setFilter}
+          onClear={resetFilters}
+          canClear={hasFilters}
+        />
 
         <div className={s.tableWrap}>
           <table className={s.table}>
             <thead>
               <tr>
-                <th className={s.checkTh}><input type="checkbox" checked={allSelected} onChange={toggleAll} /></th>
+                <th className={s.checkTh}><input type="checkbox" aria-label="Select all orders on this page" checked={allSelected} onChange={toggleAll} /></th>
                 <th>#</th>
-                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('org_name')}>Organization{sortArrow('org_name')}</th>
-                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('credit_title')}>Credit Package{sortArrow('credit_title')}</th>
-                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('credit_amount')}>Amount{sortArrow('credit_amount')}</th>
-                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('purchase_date')}>Purchase Date{sortArrow('purchase_date')}</th>
-                <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('payment_gateway')}>Gateway{sortArrow('payment_gateway')}</th>
+                <th style={sortable} onClick={() => toggleSort('org_name')}>Organization{sortArrow('org_name')}</th>
+                <th style={sortable} onClick={() => toggleSort('credit_title')}>Credit Package{sortArrow('credit_title')}</th>
+                <th style={sortable} onClick={() => toggleSort('credit_amount')}>Amount{sortArrow('credit_amount')}</th>
+                <th style={sortable} onClick={() => toggleSort('purchase_date')}>Purchase Date{sortArrow('purchase_date')}</th>
+                <th style={sortable} onClick={() => toggleSort('payment_gateway')}>Gateway{sortArrow('payment_gateway')}</th>
                 <th>Status</th>
                 <th>Action</th>
               </tr>
@@ -199,12 +224,13 @@ export default function OrdersList() {
             <tbody>
               {loading ? (
                 <tr className={s.emptyRow}><td colSpan={9}>Loading…</td></tr>
-              ) : sorted.length === 0 ? (
-                <tr className={s.emptyRow}><td colSpan={9}>No orders found.</td></tr>
-              ) : sorted.map((o, idx) => (
-                <tr key={o._id} style={{ cursor: 'pointer' }} onClick={() => toggleOne(o._id)}>
-                  <td className={s.checkTd} onClick={e => e.stopPropagation()}>
-                    <input type="checkbox" checked={selected.includes(o._id)} onChange={() => toggleOne(o._id)} />
+              ) : pageRows.length === 0 ? (
+                <tr className={s.emptyRow}><td colSpan={9}>{hasFilters ? 'No orders match these filters.' : 'No orders found.'}</td></tr>
+              ) : pageRows.map((o, idx) => (
+                <tr key={o._id}>
+                  <td className={s.checkTd}>
+                    <input type="checkbox" aria-label={`Select order ${o.credit_id?.title || ''} for ${o.organizer_id?.org_name || ''}`}
+                      checked={selected.includes(o._id)} onChange={() => toggleOne(o._id)} />
                   </td>
                   <td className={s.colMuted}>{(page - 1) * LIMIT + idx + 1}</td>
                   <td>{o.organizer_id?.org_name || '—'}</td>
@@ -212,22 +238,13 @@ export default function OrdersList() {
                   <td className={s.colAmount}>{fmtAmount(o.credit_amount)}</td>
                   <td className={s.colMuted}>{fmtDate(o.purchase_date)}</td>
                   <td><span className={s.colGateway}>{o.payment_gateway || '—'}</span></td>
+                  <td><StatusBadge status={o.status} /></td>
                   <td>
-                    {o.status === 'success'  && <span className={s.badgeSuccess}>Success</span>}
-                    {o.status === 'pending'  && <span className={s.badgePending}>Pending</span>}
-                    {o.status === 'failed'   && <span className={s.badgeFailed}>Failed</span>}
-                    {o.status === 'canceled' && <span className={s.badgeCanceled}>Canceled</span>}
-                    {o.status === 'refunded' && <span className={s.badgeRefunded}>Refunded</span>}
-                    {!['success','pending','failed','canceled','refunded'].includes(o.status) && (
-                      <span className={s.badgePending} style={{ textTransform: 'capitalize' }}>{o.status || 'Pending'}</span>
-                    )}
-                  </td>
-                  <td>
-                    <div className={s.actions} onClick={e => e.stopPropagation()}>
-                      <button className={s.btnView} title="View" onClick={() => router.push(`/superadmin/payments/orders/view/${o._id}`)}>
+                    <div className={s.actions}>
+                      <button data-action="view" className={s.btnView} title="View" aria-label="View order" onClick={() => router.push(`/superadmin/payments/orders/view/${o._id}`)}>
                         <EyeIcon />
                       </button>
-                      <button className={s.btnDelete} title="Delete" onClick={() => setConfirm({ show: true, id: o._id })}>
+                      <button data-action="delete" className={s.btnDelete} title="Delete" aria-label="Delete order" onClick={() => setConfirm({ show: true, id: o._id })}>
                         <TrashIcon />
                       </button>
                     </div>
@@ -245,7 +262,9 @@ export default function OrdersList() {
                 Delete {selected.length} Selected
               </button>
             )}
-            <span>Showing {from}–{to} of {total}</span>
+            <span>
+              {total === 0 ? 'No orders' : `Showing ${from}–${to} of ${total}`}
+            </span>
           </div>
           <div className={s.paginationBtns}>
             <button className={s.pageBtn} disabled={page <= 1} onClick={() => setPage(p => p - 1)}>‹</button>

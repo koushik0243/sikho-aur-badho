@@ -578,3 +578,13 @@
     min-width: 0;
   }
 }
+
+/* ── Shared view-page label column: same width on every view page (--view-label-width in globals.css) ── */
+@media (min-width: 481px) {
+  .sectionRow > .sectionLabel {
+    flex: 0 0 var(--view-label-width, 180px);
+    width: var(--view-label-width, 180px);
+    min-width: 0;
+  }
+}
+.submissionsCard { margin-top: 16px; }

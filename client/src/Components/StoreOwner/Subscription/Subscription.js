@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { selectUser } from '../../../redux/slices/authSlice';
 import s from "./Subscription.module.css";
 import apiServiceHandler from '../../../service/apiService';
+import { kit as k, PageHeader, KpiTiles, Card, Pill, Pager, KitIcon } from '../PageKit/PageKit';
 
 function CheckCircle({ dark }) {
   return (
@@ -91,7 +92,7 @@ export default function SubscriptionPage() {
   // server/organization_credit_assignment/organization_credit_assignment.service.js).
   async function handlePurchase() {
     if (!selectedCreditId) return;
-    if (!purchaseOrgId) { toast.error('Organisation not found.'); return; }
+    if (!purchaseOrgId) { toast.warning('Organisation not found.'); return; }
     setPurchasing(true);
     try {
       await apiServiceHandler('POST', 'organization-credit-assignment/create', {
@@ -102,7 +103,7 @@ export default function SubscriptionPage() {
       setSelectedCreditId('');
       loadData();
     } catch (err) {
-      toast.error(err?.message || 'Purchase failed. Please try again.');
+      toast.warning(err?.message || 'Purchase failed. Please try again.');
     } finally {
       setPurchasing(false);
     }
@@ -121,184 +122,132 @@ export default function SubscriptionPage() {
     .map(l => l.trim())
     .filter(Boolean);
 
+  const rangeText = limitFrom != null && limitTo != null ? `${limitFrom} – ${limitTo}`
+    : limitTo != null ? `Up to ${limitTo}` : limitFrom != null ? `From ${limitFrom}` : '—';
+  const priceOf = c => { const n = parseFloat(c?.price?.$numberDecimal ?? c?.price); return isNaN(n) ? 0 : n; };
+  const totalSpent = assignments.reduce((sum, a) => sum + priceOf(a.creditId), 0);
+  const history = [...assignments].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const pagedHistory = history.slice((assignPage - 1) * PAGE_SIZE, assignPage * PAGE_SIZE);
+  const creditLabel = c => {
+    const range = c.limit_from != null && c.limit_to != null ? `${c.limit_from}–${c.limit_to} credits`
+      : c.limit_to != null ? `${c.limit_to} credits` : c.limit_from != null ? `${c.limit_from}+ credits` : null;
+    const price = c.price != null ? fmtPrice(c.price) : null;
+    return [c.title ?? '', range && `(${range})`, price && `— ${price}`].filter(Boolean).join(' ');
+  };
+  const selectedCredit = credits.find(c => c._id === selectedCreditId);
+
   return (
-    <>
-      {/* Main two-column grid */}
+    <div className={k.page}>
+      <PageHeader title="Current Credit" sub="Your active credit plan, buying more credits, and every plan assigned to your organisation." />
+
+      <KpiTiles items={[
+        { label: 'Current plan',    value: loading ? '—' : (activePlan ? planTitle : 'None'), icon: KitIcon.layers },
+        { label: 'Credit range',    value: loading || !activePlan ? '—' : rangeText,          icon: KitIcon.coins },
+        { label: 'Plans purchased', value: loading ? '—' : assignments.length,                icon: KitIcon.cart, hint: 'All time' },
+        { label: 'Total spent',     value: loading ? '—' : fmtPrice(totalSpent),             icon: KitIcon.spark, hint: 'All plans' },
+      ]} />
+
       <div className={s.mainGrid}>
-
-        {/* ── Left column ── */}
-        <div className={s.leftCol}>
-
-          {/* Current plan card */}
-          <div className={s.card}>
-            <div className={s.cardHead}>
-              <h3 className={s.cardTitle}>Current Plan</h3>
-            </div>
-            <div className={s.cardBody}>
-            {loading ? (
-              <div className={s.loadingMsg}>Loading plan…</div>
-            ) : !activePlan ? (
-              <div className={s.noplan}>No credit plan assigned to this organisation yet.</div>
-            ) : (
-              <>
-                <div className={s.planTop}>
-                  <div className={s.planAvatar}>
-                    <svg viewBox="0 0 48 48" fill="none">
-                      <circle cx="24" cy="24" r="24" fill="#e0e8e8" />
-                      <circle cx="24" cy="19" r="7" fill="#b0c4c4" />
-                      <ellipse cx="24" cy="38" rx="12" ry="7" fill="#b0c4c4" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className={s.planLabel}>Your Plan</div>
-                    <div className={s.planName}>{planTitle}</div>
-                    <div className={s.planPrice}>{planPrice}</div>
-                  </div>
+        {/* Current plan */}
+        <Card title="Current plan" meta={activePlan && <Pill tone="good">Active</Pill>}>
+          {loading ? (
+            <div className={s.loadingMsg}>Loading plan…</div>
+          ) : !activePlan ? (
+            <div className={s.noplan}>No credit plan assigned to this organisation yet. Buy one on the right to get started.</div>
+          ) : (
+            <div className={s.planHero}>
+              <div className={s.planHeroTop}>
+                <div>
+                  <div className={s.planLabel}>Your plan</div>
+                  <div className={s.planName}>{planTitle}</div>
                 </div>
-
-                {(limitFrom != null || limitTo != null) && (
-                  <div className={s.creditRange}>
-                    <span className={s.creditRangeLabel}>Credits</span>
-                    <span className={s.creditRangeValue}>
-                      {limitFrom != null && limitTo != null
-                        ? `${limitFrom} – ${limitTo}`
-                        : limitTo != null ? `Up to ${limitTo}` : `From ${limitFrom}`}
-                    </span>
-                  </div>
-                )}
-
-                {features.length > 0 && (
-                  <div className={s.featureGrid}>
-                    {features.map((f, i) => (
-                      <div key={i} className={s.featureItem}>
-                        <CheckCircle />
-                        <span>{f}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className={s.planBottom}>
-                  <div className={s.planChips}>
-                    <span className={s.renewalChip}>Assigned {formatDate(activePlan.createdAt)}</span>
-                  </div>
+                <div className={s.planPrice}>{planPrice}</div>
+              </div>
+              {(limitFrom != null || limitTo != null) && (
+                <div className={s.creditRange}>
+                  <span className={s.creditRangeLabel}>Credits</span>
+                  <span className={s.creditRangeValue}>{rangeText}</span>
                 </div>
-              </>
-            )}
+              )}
+              {features.length > 0 && (
+                <ul className={s.featureGrid}>
+                  {features.map((ft, i) => (
+                    <li key={i} className={s.featureItem}><CheckCircle /><span>{ft}</span></li>
+                  ))}
+                </ul>
+              )}
+              <div className={s.planFoot}>Assigned {formatDate(activePlan.createdAt)}</div>
             </div>
-          </div>
+          )}
+        </Card>
 
-          {/* Credit Assignment History */}
-          <div className={s.card}>
-            <div className={s.cardHead}><h3 className={s.cardTitle}>Assignment History</h3></div>
-            <div className={s.cardBody}>
-            {loading ? (
-              <div className={s.loadingMsg}>Loading history…</div>
-            ) : assignments.length === 0 ? (
-              <div className={s.noplan}>No credit assignments found.</div>
-            ) : (() => {
-              const sorted = [...assignments].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-              const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
-              const paged = sorted.slice((assignPage - 1) * PAGE_SIZE, assignPage * PAGE_SIZE);
-              return (
-                <>
-                  <div className={s.tableScrollWrap}>
-                    <table className={s.billingTable}>
-                      <thead>
-                        <tr>
-                          <th>Sl.</th>
-                          <th>Date</th>
-                          <th>Plan</th>
-                          <th>Credits</th>
-                          <th>Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {paged.map((a, i) => {
-                          const globalIdx = (assignPage - 1) * PAGE_SIZE + i;
-                          const c = a.creditId ?? {};
-                          return (
-                            <tr key={a._id ?? i}>
-                              <td>{globalIdx + 1}</td>
-                              <td>{formatDate(a.createdAt)}</td>
-                              <td>{c.title ?? '—'}</td>
-                              <td>{c.limit_to != null ? c.limit_to : '—'}</td>
-                              <td>{fmtPrice(c.price)}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className={s.pagination}>
-                    <span className={s.paginationInfo}>
-                      Showing {sorted.length === 0 ? 0 : (assignPage - 1) * PAGE_SIZE + 1}–{Math.min(assignPage * PAGE_SIZE, sorted.length)} of {sorted.length}
-                    </span>
-                    <div className={s.paginationBtns}>
-                      <button className={s.pageBtn} onClick={() => setAssignPage(p => Math.max(1, p - 1))} disabled={assignPage <= 1}>‹</button>
-                      {Array.from({ length: Math.max(1, totalPages) }, (_, i) => i + 1).map(p => (
-                        <button key={p} className={`${s.pageBtn} ${p === assignPage ? s.pageBtnActive : ''}`} onClick={() => setAssignPage(p)}>{p}</button>
-                      ))}
-                      <button className={s.pageBtn} onClick={() => setAssignPage(p => Math.min(totalPages, p + 1))} disabled={assignPage >= totalPages}>›</button>
-                    </div>
-                  </div>
-                </>
-              );
-            })()}
+        {/* Purchase */}
+        <Card title="Purchase credit" sub="Buy another credit pack — it’s added to your organisation straight away.">
+          <label className={s.purchaseLabel} htmlFor="creditSelect">Credit pack</label>
+          <select
+            id="creditSelect"
+            className={k.select}
+            style={{ width: '100%' }}
+            value={selectedCreditId}
+            onChange={e => setSelectedCreditId(e.target.value)}
+            disabled={purchasing}
+          >
+            <option value="">Select a credit option</option>
+            {credits.map(c => <option key={c._id} value={c._id}>{creditLabel(c)}</option>)}
+          </select>
+          {selectedCredit && (
+            <div className={s.purchaseSummary}>
+              <span>{selectedCredit.title}</span>
+              <strong>{fmtPrice(selectedCredit.price)}</strong>
             </div>
-          </div>
-        </div>
-
-        {/* ── Right column ── */}
-        <div className={s.rightCol}>
-
-          {/* Purchase Credit */}
-          <div className={s.card}>
-            <div className={s.cardHead}><h3 className={s.cardTitle}>Purchase Credit</h3></div>
-            <div className={s.cardBody}>
-            <div className={s.purchaseGrid}>
-              <div className={s.purchaseGroup}>
-                <label className={s.purchaseLabel} htmlFor="creditSelect">Select Credit</label>
-                <select
-                  id="creditSelect"
-                  className={s.purchaseSelect}
-                  value={selectedCreditId}
-                  onChange={e => setSelectedCreditId(e.target.value)}
-                  disabled={purchasing}
-                >
-                  <option value="">Select a credit option</option>
-                  {credits.map(c => {
-                    const range = c.limit_from != null && c.limit_to != null
-                      ? `${c.limit_from} -${c.limit_to} credits`
-                      : c.limit_to != null
-                        ? `${c.limit_to} credits`
-                        : c.limit_from != null
-                          ? `${c.limit_from}+ credits`
-                          : null;
-                    const price = c.price != null ? fmtPrice(c.price) : null;
-                    const label = `${c.title ?? ''}${range ? `(${range})` : ''}${price ? ` - ${price}` : ''}`;
-                    return (
-                      <option key={c._id} value={c._id}>{label}</option>
-                    );
-                  })}
-                </select>
-              </div>
-              <div className={s.purchaseGroupBtn}>
-                <button
-                  className={s.btnPurchase}
-                  onClick={handlePurchase}
-                  disabled={!selectedCreditId || purchasing}
-                >
-                  {purchasing ? 'Processing…' : 'Purchase'}
-                </button>
-              </div>
-            </div>
-            </div>
-          </div>
-
-        </div>
+          )}
+          <button
+            className={k.btnPrimary}
+            style={{ width: '100%', marginTop: 14 }}
+            onClick={handlePurchase}
+            disabled={!selectedCreditId || purchasing}
+          >
+            {purchasing ? 'Processing…' : 'Purchase'}
+          </button>
+        </Card>
       </div>
 
-    </>
+      {/* History */}
+      <Card title="Assignment history" sub="Every credit plan assigned to your organisation, newest first."
+        meta={!loading && <Pill tone="neutral">{history.length} plan{history.length !== 1 ? 's' : ''}</Pill>} flush>
+        <div className={k.tableWrap}>
+          <table className={k.table}>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Date</th>
+                <th>Plan</th>
+                <th className={k.num}>Credits</th>
+                <th className={k.num}>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={5} className={k.empty}>Loading history…</td></tr>
+              ) : history.length === 0 ? (
+                <tr><td colSpan={5} className={k.empty}>No credit assignments found.</td></tr>
+              ) : pagedHistory.map((a, i) => {
+                const c = a.creditId ?? {};
+                return (
+                  <tr key={a._id ?? i}>
+                    <td className={k.idx}>{(assignPage - 1) * PAGE_SIZE + i + 1}</td>
+                    <td>{formatDate(a.createdAt)}</td>
+                    <td className={k.strong}>{c.title ?? '—'}</td>
+                    <td className={k.num}>{c.limit_to != null ? c.limit_to : '—'}</td>
+                    <td className={`${k.num} ${k.strong}`}>{fmtPrice(c.price)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {!loading && <Pager page={assignPage} pageSize={PAGE_SIZE} total={history.length} onPage={setAssignPage} />}
+      </Card>
+    </div>
   );
 }

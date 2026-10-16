@@ -3,7 +3,11 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
-import s from "./IndustryTypeTree.module.css";
+import sPage from "./IndustryTypeTree.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const SearchIcon = (
   <svg viewBox="0 0 20 20" fill="currentColor" width="13" height="13">
@@ -72,7 +76,8 @@ function TreeNode({ node, selectedIds, onToggle, expanded, onExpand }) {
   );
 }
 
-export default function IndustryTypeTree({ industryTypes, setIndustryTypes, selectedIds, setSelectedIds, allowAdd = true }) {
+/** listHeight — max height (px) of the scrolling list; defaults to the stylesheet's 120px. */
+export default function IndustryTypeTree({ industryTypes, setIndustryTypes, selectedIds, setSelectedIds, allowAdd = true, listHeight }) {
   const [search, setSearch]           = useState('');
   const [expanded, setExpanded]       = useState(new Set());
   const [addOpen, setAddOpen]         = useState(false);
@@ -113,7 +118,7 @@ export default function IndustryTypeTree({ industryTypes, setIndustryTypes, sele
       setAddOpen(false);
       toast.success('Industry type added.');
     } catch {
-      toast.error('Failed to add industry type.');
+      toast.warning('Failed to add industry type.');
     } finally {
       setAdding(false);
     }
@@ -176,7 +181,7 @@ export default function IndustryTypeTree({ industryTypes, setIndustryTypes, sele
         />
       </div>
 
-      <div className={s.itList}>
+      <div className={s.itList} style={listHeight ? { maxHeight: listHeight } : undefined}>
         {industryTypes.length === 0 ? (
           <p className={s.itEmpty}>No industry types available.</p>
         ) : filtered ? (

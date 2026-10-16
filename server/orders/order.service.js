@@ -10,6 +10,14 @@ const buildQuery = (filters = {}) => {
         query.organizer_id = new ObjectId(filters.organizer_id);
     if (filters.credit_id && ObjectId.isValid(filters.credit_id))
         query.credit_id = new ObjectId(filters.credit_id);
+    // Purchase date range (ISO timestamps; either end optional, both inclusive).
+    const from = filters.date_from ? new Date(filters.date_from) : null;
+    const to   = filters.date_to ? new Date(filters.date_to) : null;
+    if ((from && !isNaN(from)) || (to && !isNaN(to))) {
+        query.purchase_date = {};
+        if (from && !isNaN(from)) query.purchase_date.$gte = from;
+        if (to && !isNaN(to)) query.purchase_date.$lte = to;
+    }
     return query;
 };
 

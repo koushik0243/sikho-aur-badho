@@ -6,7 +6,11 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from "./AddCourse.module.css";
+import sPage from "./AddCourse.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
 const TOPIC_TYPES = [
@@ -209,7 +213,7 @@ export default function AddCourse() {
       toast.success('Course created successfully.');
       router.push('/superadmin/courses');
     } catch {
-      toast.error('Failed to create course. Please try again.');
+      toast.warning('Failed to create course. Please try again.');
     } finally {
       setSubmitting(false);
     }

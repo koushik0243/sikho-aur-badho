@@ -4,7 +4,12 @@ import { useRouter } from 'next/navigation';
 import { useSelector } from 'react-redux';
 import { selectUser, selectAuthReady } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
-import s from "./Quiz.module.css";
+import { DEFAULT_PASSING_GRADE } from '../../../Components/Learner/quizSettings';
+import pageStyles from "./Quiz.module.css";
+import { withLearnerKit } from '../../../Components/Learner/LearnerKit/LearnerKit';
+
+// Page styles + the shared learner page look.
+const s = withLearnerKit(pageStyles);
 
 const BackArrow = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -98,6 +103,12 @@ export default function QuizResultPage() {
           list = all;
         }
         setCourses(list);
+        // Open on the first course with a quiz attempt (else the first course), so the page shows results straight away.
+        const prog = await apiServiceHandler('GET', `my-report/progress?t=${Date.now()}`).catch(() => null);
+        if (cancelled) return;
+        const withResults = new Set((prog?.data?.tests || []).map(x => String(x.courseId)));
+        const pick = list.find(c => withResults.has(String(c._id))) || list[0];
+        if (pick?._id) setSelectedCourse(prev => prev || String(pick._id));
       } finally {
         if (!cancelled) setLoadingCourses(false);
       }
@@ -311,7 +322,8 @@ export default function QuizResultPage() {
                   </div>
                 </div>
 
-                <p className={s.threshold}>Pass Threshold: 60%</p>
+                {/* The attempt stores the quiz's own pass mark (default 20%) */}
+                <p className={s.threshold}>Pass mark: {att.passingGrade ?? DEFAULT_PASSING_GRADE}%</p>
               </div>
             </div>
 
@@ -321,6 +333,7 @@ export default function QuizResultPage() {
                 <p className={s.breakdownMeta}>Detailed Breakdown</p>
                 <h3 className={s.breakdownTitle}>Question Answers</h3>
 
+                <div className={s.qGrid}>
                 {answers.map((a, i) => {
                   const aiScore  = Number(a.aiScore || 0);
                   const maxScore = Number(a.maxScore || 0);
@@ -359,6 +372,7 @@ export default function QuizResultPage() {
                     </div>
                   );
                 })}
+                </div>
               </div>
             )}
 

@@ -924,3 +924,9 @@
   flex-wrap: wrap;
   justify-content: flex-end;
 }
+
+/* ── Column alignment: headers line up with their values ── */
+/* Header text starts where the column values start (same side padding as the cells). */
+.table thead tr th:not(:has(input[type="checkbox"])) { padding-left: 6px; padding-right: 6px; }
+/* Status labels have no pill background, so no side padding: the text lines up with its header. */
+.badgeActive.badgeActive, .badgeInactive.badgeInactive { padding-left: 0; padding-right: 0; }

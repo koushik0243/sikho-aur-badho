@@ -585,3 +585,26 @@
   padding: 20px !important;
   /* border-top: 1px solid #e3e3e3 !important; */
 }
+
+/* ── Restyled list (shared layout from PageKit) ───────────── */
+.nameCell { min-width: 0; }
+.nameText { display: flex; flex-direction: column; min-width: 0; }
+.nameText .emailText { color: #7a8c8c; }
+.nameText .emailText.emailText { font-size: 12.5px !important; }
+.avatar.avatar {
+  width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%;
+  background: linear-gradient(135deg, #0b7b7b, #14b8a6); color: #fff; font-weight: 800;
+  display: grid; place-items: center; font-size: 13px !important;
+}
+.courseCount.courseCount {
+  display: inline-grid; place-items: center; min-width: 28px; height: 24px; padding: 0 8px;
+  border-radius: 999px; background: #eef6f6; color: #0b6767; font-weight: 700; font-size: 12.5px !important;
+}
+.statusBtn {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px; border: none; background: none;
+  border-radius: 999px; cursor: pointer;
+}
+.statusBtn:hover .statusCaret { color: #0b7b7b; }
+.statusBtn:focus-visible { outline: 2px solid #0b7b7b; outline-offset: 2px; }
+.statusCaret { color: #9aa9a9; }
+.statusCaret { width: 14px; height: 14px; }

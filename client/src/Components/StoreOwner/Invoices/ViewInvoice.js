@@ -4,7 +4,12 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import apiServiceHandler from '../../../service/apiService';
 import { generateInvoicePDF } from '../../../lib/generateInvoicePDF';
-import vp from "./ViewInvoice.module.css";
+import { usePaymentMethods } from '../../../lib/paymentMethods';
+import pageStyles from "./ViewInvoice.module.css";
+import { withDetailKit } from '../PageKit/PageKit';
+
+// Page styles + the shared store owner detail-page look.
+const vp = withDetailKit(pageStyles);
 
 const BackArrow = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -39,6 +44,7 @@ function fmtAmount(val) {
 }
 
 export default function ViewInvoice() {
+  const { labelOf: paymentMethodLabel } = usePaymentMethods();
   const router = useRouter();
   const { id } = useParams();
   const [inv, setInv] = useState(null);
@@ -56,7 +62,7 @@ export default function ViewInvoice() {
   async function handleDownloadPDF() {
     if (!inv) return;
     setGenerating(true);
-    try { await generateInvoicePDF(inv); }
+    try { await generateInvoicePDF(inv, { paymentMethodLabel }); }
     finally { setGenerating(false); }
   }
 
@@ -122,7 +128,7 @@ export default function ViewInvoice() {
               </div>
               <div className={vp.sectionRow}>
                 <span className={vp.sectionLabel}>Payment Method</span>
-                <span className={vp.sectionValue}>{inv.payment_method || '—'}</span>
+                <span className={vp.sectionValue}>{paymentMethodLabel(inv.payment_method)}</span>
               </div>
               <div className={vp.sectionRow}>
                 <span className={vp.sectionLabel}>Transaction ID</span>

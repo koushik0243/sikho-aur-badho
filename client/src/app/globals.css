@@ -1,4 +1,6 @@
 :root {
+  /* Label column width on every view (details) page — change it here to resize them all. */
+  --view-label-width: 180px;
   --background: #ffffff;
   --foreground: #171717;
 }
@@ -174,3 +176,29 @@ html.capture-blocked body {
     display: none !important;
   }
 }
+
+/* ── Action-column icons (every list page, all portals) ─────────────────────
+   Buttons carry data-action="view | edit | delete | login | video". One look everywhere;
+   !important because each page's own module styles these buttons too. */
+button[data-action] {
+  display: inline-flex !important; align-items: center !important; justify-content: center !important;
+  flex-shrink: 0; width: 32px !important; height: 32px !important; min-width: 32px; padding: 0 !important; margin: 0;
+  border: none !important; border-radius: 8px !important; box-shadow: none;
+  color: #FFFFFF !important; opacity: 1 !important; cursor: pointer; line-height: 1;
+  transition: filter 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+button[data-action] svg { width: 15px !important; height: 15px !important; color: #FFFFFF !important; }
+/* icons drawn with a fixed colour still show white */
+button[data-action] svg [fill]:not([fill="none"]), button[data-action] svg[fill]:not([fill="none"]) { fill: #FFFFFF !important; }
+button[data-action] svg [stroke]:not([stroke="none"]), button[data-action] svg[stroke]:not([stroke="none"]) { stroke: #FFFFFF !important; }
+
+button[data-action="view"]   { background: #0B5ED7 !important; }
+button[data-action="edit"]   { background: #FFCA2C !important; }
+button[data-action="delete"] { background: #B91C1C !important; }
+button[data-action="login"]  { background: #31D2F2 !important; }
+button[data-action="video"]  { background: #157347 !important; } /* video / results links */
+
+button[data-action]:hover:not(:disabled) { filter: brightness(0.9); box-shadow: 0 4px 10px rgba(15, 23, 42, 0.18); transform: translateY(-1px); }
+button[data-action]:active:not(:disabled) { filter: brightness(0.82); transform: none; box-shadow: none; }
+button[data-action]:focus-visible { outline: 2px solid #12302f !important; outline-offset: 2px; }
+button[data-action]:disabled { opacity: 0.45 !important; cursor: not-allowed; }

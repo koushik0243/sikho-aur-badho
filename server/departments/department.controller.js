@@ -2,6 +2,8 @@ import express from 'express';
 import mongoose from 'mongoose';
 import * as DepartmentHelper from './department.service.js';
 
+import { requireSuperAdmin } from '../middleware/authMiddleware.js';
+
 const Router = express.Router();
 
 const STATUSES = ['active', 'inactive'];
@@ -109,12 +111,12 @@ const deleteDepartment = async (req, res, next) => {
 };
 
 Router.get('/check',           checkName);
-Router.post('/create',         createDepartment);
+Router.post('/create',         requireSuperAdmin, createDepartment);
 Router.get('/list',            listDepartments);
 Router.get('/list-pagination', listDepartmentsPagination);
 Router.get('/edit/:id',        editDepartment);
-Router.put('/update/:id',      updateDepartment);
-Router.get('/delete/:id',      deleteDepartment);
+Router.put('/update/:id',      requireSuperAdmin, updateDepartment);
+Router.get('/delete/:id',      requireSuperAdmin, deleteDepartment);
 Router.get('/:id',             editDepartment);
 
 export default Router;

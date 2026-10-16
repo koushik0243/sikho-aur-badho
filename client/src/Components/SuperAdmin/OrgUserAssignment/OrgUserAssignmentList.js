@@ -6,7 +6,11 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from "./OrgUserAssignmentList.module.css";
+import sPage from "./OrgUserAssignmentList.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const SearchIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -22,6 +26,11 @@ const EyeIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
     <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
     <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+  </svg>
+);
+const LoginIcon = () => (
+  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+    <path fillRule="evenodd" d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" />
   </svg>
 );
 const EditIcon = () => (
@@ -118,10 +127,10 @@ export default function OrgUserAssignmentList() {
     setConfirm({ show: false, id: null, name: '' });
     try {
       await apiServiceHandler('PUT', `user/admin/update/${id}`, { orgId: null });
-      toast.success('User removed from organization.');
+      toast.error('User removed from organization.');
       fetchRecords();
     } catch {
-      toast.error('Failed to remove user.');
+      toast.warning('Failed to remove user.');
     }
   }
 
@@ -135,8 +144,8 @@ export default function OrgUserAssignmentList() {
     const ids = [...selected];
     setSelected([]);
     Promise.all(ids.map(id => apiServiceHandler('PUT', `user/admin/update/${id}`, { orgId: null })))
-      .then(() => { toast.success(`${ids.length} user${ids.length !== 1 ? 's' : ''} removed.`); fetchRecords(); })
-      .catch(() => toast.error('Some removals failed'));
+      .then(() => { toast.error(`${ids.length} user${ids.length !== 1 ? 's' : ''} removed.`); fetchRecords(); })
+      .catch(() => toast.warning('Some removals failed'));
   }
 
   function toggleSort(key) {
@@ -253,26 +262,36 @@ export default function OrgUserAssignmentList() {
                   <td>{fmtDate(u.updatedAt || u.createdAt)}</td>
                   <td>
                     <div className={s.actions} onClick={e => e.stopPropagation()}>
-                      <button
+                      <button data-action="view"
                         className={s.btnView}
                         title="View"
                         onClick={() => router.push(`/superadmin/organization-user-assignment/${u._id}`)}
                       >
                         <EyeIcon />
                       </button>
-                      <button
+                      <button data-action="edit"
                         className={s.btnEdit}
                         title="Edit assignment"
                         onClick={() => router.push(`/superadmin/organization-user-assignment/edit/${u._id}`)}
                       >
                         <EditIcon />
                       </button>
-                      <button
+                      <button data-action="delete"
                         className={s.btnRemove}
                         title="Remove from organization"
                         onClick={() => handleRemove(u._id, displayName(u))}
                       >
                         <TrashIcon />
+                      </button>
+                      {/* Log in as this learner — opens the learner dashboard in a new tab (this tab stays super admin) */}
+                      <button data-action="login"
+                        className={s.btnView}
+                        title={u.status === 'active' ? 'Log in' : 'Log in (account not active)'}
+                        aria-label={`Log in as ${displayName(u)} (opens a new tab)`}
+                        disabled={u.status !== 'active'}
+                        onClick={() => window.open(`/impersonate?userId=${u._id}`, '_blank', 'noopener')}
+                      >
+                        <LoginIcon />
                       </button>
                     </div>
                   </td>

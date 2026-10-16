@@ -1,10 +1,11 @@
 import dotenv from 'dotenv';
 dotenv.config();
 import express from 'express';
+import mongoose from 'mongoose';
 const Router = express.Router();
 import * as UserHelper from './user.service.js';
 import User from './user.model.js';
-import protect from '../middleware/authMiddleware.js';
+import protect, { requireSuperAdmin } from '../middleware/authMiddleware.js';
 import RolePermission from '../role_permissions/role_permission.model.js';
 //import otpGenerator from 'otp-generator';
 import nodemailer from 'nodemailer';
@@ -484,6 +485,71 @@ const registerUser = async (req, res, next) => {
     }
 };
 
+// How long a "Log in" (as a store owner or learner) session lasts; the tab's 30-minute idle logout still applies.
+const IMPERSONATION_EXPIRES_IN = '2h';
+
+/** Who to log in as: { orgId } → that organization's store owner, { userId } → that learner. */
+async function impersonationTarget({ orgId, userId }) {
+    const db = mongoose.connection.db;
+    const fail = (status, message) => ({ error: [status, message] });
+
+    if (userId !== undefined) {
+        if (!mongoose.isValidObjectId(userId)) return fail(400, 'A valid learner is required.');
+        const learner = await User.findOne({ _id: userId, user_type: 'employee', deletedAt: null }).lean();
+        if (!learner) return fail(404, 'Learner not found.');
+        const org = learner.orgId
+            ? await db.collection('organizations').findOne({ _id: learner.orgId, deletedAt: null }, { projection: { org_name: 1 } })
+            : null;
+        if (!org) return fail(400, `${learner.name || learner.email} is not assigned to an organization.`);
+        if (learner.status && learner.status !== 'active') return fail(400, `${learner.name || learner.email}'s account is not active.`);
+        return { user: learner, role: 'learner', org };
+    }
+
+    if (!mongoose.isValidObjectId(orgId)) return fail(400, 'A valid organization is required.');
+    const org = await db.collection('organizations').findOne(
+        { _id: new mongoose.Types.ObjectId(orgId), deletedAt: null },
+        { projection: { org_name: 1, ownerId: 1 } },
+    );
+    if (!org) return fail(404, 'Organization not found.');
+    // The owner account: organizations.ownerId, else the org's user with the owner role.
+    const ownerQuery = { user_type: 'organization', deletedAt: null };
+    const owner = (org.ownerId && await User.findOne({ ...ownerQuery, _id: org.ownerId }).lean())
+        || await User.findOne({ ...ownerQuery, orgId: org._id, orgRole: 'owner' }).lean();
+    if (!owner) return fail(404, `${org.org_name || 'This organization'} has no store owner account to log in as.`);
+    if (owner.status && owner.status !== 'active') return fail(400, `The store owner account of ${org.org_name || 'this organization'} is not active.`);
+    return { user: owner, role: 'storeowner', org };
+}
+
+// POST /user/admin/impersonate { orgId } | { userId } — super admin only.
+// Signs the super admin in as an organization's store owner ({ orgId }) or as a learner
+// ({ userId }) in a separate browser tab. The token carries impersonatedBy, so it isn't
+// counted as that user's own login or activity, and every use is written to the server log.
+const impersonateUser = async (req, res, next) => {
+    try {
+        const { user, role, org, error } = await impersonationTarget(req.body || {});
+        if (error) return res.status(error[0]).json({ status: error[0], message: error[1] });
+
+        const secret = jwt.sign(
+            { _id: user._id, email: user.email, user_type: user.user_type, impersonatedBy: req.user._id },
+            process.env.JWT_SECRET,
+            { expiresIn: IMPERSONATION_EXPIRES_IN },
+        );
+        console.info(`[impersonate] super admin ${req.user._id} (${req.user.email}) logged in as ${role} ${user._id} (${user.email}) of org ${org._id}`);
+        const name = role === 'learner' ? (user.name || user.email) : (org.org_name || 'the store owner');
+        res.status(200).json({
+            status: 200,
+            message: `Logged in as ${name}.`,
+            data: {
+                _id: user._id, name: user.name, email: user.email, user_type: user.user_type,
+                orgId: user.orgId, orgRole: user.orgRole, status: user.status, secret,
+                impersonation: { role, name: user.name || user.email || '', orgName: org.org_name || '', by: req.user.email || '' },
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 const loginUser = async (req, res, next) => {
     try {
         // Single fetch reused for both the existence check and the password compare —
@@ -643,6 +709,7 @@ const adminLoginVerifyOtp = async (req, res, next) => {
         await UserHelper.updateUser(userDetails._id, payload);
 
         const token = generateJwtToken(userDetails);
+        UserHelper.markLoggedIn(userDetails._id);
         return res.status(200).json({
             status: 200,
             message: "Successfully verified OTP.",
@@ -922,6 +989,7 @@ Router.get('/admin/list-pagination', protect, listUserPagination);
 Router.get('/admin/export', protect, exportUsers);
 Router.post('/register', registerUser);
 Router.post('/login', loginUser);
+Router.post('/admin/impersonate', protect, requireSuperAdmin, impersonateUser);
 Router.post('/gmail-login', gmLoginUser);
 Router.post('/google-login', gmLoginUser);
 Router.post('/google-signin', gmLoginUser);

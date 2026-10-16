@@ -50,7 +50,7 @@ const courseUpload = upload.fields([
 const parseBodyWithFiles = (req) => {
     const body = { ...req.body };
     // Parse JSON-stringified arrays sent via FormData
-    ['subCatIds', 'tagIds', 'aptitudeSelectedQuestionIds'].forEach(key => {
+    ['catIds', 'subCatIds', 'tagIds', 'aptitudeSelectedQuestionIds'].forEach(key => {
         if (typeof body[key] === 'string') {
             try { body[key] = JSON.parse(body[key]); } catch { body[key] = [body[key]]; }
         }

@@ -6,7 +6,11 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import { API_URL } from '../../../lib/constant';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./EditCategorySubcategory.module.css";
+import sPage from "./EditCategorySubcategory.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const LayersIcon = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -156,7 +160,7 @@ export default function EditCategorySubcategory() {
       toast.success('Updated successfully.');
       router.push('/superadmin/category-subcategory');
     } catch {
-      toast.error('Failed to update. Please try again.');
+      toast.warning('Failed to update. Please try again.');
     } finally {
       setSubmitting(false);
     }

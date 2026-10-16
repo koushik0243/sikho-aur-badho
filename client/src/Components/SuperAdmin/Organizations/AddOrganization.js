@@ -6,8 +6,15 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import IndustryTypeTree from './IndustryTypeTree';
-import s from "./AddOrganization.module.css";
+import sPage from "./AddOrganization.module.css";
 import PasswordInput from '../../PasswordInput/PasswordInput';
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
+
+// Taller Industry Type list so more options show without scrolling.
+const INDUSTRY_LIST_HEIGHT = 200;
 
 const BackArrow = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -172,7 +179,7 @@ export default function AddOrganization() {
       toast.success('Organization created successfully.');
       router.push('/superadmin/organizations');
     } catch (err) {
-      toast.error(err?.message || 'Failed to create organization. Please try again.');
+      toast.warning(err?.message || 'Failed to create organization. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -245,6 +252,7 @@ export default function AddOrganization() {
                   setIndustryTypes={setIndustryTypes}
                   selectedIds={industryTypeIds}
                   setSelectedIds={setIndustryTypeIds}
+                  listHeight={INDUSTRY_LIST_HEIGHT}
                 />
               </div>
             </div>

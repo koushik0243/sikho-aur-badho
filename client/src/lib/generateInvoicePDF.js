@@ -1,4 +1,9 @@
-export async function generateInvoicePDF(invoice) {
+/**
+ * @param {object} invoice
+ * @param {{ paymentMethodLabel?: (value: string) => string }} [opts] names the
+ *   stored payment method (see lib/paymentMethods.js usePaymentMethods).
+ */
+export async function generateInvoicePDF(invoice, { paymentMethodLabel = v => v || '—' } = {}) {
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
 
@@ -101,7 +106,7 @@ export async function generateInvoicePDF(invoice) {
     ['Invoice No',     v(invoice.invoice_no)],
     ['Invoice Date',   fmt(invoice.createdAt)],
     ['Payment Date',   fmt(invoice.payment_date)],
-    ['Payment Method', v(invoice.payment_method)],
+    ['Payment Method', paymentMethodLabel(invoice.payment_method)],
     ['Currency',       v(cur)],
     ['Order Ref',      v(invoice.order_id?._id)],
   ];

@@ -6,7 +6,11 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import useScaledIframePreview from '../../../hooks/useScaledIframePreview';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./EditCertificateTemplate.module.css";
+import sPage from "./EditCertificateTemplate.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const CertIcon = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -46,7 +50,7 @@ export default function EditCertificateTemplate() {
         setDesc(d?.desc ?? '');
         setPreviewHtml(d?.desc ?? '');
       })
-      .catch(() => toast.error('Failed to load certificate template.'))
+      .catch(() => toast.warning('Failed to load certificate template.'))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -68,7 +72,7 @@ export default function EditCertificateTemplate() {
       toast.success('Certificate template updated successfully.');
       router.push('/superadmin/certificate-template');
     } catch {
-      toast.error('Failed to update certificate template. Please try again.');
+      toast.warning('Failed to update certificate template. Please try again.');
     } finally {
       setSubmitting(false);
     }

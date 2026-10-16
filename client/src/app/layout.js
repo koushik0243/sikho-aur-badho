@@ -4,6 +4,8 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import ReduxProvider from "../redux/ReduxProvider";
 import { Toaster } from "sonner";
 import PlatformSecurity from "../Components/PlatformSecurity";
+import GlobalPageLoader from "../Components/GlobalPageLoader";
+import Script from "next/script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,8 +31,11 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" data-scroll-behavior="smooth" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body suppressHydrationWarning>
+        {/* Per-tab login for "Log in as store owner" — must run before the app reads its login. */}
+        <Script id="tab-session" src="/tab-session.js" strategy="beforeInteractive" />
         <ReduxProvider>
           <PlatformSecurity />
+          <GlobalPageLoader />
           {children}
           <Toaster position="top-right" richColors closeButton />
         </ReduxProvider>

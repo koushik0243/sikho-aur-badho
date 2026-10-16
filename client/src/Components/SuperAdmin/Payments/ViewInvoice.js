@@ -5,7 +5,12 @@ import { useRouter, useParams } from 'next/navigation';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import { generateInvoicePDF } from '../../../lib/generateInvoicePDF';
-import vp from "./ViewInvoice.module.css";
+import vpPage from "./ViewInvoice.module.css";
+import { usePaymentMethods } from '../../../lib/paymentMethods';
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const vp = withAdminKit(vpPage);
 
 const BackArrow = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -39,6 +44,7 @@ function fmtAmount(val, currency = 'INR') {
 }
 
 export default function ViewInvoice() {
+  const { labelOf: paymentMethodLabel } = usePaymentMethods();
   const router  = useRouter();
   const { id }  = useParams();
   const [invoice, setInvoice]       = useState(null);
@@ -56,7 +62,7 @@ export default function ViewInvoice() {
   async function handleGeneratePDF() {
     if (!invoice) return;
     setGenerating(true);
-    try { await generateInvoicePDF(invoice); }
+    try { await generateInvoicePDF(invoice, { paymentMethodLabel }); }
     finally { setGenerating(false); }
   }
 
@@ -171,7 +177,7 @@ export default function ViewInvoice() {
             <div className={vp.sectionRows}>
               <div className={vp.sectionRow}>
                 <span className={vp.sectionLabel}>Payment Method</span>
-                <span className={vp.sectionValue}>{invoice.payment_method || '—'}</span>
+                <span className={vp.sectionValue}>{paymentMethodLabel(invoice.payment_method)}</span>
               </div>
               <div className={vp.sectionRow}>
                 <span className={vp.sectionLabel}>Transaction ID</span>

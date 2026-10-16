@@ -5,6 +5,8 @@ const CourseSchema = new Schema({
   title: { type: String, required: true },
   slug: { type: String, unique: true },
   desc: { type: String, required: true },
+  // Every selected category (top-level or child). catId mirrors the first one — kept for existing filters / lookups.
+  catIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "course_category", default: [] }],
   catId: { type: mongoose.Schema.Types.ObjectId, ref: "course_category", required: false, default: null, index: true },
   subCatIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "course_subcategory", default: [] }],
   tagIds: [{ type: mongoose.Schema.Types.ObjectId, ref: "Tag", default: [] }],

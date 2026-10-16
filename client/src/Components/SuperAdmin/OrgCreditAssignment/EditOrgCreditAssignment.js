@@ -5,7 +5,11 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./EditOrgCreditAssignment.module.css";
+import sPage from "./EditOrgCreditAssignment.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const BackIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -69,10 +73,10 @@ export default function EditOrgCreditAssignment() {
       } else {
         await apiServiceHandler('POST', 'organization-credit-assignment/create', { orgId, creditId, status: 'active' });
       }
-      toast.warning('Credit assignment updated successfully.');
+      toast.success('Credit assignment updated successfully.');
       router.push('/superadmin/organization-credit-assignment');
     } catch (err) {
-      toast.error(err?.message || 'Failed to update credit assignment. Please try again.');
+      toast.warning(err?.message || 'Failed to update credit assignment. Please try again.');
     } finally {
       setSubmitting(false);
     }

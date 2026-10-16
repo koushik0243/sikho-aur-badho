@@ -504,3 +504,29 @@
   .modalColumns { flex-direction: column; }
   .formTextarea { min-height: 70px; }
 }
+
+/* ── Redesign: real stats with a slim bar, course progress, earned/locked badges ── */
+.topSection.topSection, .card.card { border-color: #e6eded; box-shadow: 0 1px 2px rgba(15, 60, 60, 0.04); }
+.statCard.statCard { background: #fff; border-color: #e6eded; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.statLbl.statLbl { color: #4d6464; font-weight: 600; font-size: 13px !important; }
+.statBig.statBig { color: #12302f; font-variant-numeric: tabular-nums; font-size: 26px !important; }
+.statOf { color: #9aa9a9; font-weight: 700; font-size: 15px !important; }
+.statSub.statSub { margin: 0; color: #6b7d7d; font-size: 12.5px !important; }
+.statBar { height: 6px; border-radius: 999px; background: #e8f0f0; overflow: hidden; }
+.statBar span { display: block; height: 100%; border-radius: 999px; background: #0b7b7b; }
+
+.cardTitle.cardTitle { display: flex; align-items: baseline; gap: 8px; color: #12302f; font-weight: 800; }
+.cardCount { color: #6b7d7d; font-weight: 600; font-size: 12.5px !important; }
+
+.courseInfo .statBar { margin-top: 6px; height: 4px; }
+.statusBadge.statusBadge { border-radius: 999px; font-weight: 700; font-size: 11.5px !important; }
+.statusComplete.statusComplete { background: #e7f7ee; color: #15803d; }
+.statusInProgress.statusInProgress { background: #eaf6f5; color: #0b6767; }
+.statusStopped { background: #fdecec; color: #b91c1c; }
+.statusNotStarted { background: #f1f5f5; color: #4d6464; }
+
+.badgesGrid.badgesGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 12px; }
+.badge.badge { padding: 10px 6px; border-radius: 12px; border: 1px solid #e6eded; background: #fbfdfd; text-align: center; }
+.badgeLocked.badgeLocked { opacity: 0.5; filter: grayscale(1); }
+.badgeSub.badgeSub { font-size: 11.5px !important; line-height: 1.35; }
+.badgeLabel.badgeLabel { font-size: 13px !important; }

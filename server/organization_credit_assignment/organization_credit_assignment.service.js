@@ -35,6 +35,14 @@ const buildQuery = (filters = {}) => {
     if (filters.assignedBy && ObjectId.isValid(filters.assignedBy)) {
         query.assignedBy = new ObjectId(filters.assignedBy);
     }
+    // Assigned-on (createdAt) range — ISO timestamps; either end optional, both inclusive.
+    const from = filters.date_from ? new Date(filters.date_from) : null;
+    const to   = filters.date_to ? new Date(filters.date_to) : null;
+    if ((from && !isNaN(from)) || (to && !isNaN(to))) {
+        query.createdAt = {};
+        if (from && !isNaN(from)) query.createdAt.$gte = from;
+        if (to && !isNaN(to)) query.createdAt.$lte = to;
+    }
     return query;
 };
 

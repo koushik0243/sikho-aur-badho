@@ -4,8 +4,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { selectUser } from '../../../redux/slices/authSlice';
 import apiServiceHandler from '../../../service/apiService';
-import s from "./StoreProfile.module.css";
 import PasswordInput from '../../PasswordInput/PasswordInput';
+import pageStyles from "./StoreProfile.module.css";
+import { withFormKit } from '../PageKit/PageKit';
+
+// Page styles + the shared store owner form look.
+const s = withFormKit(pageStyles);
 
 const EMPTY_ORG = {
   org_name: '', industry: '', emp_count: '',

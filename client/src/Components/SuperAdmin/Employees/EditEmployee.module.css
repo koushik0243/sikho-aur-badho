@@ -459,3 +459,6 @@
 .datePickerWrapper input { width: 100%; box-sizing: border-box; }
 
 .select:disabled { background-color: #f9fafb; color: #9ca3af; cursor: wait; }
+
+/* ── Dropdown text fully visible: fixed-height dropdowns have no top/bottom padding, so the 15px text isn't cut off ── */
+select.select.select { padding-top: 0; padding-bottom: 0; }

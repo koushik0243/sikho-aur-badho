@@ -5,8 +5,13 @@ import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./EditRolePermission.module.css";
-import rp from "./EditRolePermission.module.css";
+import sPage from "./EditRolePermission.module.css";
+import rpPage from "./EditRolePermission.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
+const rp = withAdminKit(rpPage);
 
 const BackArrow = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -140,7 +145,7 @@ export default function EditRolePermission() {
       toast.success('Role permissions updated.');
       router.push('/superadmin/role-permissions');
     } catch (err) {
-      toast.error(err?.message || 'Failed to update permissions.');
+      toast.warning(err?.message || 'Failed to update permissions.');
     } finally {
       setSubmitting(false);
     }

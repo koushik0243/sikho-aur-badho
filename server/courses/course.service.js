@@ -29,6 +29,23 @@ const { ObjectId } = mongoose.Types;
 
 const generateSlug = (title) => slugify(title, { lower: true, strict: true, trim: true });
 
+/**
+ * Category fields to store: catIds = all selected categories, catId = the first
+ * (or null). Older clients send only catId, which becomes a one-item catIds.
+ * Returns {} when the request carries no category data (leave them unchanged).
+ */
+const categoryFields = (data) => {
+    if (Array.isArray(data.catIds)) {
+        const catIds = data.catIds.filter(id => ObjectId.isValid(id));
+        return { catIds, catId: catIds[0] || null };
+    }
+    if (data.catId !== undefined) {
+        const catId = data.catId && ObjectId.isValid(data.catId) ? data.catId : null;
+        return { catId, catIds: catId ? [catId] : [] };
+    }
+    return {};
+};
+
 const buildQuery = (filters = {}) => {
     const query = { deletedAt: null, status: { $ne: 'deleted' } };
     if (filters.status) query.status = filters.status;
@@ -49,7 +66,7 @@ const buildQuery = (filters = {}) => {
     const catIds = toIds(filters.catIds);
     const subCatIds = toIds(filters.subCatIds);
     const or = [];
-    if (catIds.length) or.push({ catId: { $in: catIds } });
+    if (catIds.length) or.push({ catId: { $in: catIds } }, { catIds: { $in: catIds } });
     if (subCatIds.length) or.push({ subCatIds: { $in: subCatIds } });
     if (or.length) query.$or = or;
     return query;
@@ -62,7 +79,9 @@ export const createCourse = async (data, userId) => {
             title: data.title,
             slug,
             desc: data.desc,
-            catId: data.catId || null,
+            catId: null,
+            catIds: [],
+            ...categoryFields(data),
             subCatIds: Array.isArray(data.subCatIds) ? data.subCatIds : [],
             tagIds: Array.isArray(data.tagIds) ? data.tagIds : [],
             level: data.level || 'beginner',
@@ -97,6 +116,7 @@ export const editCourse = async (editId) => {
     try {
         return await Course.findOne({ _id: editId, deletedAt: null })
             .populate('catId', '_id title slug')
+            .populate('catIds', '_id title slug')
             .populate('subCatIds', '_id name slug')
             .populate('createdBy', '_id name email')
             .populate('certificate_template_id', '_id title slug desc status')
@@ -109,14 +129,14 @@ export const editCourse = async (editId) => {
 export const updateCourse = async (updateId, data) => {
     try {
         const fields = [
-            'desc', 'catId', 'subCatIds', 'tagIds', 'level', 'course_image',
+            'desc', 'subCatIds', 'tagIds', 'level', 'course_image',
             'intro_video', 'intro_video_url', 'duration_hr', 'duration_min',
             'totalChapters', 'status', 'max_students', 'enable_review', 'qna_enabled',
             'what_will_learn', 'target_audience', 'materials_included', 'requirements',
             'aptitudeEnabled', 'aptitudeContext', 'aptitudeSelectedQuestionIds',
             'certificate_template_id'
         ];
-        const updateFields = {};
+        const updateFields = { ...categoryFields(data) };
         if (data.aptitudeSettings !== undefined) updateFields.aptitudeSettings = sanitizeAptitudeSettings(data.aptitudeSettings);
 
         if (data.course_price !== undefined) {
@@ -152,6 +172,7 @@ export const listCourse = async (filters = {}) => {
         const query = buildQuery(filters);
         return await Course.find(query)
             .populate('catId', '_id title slug')
+            .populate('catIds', '_id title slug')
             .populate('subCatIds', '_id name slug')
             .populate('createdBy', '_id name email')
             .sort({ createdAt: -1 })
@@ -166,6 +187,7 @@ export const listCoursePagination = async (page, limit, filters = {}) => {
         const query = buildQuery(filters);
         return await Course.find(query)
             .populate('catId', '_id title slug')
+            .populate('catIds', '_id title slug')
             .populate('subCatIds', '_id name slug')
             .populate('createdBy', '_id name email')
             .sort({ createdAt: -1, _id: -1 })

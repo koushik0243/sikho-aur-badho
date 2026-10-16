@@ -43,8 +43,8 @@ export const createCourseAssignment = async (data) => {
 export const editCourseAssignment = async (editId) => {
     try {
         return await CourseAssignment.findById(editId)
-            .populate('organizationId', '_id name')
-            .populate('userId', '_id name email')
+            .populate('organizationId', '_id name org_name')
+            .populate('userId', '_id name email emp_id')
             .populate('topicId', '_id title')
             .populate('courseId', '_id title')
             .lean();
@@ -67,8 +67,8 @@ export const updateCourseAssignment = async (updateId, data) => {
 
         if (Object.keys(updateFields).length === 0) {
             return await CourseAssignment.findById(updateId)
-                .populate('organizationId', '_id name')
-                .populate('userId', '_id name email')
+                .populate('organizationId', '_id name org_name')
+                .populate('userId', '_id name email emp_id')
                 .populate('topicId', '_id title')
                 .populate('courseId', '_id title')
                 .lean();
@@ -88,8 +88,8 @@ export const listCourseAssignment = async (filters = {}) => {
     try {
         const query = buildQuery(filters);
         return await CourseAssignment.find(query)
-            .populate('organizationId', '_id name')
-            .populate('userId', '_id name email')
+            .populate('organizationId', '_id name org_name')
+            .populate('userId', '_id name email emp_id')
             .populate('topicId', '_id title')
             .populate('courseId', '_id title')
             .sort({ attemptedAt: -1 })
@@ -103,8 +103,8 @@ export const listCourseAssignmentPagination = async (page, limit, filters = {}) 
     try {
         const query = buildQuery(filters);
         return await CourseAssignment.find(query)
-            .populate('organizationId', '_id name')
-            .populate('userId', '_id name email')
+            .populate('organizationId', '_id name org_name')
+            .populate('userId', '_id name email emp_id')
             .populate('topicId', '_id title')
             .populate('courseId', '_id title')
             .sort({ attemptedAt: -1 })

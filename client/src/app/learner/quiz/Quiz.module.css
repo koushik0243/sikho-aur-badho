@@ -441,3 +441,14 @@
   .bonusBtn,
   .failPolicyBtn { width: 100%; }
 }
+
+/* ── Redesign: full-width page, answers in a two-column grid of cards ── */
+.qGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+.qGrid .qRow.qRow {
+  margin: 0; padding: 14px 16px; align-items: flex-start; border: 1px solid #e6eded; border-radius: 12px; background: #fff;
+}
+.qGrid .qRowWrong.qRowWrong { background: #fff8f8; border-color: #f6d4d4; }
+.qText.qText { color: #12302f; font-weight: 600; font-size: 14px !important; }
+.resultBody.resultBody { padding-bottom: 24px; }
+.threshold.threshold { color: #6b7d7d; font-size: 13px !important; }
+@media (max-width: 900px) { .qGrid { grid-template-columns: minmax(0, 1fr); } }

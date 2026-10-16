@@ -5,7 +5,11 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./AddCourseCategory.module.css";
+import sPage from "./AddCourseCategory.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const LayersIcon = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -44,7 +48,7 @@ export default function AddCourseCategory() {
       toast.success('Category created successfully.');
       router.push('/superadmin/course-category');
     } catch {
-      toast.error('Failed to create category. Please try again.');
+      toast.warning('Failed to create category. Please try again.');
     } finally {
       setSubmitting(false);
     }

@@ -4,7 +4,12 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import vp from "./ViewPermission.module.css";
+import vpPage from "./ViewPermission.module.css";
+import ViewDetailRows, { capitalize } from '../ViewDetailRows';
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const vp = withAdminKit(vpPage);
 
 const BackArrow = (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -42,56 +47,34 @@ export default function ViewPermission() {
   if (!perm?._id) return <SuperAdminShell activeSection="permissions"><p className={vp.loadingText}>Permission not found.</p></SuperAdminShell>;
 
   const displayName = perm.display_name || perm.name || '—';
-  const isActive    = perm.status === 'active';
 
   return (
     <SuperAdminShell activeSection="permissions">
       <button className={vp.backBtn} onClick={() => router.push('/superadmin/permissions')}>
         {BackArrow} Back to Permissions
       </button>
-      <nav className={vp.breadcrumb}>
-        <button className={vp.breadcrumbLink} onClick={() => router.push('/superadmin/permissions')}>Permissions</button>
-        <span className={vp.breadcrumbSep}>›</span>
-        <span className={vp.breadcrumbCurr}>{displayName}</span>
-      </nav>
+      <div className={vp.viewToolbar}>
+        <nav className={vp.breadcrumb}>
+          <button className={vp.breadcrumbLink} onClick={() => router.push('/superadmin/permissions')}>Permissions</button>
+          <span className={vp.breadcrumbSep}>›</span>
+          <span className={vp.breadcrumbCurr}>{displayName}</span>
+        </nav>
+        <button className={vp.btnEdit} onClick={() => router.push(`/superadmin/permissions/${id}/edit`)}>
+          <EditIcon /> Edit
+        </button>
+      </div>
 
       <div className={vp.detailCard}>
-        <div className={vp.detailHead}>
-          <div className={vp.detailHeadLeft}>
-            <div className={vp.detailAvatar}>{displayName.charAt(0).toUpperCase()}</div>
-            <div>
-              <h1 className={vp.detailTitle}>{displayName}</h1>
-              <div className={vp.detailBadges}>
-                <span className={isActive ? vp.badgeActive : vp.badgeInactive}>
-                  {perm.status ? perm.status.charAt(0).toUpperCase() + perm.status.slice(1) : 'Unknown'}
-                </span>
-              </div>
-            </div>
-          </div>
-          <button className={vp.btnEdit} onClick={() => router.push(`/superadmin/permissions/${id}/edit`)}>
-            <EditIcon /> Edit
-          </button>
-        </div>
 
         <div className={vp.detailBody}>
-          <div className={vp.detailRows}>
-            <div className={vp.detailRow}>
-              <span className={vp.detailLabel}>Key</span>
-              <span className={vp.detailValueMono}>{perm.name || '—'}</span>
-            </div>
-            <div className={vp.detailRow}>
-              <span className={vp.detailLabel}>Display Name</span>
-              <span className={vp.detailValue}>{perm.display_name || '—'}</span>
-            </div>
-            <div className={vp.detailRow}>
-              <span className={vp.detailLabel}>Created</span>
-              <span className={vp.detailValue}>{fmtDate(perm.createdAt)}</span>
-            </div>
-            <div className={vp.detailRow}>
-              <span className={vp.detailLabel}>Updated</span>
-              <span className={vp.detailValue}>{fmtDate(perm.updatedAt)}</span>
-            </div>
-          </div>
+          <ViewDetailRows s={vp} rows={[
+              { label: 'Key', value: perm.name, variant: 'mono' },
+              { label: 'Display Name', value: perm.display_name },
+              { label: 'Description', value: perm.desc, variant: 'desc' },
+              { label: 'Status', value: capitalize(perm.status) },
+              { label: 'Created', value: fmtDate(perm.createdAt) },
+              { label: 'Updated', value: fmtDate(perm.updatedAt) },
+          ]} />
         </div>
       </div>
     </SuperAdminShell>

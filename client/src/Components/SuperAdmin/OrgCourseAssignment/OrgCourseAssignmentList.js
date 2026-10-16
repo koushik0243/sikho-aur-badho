@@ -6,7 +6,11 @@ import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
 import ConfirmModal from '../ConfirmModal';
-import s from "./OrgCourseAssignmentList.module.css";
+import sPage from "./OrgCourseAssignmentList.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const SearchIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -16,12 +20,6 @@ const SearchIcon = () => (
 const TrashIcon = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
     <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-  </svg>
-);
-const EyeIcon = () => (
-  <svg viewBox="0 0 20 20" fill="currentColor">
-    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-    <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
   </svg>
 );
 const EditIcon = () => (
@@ -143,8 +141,8 @@ export default function OrgCourseAssignmentList() {
     const { id } = confirm;
     setConfirm({ show: false, id: null, label: '' });
     apiServiceHandler('GET', `organization-course/delete/${id}`)
-      .then(() => { toast.success('Assignment deleted.'); fetchRecords(); })
-      .catch(() => toast.error('Delete failed.'));
+      .then(() => { toast.error('Assignment deleted.'); fetchRecords(); })
+      .catch(() => toast.warning('Delete failed.'));
   }
 
   let rowCounter = (page - 1) * LIMIT;
@@ -154,7 +152,7 @@ export default function OrgCourseAssignmentList() {
       <ConfirmModal
         show={confirm.show}
         title="Delete Assignment"
-        message={`Remove "${confirm.label}" from this organization? This cannot be undone.`}
+        message={`Remove "${confirm.label}" from ${confirm.org || 'this organization'}? This cannot be undone.`}
         confirmLabel="Delete"
         onConfirm={doDelete}
         onCancel={() => setConfirm({ show: false, id: null, label: '' })}
@@ -203,14 +201,15 @@ export default function OrgCourseAssignmentList() {
                 <th>Course</th>
                 <th>Status</th>
                 <th style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={() => toggleSort('assignedOn')}>Assigned On{sortArrow('assignedOn')}</th>
-                <th>Action</th>
+                <th style={{ textAlign: 'center' }}>Delete</th>
+                <th style={{ textAlign: 'center' }}>Edit</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr className={s.emptyRow}><td colSpan={6}>Loading…</td></tr>
+                <tr className={s.emptyRow}><td colSpan={7}>Loading…</td></tr>
               ) : filtered.length === 0 ? (
-                <tr className={s.emptyRow}><td colSpan={6}>No assignments found.</td></tr>
+                <tr className={s.emptyRow}><td colSpan={7}>No assignments found.</td></tr>
               ) : (
                 pagedFiltered.flatMap((g, idx) => {
                   const orgKey  = String(g.orgId ?? idx);
@@ -241,31 +240,32 @@ export default function OrgCourseAssignmentList() {
                           : <span className={s.badgeInactive}>Inactive</span>}
                       </td>
                       <td>{fmtDate(course.createdAt)}</td>
-                      <td>
-                        <div className={s.actions} onClick={e => e.stopPropagation()}>
-                          <button
-                            className={s.btnView}
-                            title="View"
-                            onClick={() => router.push(`/superadmin/organization-course-assignment/view/${g.orgId}`)}
-                          >
-                            <EyeIcon />
-                          </button>
-                          <button
-                            className={s.btnEdit}
-                            title="Edit"
-                            onClick={() => router.push(`/superadmin/organization-course-assignment/${g.orgId}`)}
-                          >
-                            <EditIcon />
-                          </button>
-                          <button
+                      <td style={{ textAlign: 'center' }}>
+                        <div className={s.actions} style={{ justifyContent: 'center' }}>
+                          <button data-action="delete"
                             className={s.btnDelete}
-                            title="Delete"
-                            onClick={() => setConfirm({ show: true, id: course.recordId, label: course.title })}
+                            title="Remove this course from the organization"
+                            aria-label={`Remove ${course.title} from ${g.orgName}`}
+                            onClick={() => setConfirm({ show: true, id: course.recordId, label: course.title, org: g.orgName })}
                           >
                             <TrashIcon />
                           </button>
                         </div>
                       </td>
+                      {ci === 0 && (
+                        <td rowSpan={g.courses.length} style={{ textAlign: 'center' }}>
+                          <div className={s.actions} style={{ justifyContent: 'center' }}>
+                            <button data-action="edit"
+                              className={s.btnEdit}
+                              title="Edit this organization's courses"
+                              aria-label={`Edit ${g.orgName}'s courses`}
+                              onClick={() => router.push(`/superadmin/organization-course-assignment/${g.orgId}`)}
+                            >
+                              <EditIcon />
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ));
                 })

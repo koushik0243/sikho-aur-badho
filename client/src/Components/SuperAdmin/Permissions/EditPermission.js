@@ -5,7 +5,11 @@ import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./EditPermission.module.css";
+import sPage from "./EditPermission.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const BackArrow = () => (
   <svg viewBox="0 0 20 20" fill="currentColor">
@@ -34,7 +38,7 @@ export default function EditPermission() {
           });
         }
       })
-      .catch(() => toast.error('Failed to load permission.'))
+      .catch(() => toast.warning('Failed to load permission.'))
       .finally(() => setLoading(false));
   }, [id]);
 
@@ -62,7 +66,7 @@ export default function EditPermission() {
       toast.success('Permission updated successfully.');
       router.push('/superadmin/permissions');
     } catch (err) {
-      toast.error(err?.message || 'Failed to update permission.');
+      toast.warning(err?.message || 'Failed to update permission.');
     } finally {
       setSubmitting(false);
     }

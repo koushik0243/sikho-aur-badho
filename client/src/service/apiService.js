@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { API_URL } from '../lib/constant';
 import { forceLogout } from '../utils/authSession';
+import { trackPageRequest } from '../lib/pageLoader';
 
 const GET_CACHE_TTL_MS = 60 * 1000;
 const getResponseCache = new Map();
@@ -29,7 +30,18 @@ const getTokenFromStorage = () => {
     : normalizedToken;
 };
 
+// GETs made while a page is opening keep the full-page loader up until they finish.
 async function apiServiceHandler(method, endpoint, payload) {
+  if (String(method || '').toUpperCase() !== 'GET') return sendRequest(method, endpoint, payload);
+  const done = trackPageRequest();
+  try {
+    return await sendRequest(method, endpoint, payload);
+  } finally {
+    done();
+  }
+}
+
+async function sendRequest(method, endpoint, payload) {
   const token = getTokenFromStorage();
   const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
   const normalizedMethod = String(method || '').toUpperCase();
@@ -176,3 +188,6 @@ export function clearGetCache() {
 }
 
 export default apiServiceHandler;
+
+/** The signed-in user's bearer token (for requests apiServiceHandler can't make: uploads with progress, file blobs). */
+export const getAuthToken = getTokenFromStorage;

@@ -33,8 +33,8 @@ const updateOrgCreditAssignment = async (req, res, next) => {
 
 const listOrgCreditAssignment = async (req, res, next) => {
     try {
-        const { status, orgId, creditId, assignedBy } = req.query;
-        const data = await OrgCreditAssignmentHelper.listOrgCreditAssignment({ status, orgId, creditId, assignedBy });
+        const { status, orgId, creditId, assignedBy, date_from, date_to } = req.query;
+        const data = await OrgCreditAssignmentHelper.listOrgCreditAssignment({ status, orgId, creditId, assignedBy, date_from, date_to });
         res.status(200).json({ status: 200, message: "Successfully fetched.", data });
     } catch (error) {
         next(error);
@@ -45,11 +45,11 @@ const listOrgCreditAssignmentPagination = async (req, res, next) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
-        const { status, orgId, creditId, assignedBy } = req.query;
+        const { status, orgId, creditId, assignedBy, date_from, date_to } = req.query;
 
         const [assignments, total] = await Promise.all([
-            OrgCreditAssignmentHelper.listOrgCreditAssignmentPagination(page, limit, { status, orgId, creditId, assignedBy }),
-            OrgCreditAssignmentHelper.getOrgCreditAssignmentCount({ status, orgId, creditId, assignedBy })
+            OrgCreditAssignmentHelper.listOrgCreditAssignmentPagination(page, limit, { status, orgId, creditId, assignedBy, date_from, date_to }),
+            OrgCreditAssignmentHelper.getOrgCreditAssignmentCount({ status, orgId, creditId, assignedBy, date_from, date_to })
         ]);
         res.status(200).json({
             status: 200,

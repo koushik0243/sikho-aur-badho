@@ -459,3 +459,126 @@
 .datePickerWrapper input { width: 100%; box-sizing: border-box; }
 
 .select:disabled { background-color: #f9fafb; color: #9ca3af; cursor: wait; }
+
+/* ── Dropdown text fully visible: fixed-height dropdowns have no top/bottom padding, so the 15px text isn't cut off ── */
+select.select.select { padding-top: 0; padding-bottom: 0; }
+
+/* ── Add User: full width + multiple users (up to 10) ─────────────── */
+.formCard.formCard {
+  max-width: none;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 16px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* 4 columns: 8 detail fields fill two rows, Password + Confirm Password share the third */
+.formCard .formGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px 20px;
+}
+.formCard .formGrid > .formGroup { margin-bottom: 0; min-width: 0; }
+
+@media (max-width: 1100px) { .formCard .formGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px)  { .formCard .formGrid { grid-template-columns: 1fr; } }
+
+.userBlock {
+  border: 1px solid #e5e7eb;
+  border-left: 3px solid #0b7b7b;
+  border-radius: 10px;
+  padding: 16px 20px 20px;
+  background: #fcfdfd;
+  scroll-margin-top: 80px;
+}
+.userBlockHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.userBlockTitle.userBlockTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  font-size: 15px !important;
+  font-weight: 700;
+  color: #111827;
+}
+.userBadge.userBadge {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #047279 0%, #299c8f 100%);
+  color: #fff;
+  font-size: 12px !important;
+  font-weight: 700;
+}
+.userBlockName.userBlockName {
+  font-weight: 500;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.blockError { margin: 0 0 12px; padding: 8px 12px; border-radius: 6px; background: #fef2f2; color: #b91c1c; font-size: 13px; }
+
+.btnRemove {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  background: #fff;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btnRemove:hover:not(:disabled) { background: #fef2f2; border-color: #fca5a5; }
+.btnRemove:focus-visible { outline: 2px solid #dc2626; outline-offset: 2px; }
+.btnRemove:disabled { opacity: 0.5; cursor: not-allowed; }
+.btnRemove svg, .btnAddMore svg { width: 15px; height: 15px; }
+
+.addMoreRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.btnAddMore {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  border: 1.5px dashed #0b7b7b;
+  color: #0b7b7b;
+  border-radius: 7px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btnAddMore:hover:not(:disabled) { background: #f0fdfa; }
+.btnAddMore:focus-visible { outline: 2px solid #0b7b7b; outline-offset: 2px; }
+.btnAddMore:disabled { opacity: 0.5; cursor: not-allowed; border-color: #9ca3af; color: #6b7280; }
+.addMoreHint { font-size: 13px; color: #6b7280; }
+
+.formCard .formActions { padding-top: 14px; border-top: 1px solid #eef0f2; }
+
+@media (max-width: 480px) {
+  .formCard.formCard { padding: 14px; }
+  .userBlock { padding: 12px 12px 14px; }
+}

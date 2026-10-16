@@ -5,7 +5,11 @@ import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import apiServiceHandler from '../../../service/apiService';
 import SuperAdminShell from '../SuperAdminShell';
-import s from "./EditOrgCourseAssignment.module.css";
+import sPage from "./EditOrgCourseAssignment.module.css";
+import { withAdminKit } from '../AdminKit/AdminKit';
+
+// Page styles + the shared super admin look.
+const s = withAdminKit(sPage);
 
 const BackIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -100,7 +104,7 @@ export default function EditOrgCourseAssignment() {
       toast.success('Assignments updated successfully.');
       window.location.href = '/superadmin/organization-course-assignment';
     } catch (err) {
-      toast.error(err?.message || 'Failed to update assignments. Please try again.');
+      toast.warning(err?.message || 'Failed to update assignments. Please try again.');
     } finally {
       setSubmitting(false);
     }

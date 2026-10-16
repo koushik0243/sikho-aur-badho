@@ -17,6 +17,7 @@ const aptitudeAttemptSchema = new mongoose.Schema({
   answers:     [answerSchema],
   totalScore:  { type: Number, default: 0 },
   level:       { type: String, enum: ['beginner', 'intermediate', 'expert'], default: 'beginner' },
+  timeTakenSec: { type: Number, default: null }, // seconds spent on the test (null = not recorded)
   status:      { type: String, enum: ['pending', 'evaluated'], default: 'evaluated' },
   evaluatedAt: { type: Date },
 }, { timestamps: true });
