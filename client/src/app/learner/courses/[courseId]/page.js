@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import { selectUser } from '../../../../redux/slices/authSlice';
 import apiServiceHandler, { clearGetCache } from '../../../../service/apiService';
+import { toast } from 'sonner';
 import { API_URL } from '../../../../lib/constant';
 import { useMediaToken, getMediaToken, secureMediaUrl } from '../../../../lib/mediaToken';
 import useVoiceAnswer from '../../../../hooks/useVoiceAnswer';
@@ -1558,10 +1559,25 @@ const isAssignmentDone = rec => Boolean(rec) && (rec.review?.status === 'approve
 const fmtShortDate = d => (d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '');
 
 /** One uploaded video: details, the reviewer's comment, and Play (loads and plays inline). */
-function SubmittedVideoTile({ recordId, video, latest }) {
+function SubmittedVideoTile({ recordId, video, latest, courseId, topicId, canDelete, onDeleted }) {
   const [url, setUrl] = useState('');
   const [state, setState] = useState('idle'); // idle | loading | ready | error
   const [error, setError] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  async function remove() {
+    setDeleting(true); setError('');
+    try {
+      const res = await apiServiceHandler('POST', 'topic-activity/assignment-video-delete', { courseId, topicId, video: video.n });
+      toast.success(res?.message || 'Video deleted.');
+      onDeleted?.(res?.data);
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.message || 'Could not delete the video.');
+      setConfirming(false);
+    } finally {
+      setDeleting(false);
+    }
+  }
   useEffect(() => () => { if (url) URL.revokeObjectURL(url); }, [url]);
   async function play() {
     setState('loading'); setError('');
@@ -1585,8 +1601,25 @@ function SubmittedVideoTile({ recordId, video, latest }) {
       <div className={s.vidInfo}>
         <div className={s.vidTop}>
           <span className={s.vidLabel}>Video {video.n}{latest ? ' · latest' : ''}</span>
-          <span className={s.vidMeta}>{formatBytes(video.size)} · {fmtShortDate(video.uploadedAt)}</span>
+          <span className={s.vidTopRight}>
+            <span className={s.vidMeta}>{formatBytes(video.size)} · {fmtShortDate(video.uploadedAt)}</span>
+            {canDelete && !confirming && (
+              <button type="button" data-action="delete" className={s.vidDelete} title="Delete video"
+                aria-label={`Delete video ${video.n}`} onClick={() => setConfirming(true)}>
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" clipRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" /></svg>
+              </button>
+            )}
+          </span>
         </div>
+        {confirming && (
+          <div className={s.vidConfirm} role="alertdialog" aria-label={`Delete video ${video.n}?`}>
+            <span>Delete Video {video.n}? {video.n <= 1 && latest ? 'Your assignment will have no video until you upload one.' : 'This can\u2019t be undone.'}</span>
+            <div className={s.vidConfirmBtns}>
+              <button type="button" className={s.vidConfirmCancel} onClick={() => setConfirming(false)} disabled={deleting}>Cancel</button>
+              <button type="button" className={s.vidConfirmDelete} onClick={remove} disabled={deleting}>{deleting ? 'Deleting…' : 'Delete'}</button>
+            </div>
+          </div>
+        )}
         <span className={s.vidName} title={video.originalName}>{video.originalName || `Video ${video.n}`}</span>
         {error && <span className={s.vidError}>{error}</span>}
         {comments.length > 0 && (
@@ -1826,7 +1859,9 @@ function AssignmentPanel({ topic, courseId, record, onSubmitted, continueLabel, 
           <h4 id={`vid-h-${topic._id}`} className={`${s.asgHeading} ${s.vidSectionTitle}`}>Your uploaded videos <span className={s.vidCount}>{videos.length}</span></h4>
           <ul className={s.vidGrid}>
             {[...videos].reverse().map(v => (
-              <SubmittedVideoTile key={v.n} recordId={String(record._id)} video={v} latest={v.n === videos.length} />
+              <SubmittedVideoTile key={`${v.n}-${v.uploadedAt}`} recordId={String(record._id)} video={v} latest={v.n === videos.length}
+                courseId={courseId} topicId={String(topic._id)} canDelete={!isDone}
+                onDeleted={saved => onSubmitted?.(String(topic._id), saved)} />
             ))}
           </ul>
         </section>

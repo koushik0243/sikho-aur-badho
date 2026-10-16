@@ -152,6 +152,40 @@ async function addVideo({ userId, courseId, topic, previous, earlier, submission
   }
 }
 
+// POST /topic-activity/assignment-video-delete { courseId, topicId, video } — the learner's own record.
+// Deletes one uploaded video (and its file) while the assignment isn't approved. Its upload
+// slot is freed. The review is kept (never cleared to null): a record with no video and no
+// review would count as an old "Mark as Done" and complete the homework.
+const deleteAssignmentVideo = async (req, res, next) => {
+  try {
+    const { courseId, topicId } = req.body || {};
+    const n = Number(req.body?.video);
+    if (!isId(courseId) || !isId(topicId) || !Number.isInteger(n) || n < 1) return badRequest(res, 'A valid video is required.');
+    const userId = oid(req.user._id);
+    const { topic, error } = await checkTopic(userId, courseId, topicId, 'assignment_done');
+    if (error) return res.status(error[0]).json({ status: error[0], message: error[1] });
+
+    const key = { userId, topicId: topic._id, type: 'assignment_done' };
+    const rec = await TopicActivity.findOne(key).lean();
+    const list = allVideos(rec);
+    const target = list[n - 1];
+    if (!target) return res.status(404).json({ status: 404, message: 'Video not found.' });
+    if (rec.review?.status === 'approved') return badRequest(res, 'This assignment is approved — its videos can no longer be changed.');
+
+    const rest = list.filter((_, i) => i !== n - 1);
+    const review = rec.review || { status: 'pending', note: '', reviewedBy: null, reviewerName: '', reviewedAt: null };
+    // Only if nothing changed since it was read (e.g. an upload or approval at the same moment).
+    const data = await TopicActivity.findOneAndUpdate(
+      { ...key, updatedAt: rec.updatedAt, 'review.status': { $ne: 'approved' } },
+      { $set: { videos: rest, submission: rest[rest.length - 1] || null, review } },
+      { returnDocument: 'after' },
+    ).lean();
+    if (!data) return res.status(409).json({ status: 409, message: 'This assignment changed just now — please reload and try again.' });
+    removeFile(target.file);
+    res.status(200).json({ status: 200, message: `Video ${n} deleted.`, data: publicRecord(data) });
+  } catch (error) { next(error); }
+};
+
 /** What the client sees of a record (never the stored file name). */
 const publicComment = (c) => ({ note: c.note || '', status: c.status || '', reviewerName: c.reviewerName || '', reviewedAt: c.reviewedAt || null });
 /** All comments on a video, oldest first — older records only have the single `comment`. */
@@ -469,6 +503,7 @@ const reuploadEmail = ({ name, topic, course, note, reviewer }) => `<!DOCTYPE ht
 </body></html>`;
 
 Router.post('/assignment-submit', submitAssignment);
+Router.post('/assignment-video-delete', deleteAssignmentVideo);
 Router.post('/zoom-join', record('zoom_joined'));
 Router.get('/mine', mine);
 Router.get('/submissions', submissions);

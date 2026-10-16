@@ -2612,3 +2612,22 @@
 .vidCommentsHead em { font-style: italic; font-weight: 400; color: #6b7d7d; font-size: 12.5px !important; }
 .vidCommentsHead strong { color: #0b6767; font-weight: 700; font-size: 12.5px !important; }
 .vidCommentsText.vidCommentsText { margin: 3px 0 0; color: #2b4141; overflow-wrap: anywhere; white-space: pre-line; line-height: 1.45; font-size: 13px !important; }
+
+/* Delete an uploaded assignment video (before approval) */
+.vidTopRight { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.vidDelete.vidDelete { width: 28px !important; height: 28px !important; min-width: 28px; }
+.vidConfirm {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  margin-top: 6px; padding: 10px 12px; border-radius: 9px; background: #fef2f2; border: 1px solid #fecaca; color: #7f1d1d;
+  font-size: 13px !important;
+}
+.vidConfirmBtns { display: flex; gap: 8px; }
+.vidConfirmCancel, .vidConfirmDelete {
+  height: 32px; padding: 0 14px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px !important;
+}
+.vidConfirmCancel { background: #fff; color: #374151; border: 1px solid #d1d5db; }
+.vidConfirmCancel:hover:not(:disabled) { background: #f9fafb; }
+.vidConfirmDelete { background: #B91C1C; color: #fff; border: 1px solid #B91C1C; }
+.vidConfirmDelete:hover:not(:disabled) { filter: brightness(0.92); }
+.vidConfirmCancel:disabled, .vidConfirmDelete:disabled { opacity: 0.6; cursor: not-allowed; }
+.vidConfirmCancel:focus-visible, .vidConfirmDelete:focus-visible { outline: 2px solid #12302f; outline-offset: 2px; }
